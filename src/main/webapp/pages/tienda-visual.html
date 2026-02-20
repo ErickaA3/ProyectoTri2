@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Tienda</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/tienda.css">
+</head>
+
+<body>
+    <!-- Header - IGUAL QUE QUIZZES.HTML -->
+    <header class="header">
+        <div class="logo-container">
+            <div class="logo-icon">
+                <i class="fas fa-robot"></i>
+            </div>
+            <h1>Mi ProfesorIA</h1>
+        </div>
+        
+        <div class="header-stats">
+            <div class="stat-badge">
+                <i class="fas fa-fire"></i>
+                <span>2</span>
+            </div>
+            <div class="stat-badge">
+                <span class="lxp">4 LXP</span>
+            </div>
+            <div class="stat-badge coins">
+                <span>$<span id="user-balance-header">1,520</span></span>
+            </div>
+            <button class="settings-btn">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Sidebar - IGUAL QUE QUIZZES.HTML -->
+        <aside class="sidebar">
+            <nav class="nav-menu">
+                <a href="#" class="nav-item">
+                    <i class="fas fa-user"></i>
+                    <span>Perfil</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-rocket"></i>
+                    <span>Funciones</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Resúmenes</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-check-square"></i>
+                    <span>Cuestionarios</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Duelos</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Modo examen</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-project-diagram"></i>
+                    <span>Esquemas</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-robot"></i>
+                    <span>Mi profesorIA</span>
+                </a>
+                <a href="#" class="nav-item active">
+                    <i class="fas fa-shopping-bag"></i>
+                    <span>Tienda</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <span>Mi profesor</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-heart"></i>
+                    <span>Favoritos</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Canvas para efectos animados -->
+            <canvas id="galaxyCanvas" class="content-canvas"></canvas>
+            <canvas id="forestCanvas" class="content-canvas"></canvas>
+            <canvas id="volcanoCanvas" class="content-canvas"></canvas>
+            <canvas id="oceanCanvas" class="content-canvas"></canvas>
+            <canvas id="skyCanvas" class="content-canvas"></canvas>
+            <canvas id="rainCanvas" class="content-canvas"></canvas>
+            <canvas id="auroraCanvas" class="content-canvas"></canvas>
+            
+            <div class="content-header">
+                <div class="title-container">
+                    <h2 class="title-default">Tienda</h2>
+                    <img src="../images/titulos/titulo-forest.png" alt="Tienda" class="title-image title-forest">
+                    <img src="../images/titulos/" alt="Tienda" class="title-image title-galaxy">
+                    <img src="../images/titulos/titulo-volcano.png" alt="Tienda" class="title-image title-volcano">
+                    <img src="../images/titulos/titulo-ocean.png" alt="Tienda" class="title-image title-ocean">
+                    <img src="../images/titulos/" alt="Tienda" class="title-image title-aurora">
+                    <img src="../images/titulos/titulo-sky.png" alt="Tienda" class="title-image title-sky">
+                    <img src="../images/titulos/titulo-rain.png" alt="Tienda" class="title-image title-rain">
+                </div>
+            </div>
+
+            <div class="shop-layout">
+                <!-- Left Side - Customization -->
+                <div class="customization-area">
+                    <!-- Personaliza tu profesor -->
+                    <div class="category-section">
+                        <h3 class="category-title">Personaliza tu profesor</h3>
+                        <div class="avatar-grid">
+                            <div class="avatar-item" data-price="400" onclick="selectAvatar(this, 400, 'avatar-1')">
+                                <div class="avatar-preview">👨‍🏫</div>
+                                <div class="avatar-price">💰 400</div>
+                            </div>
+                            <div class="avatar-item" data-price="600" onclick="selectAvatar(this, 600, 'avatar-2')">
+                                <div class="avatar-preview">👨‍💼</div>
+                                <div class="avatar-price">💰 600</div>
+                            </div>
+                            <div class="avatar-item" data-price="700" onclick="selectAvatar(this, 700, 'avatar-3')">
+                                <div class="avatar-preview">👨‍🎓</div>
+                                <div class="avatar-price">💰 700</div>
+                            </div>
+                            <div class="avatar-item" data-price="800" onclick="selectAvatar(this, 800, 'avatar-4')">
+                                <div class="avatar-preview">👨‍💻</div>
+                                <div class="avatar-price">💰 800</div>
+                            </div>
+                            <div class="avatar-item" data-price="900" onclick="selectAvatar(this, 900, 'avatar-5')">
+                                <div class="avatar-preview">🧑‍🚀</div>
+                                <div class="avatar-price">💰 900</div>
+                            </div>
+                            <div class="avatar-item" data-price="1000" onclick="selectAvatar(this, 1000, 'avatar-6')">
+                                <div class="avatar-preview">🧙‍♂️</div>
+                                <div class="avatar-price">💰 1000</div>
+                            </div>
+                            <div class="avatar-item" data-price="1200" onclick="selectAvatar(this, 1200, 'avatar-7')">
+                                <div class="avatar-preview">👨‍🔬</div>
+                                <div class="avatar-price">💰 1200</div>
+                            </div>
+                            <div class="avatar-item" data-price="1500" onclick="selectAvatar(this, 1500, 'avatar-8')">
+                                <div class="avatar-preview">🦸‍♂️</div>
+                                <div class="avatar-price">💰 1500</div>
+                            </div>
+                        </div>
+                        <button class="buy-button" onclick="buySelectedAvatar()">Comprar Avatar</button>
+                    </div>
+
+                    <!-- Personaliza el fondo -->
+                    <div class="category-section">
+                        <h3 class="category-title">Personaliza el fondo</h3>
+                        <div class="background-grid">
+                            <div class="background-item owned" data-price="0" data-id="bg-default" data-class="bg-default" onclick="selectBackground(this, 0, 'bg-default', 'bg-default')">
+                                <div class="background-preview" style="background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);">
+                                    <div class="owned-badge">✓ TUYO</div>
+                                    <div class="equipped-badge">★ EQUIPADO</div>
+                                </div>
+                                <div class="background-name">🌙 Noche Oscura</div>
+                                <div class="background-price">💰 Gratis</div>
+                            </div>
+                            <div class="background-item" data-price="500" data-id="bg-galaxy" data-class="bg-galaxy" onclick="selectBackground(this, 500, 'bg-galaxy', 'bg-galaxy')">
+                                <div class="background-preview" style="background: radial-gradient(ellipse at top, #1B2735 0%, #090A0F 100%);"></div>
+                                <div class="background-name">🌌 Galaxia</div>
+                                <div class="background-price">💰 500</div>
+                            </div>
+                            <div class="background-item" data-price="600" data-id="bg-volcano" data-class="bg-volcano" onclick="selectBackground(this, 600, 'bg-volcano', 'bg-volcano')">
+                                <div class="background-preview" style="background: radial-gradient(ellipse at bottom, #ff6b00 0%, #1a0f0f 70%);"></div>
+                                <div class="background-name">🌋 Volcán</div>
+                                <div class="background-price">💰 600</div>
+                            </div>
+                            <div class="background-item" data-price="550" data-id="bg-ocean" data-class="bg-ocean" onclick="selectBackground(this, 550, 'bg-ocean', 'bg-ocean')">
+                                <div class="background-preview" style="background: linear-gradient(to bottom, #0a1f3a 0%, #051020 100%);"></div>
+                                <div class="background-name">🌊 Océano</div>
+                                <div class="background-price">💰 550</div>
+                            </div>
+                            <div class="background-item" data-price="650" data-id="bg-forest" data-class="bg-forest" onclick="selectBackground(this, 650, 'bg-forest', 'bg-forest')">
+                                <div class="background-preview" style="background: linear-gradient(to bottom, #152815 0%, #0a1a0a 100%);"></div>
+                                <div class="background-name">🌳 Amazonas</div>
+                                <div class="background-price">💰 650</div>
+                            </div>
+                            <div class="background-item" data-price="800" data-id="bg-aurora" data-class="bg-aurora" onclick="selectBackground(this, 800, 'bg-aurora', 'bg-aurora')">
+                                <div class="background-preview" style="background: radial-gradient(ellipse at top, #2a5a2a 0%, #0a1a0a 60%, #000 100%);"></div>
+                                <div class="background-name">✨ Aurora Boreal</div>
+                                <div class="background-price">💰 800</div>
+                            </div>
+                            <div class="background-item" data-price="700" data-id="bg-sky" data-class="bg-sky" onclick="selectBackground(this, 700, 'bg-sky', 'bg-sky')">
+                                <div class="background-preview" style="background: linear-gradient(to bottom, #0B1F2A 0%, #1a3344 100%);"></div>
+                                <div class="background-name">☁️ Cielo Nocturno</div>
+                                <div class="background-price">💰 700</div>
+                            </div>
+                            <div class="background-item" data-price="750" data-id="bg-rain" data-class="bg-rain" onclick="selectBackground(this, 750, 'bg-rain', 'bg-rain')">
+                                <div class="background-preview" style="background: linear-gradient(to bottom, #0a0a0a 0%, #0f1a1a 100%);"></div>
+                                <div class="background-name">🌧️ Lluvia Digital</div>
+                                <div class="background-price">💰 750</div>
+                            </div>
+                        </div>
+                        <button class="buy-button" onclick="buySelectedBackground()">Comprar Fondo</button>
+                    </div>
+                </div>
+
+                <!-- Right Side - Products -->
+                <div class="products-sidebar">
+                    <select class="product-filter">
+                        <option>Productos de Moneda</option>
+                        <option>Productos de XP</option>
+                        <option>Productos Premium</option>
+                    </select>
+
+                    <div class="product-card" data-price="500">
+                        <div class="product-header">
+                            <div class="product-icon">🧪</div>
+                            <div class="product-info">
+                                <h3>1,000 XP</h3>
+                                <div class="product-price-box">💰 500</div>
+                            </div>
+                        </div>
+                        <button class="product-buy-btn" onclick="buyProduct('1,000 XP', 500, this)">Comprar</button>
+                    </div>
+
+                    <div class="product-card" data-price="300">
+                        <div class="product-header">
+                            <div class="product-icon">🛡️</div>
+                            <div class="product-info">
+                                <h3>Streak Protector</h3>
+                                <div class="product-price-box">💰 300</div>
+                            </div>
+                        </div>
+                        <button class="product-buy-btn" onclick="buyProduct('Streak Protector', 300, this)">Comprar</button>
+                    </div>
+
+                    <div class="product-card" data-price="400">
+                        <div class="product-header">
+                            <div class="product-icon">📝</div>
+                            <div class="product-info">
+                                <h3>Resúmenes Avanzados</h3>
+                                <div class="product-price-box">💰 400</div>
+                            </div>
+                        </div>
+                        <button class="product-buy-btn" onclick="buyProduct('Resúmenes Avanzados', 400, this)">Comprar</button>
+                    </div>
+
+                    <p class="products-title">Más productos</p>
+
+                    <div class="product-card" data-price="600">
+                        <div class="product-header">
+                            <div class="product-icon">💎</div>
+                            <div class="product-info">
+                                <h3>Pack Premium</h3>
+                                <div class="product-price-box">💰 600</div>
+                            </div>
+                        </div>
+                        <button class="product-buy-btn" onclick="buyProduct('Pack Premium', 600, this)">Comprar</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for insufficient funds -->
+    <div class="modal" id="insufficientModal">
+        <div class="modal-content">
+            <div class="modal-icon">❌</div>
+            <h2 class="modal-title">Fondos Insuficientes</h2>
+            <p class="modal-message">No tienes suficientes monedas</p>
+            <div class="modal-details">
+                <p><strong>Precio:</strong> <span id="modal-price">0</span> 💰</p>
+                <p><strong>Tu saldo:</strong> <span id="modal-balance">0</span> 💰</p>
+                <p style="color: #f44336;"><strong>Te faltan:</strong> <span id="modal-needed">0</span> 💰</p>
+            </div>
+            <button class="modal-btn" onclick="closeModal()">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Modal for purchase confirmation -->
+    <div class="modal" id="purchaseModal">
+        <div class="modal-content">
+            <div class="modal-icon">🎉</div>
+            <h2 class="modal-title">¡Compra Exitosa!</h2>
+            <p class="modal-message" id="purchase-message">Has comprado un nuevo fondo</p>
+            <div class="modal-details">
+                <p><strong>Precio:</strong> <span id="purchase-price">0</span> 💰</p>
+                <p><strong>Saldo restante:</strong> <span id="purchase-balance">0</span> 💰</p>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 20px;">¿Quieres equiparlo ahora?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn" onclick="equipNow()">Equipar Ahora</button>
+                <button class="modal-btn modal-btn-secondary" onclick="equipLater()">Más Tarde</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let userBalance = 1520;
+        let selectedAvatarPrice = 0;
+        let selectedAvatarId = null;
+        let selectedBackgroundPrice = 0;
+        let selectedBackgroundId = null;
+        let selectedBackgroundClass = null;
+        let ownedBackgrounds = ['bg-default'];
+        let currentEquippedBackground = 'bg-default';
+        let lastPurchasedBackground = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateInsufficientItems();
+            initGalaxyCanvas();
+            initForestCanvas();
+            initVolcanoCanvas();
+            initOceanCanvas();
+            initSkyCanvas();
+            initRainCanvas();
+            initAuroraCanvas();
+        });
+
+        // Galaxy Canvas Animation - Estrellas titilantes
+        function initGalaxyCanvas() {
+            const canvas = document.getElementById('galaxyCanvas');
+            const ctx = canvas.getContext('2d');
+            const content = document.querySelector('.content');
+            
+            function resizeCanvas() {
+                canvas.width = content.offsetWidth;
+                canvas.height = content.offsetHeight;
+            }
+            resizeCanvas();
+
+            const stars = [];
+            const starCount = 200;
+
+            for (let i = 0; i < starCount; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 0.3,
+                    speedX: (Math.random() - 0.5) * 0.15,
+                    speedY: (Math.random() - 0.5) * 0.15,
+                    opacity: Math.random() * 0.4 + 0.1,
+                    opacityChange: (Math.random() - 0.5) * 0.015,
+                    color: ['#ffffff', '#ffffff', '#ffe9c4', '#d4f1ff', '#ffccaa', '#aaddff'][Math.floor(Math.random() * 6)]
+                });
+            }
+
+            function animate() {
+                if (!content.classList.contains('bg-galaxy')) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                stars.forEach(star => {
+                    star.x += star.speedX;
+                    star.y += star.speedY;
+
+                    if (star.x < 0) star.x = canvas.width;
+                    if (star.x > canvas.width) star.x = 0;
+                    if (star.y < 0) star.y = canvas.height;
+                    if (star.y > canvas.height) star.y = 0;
+
+                    star.opacity += star.opacityChange;
+                    if (star.opacity <= 0.2 || star.opacity >= 1) {
+                        star.opacityChange *= -1;
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fillStyle = star.color;
+                    ctx.globalAlpha = star.opacity;
+                    ctx.fill();
+
+                    if (star.size > 1.5) {
+                        ctx.beginPath();
+                        ctx.arc(star.x, star.y, star.size * 2, 0, Math.PI * 2);
+                        ctx.fillStyle = star.color;
+                        ctx.globalAlpha = star.opacity * 0.3;
+                        ctx.fill();
+                    }
+                });
+
+                ctx.globalAlpha = 1;
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        // Forest Canvas Animation - Hojas cayendo
+        // Forest Canvas Animation - Hojas PNG cayendo
+        function initForestCanvas() {
+            const canvas = document.getElementById('forestCanvas');
+            const ctx = canvas.getContext('2d');
+            const content = document.querySelector('.content');
+            
+            // Cargar imagen de hoja
+            const leafImg = new Image();
+            leafImg.src = 'leaf.png';
+            
+            function resizeCanvas() {
+                canvas.width = content.offsetWidth;
+                canvas.height = content.offsetHeight;
+            }
+            resizeCanvas();
+
+            const leaves = [];
+            const leafCount = 15;
+
+            function createLeaf() {
+                return {
+                    x: Math.random() * canvas.width,
+                    y: -100,
+                    scale: Math.random() * 0.15 + 0.08, // Tamaño variado
+                    speedY: Math.random() * 1.5 + 0.8, // Velocidad de caída
+                    speedX: (Math.random() - 0.5) * 1, // Movimiento lateral
+                    rotation: Math.random() * Math.PI * 2,
+                    rotationSpeed: (Math.random() - 0.5) * 0.03,
+                    opacity: Math.random() * 0.5 + 0.5, // 50-100% opacidad
+                    wobble: Math.random() * Math.PI * 2,
+                    wobbleSpeed: Math.random() * 0.05 + 0.02
+                };
+            }
+
+            // Inicializar hojas distribuidas
+            for (let i = 0; i < leafCount; i++) {
+                const leaf = createLeaf();
+                leaf.y = Math.random() * canvas.height; // Distribuir en pantalla
+                leaves.push(leaf);
+            }
+
+            function animate() {
+                if (!content.classList.contains('bg-forest')) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Solo dibujar si la imagen está cargada
+                if (leafImg.complete && leafImg.naturalWidth > 0) {
+                    leaves.forEach((leaf, index) => {
+                        // Movimiento ondulante
+                        leaf.wobble += leaf.wobbleSpeed;
+                        const wobbleX = Math.sin(leaf.wobble) * 2;
+                        
+                        leaf.y += leaf.speedY;
+                        leaf.x += leaf.speedX + wobbleX;
+                        leaf.rotation += leaf.rotationSpeed;
+
+                        // Resetear cuando sale de pantalla
+                        if (leaf.y > canvas.height + 100) {
+                            leaves[index] = createLeaf();
+                        }
+
+                        if (leaf.x < -100) leaf.x = canvas.width + 50;
+                        if (leaf.x > canvas.width + 100) leaf.x = -50;
+
+                        // Dibujar hoja
+                        ctx.save();
+                        ctx.translate(leaf.x, leaf.y);
+                        ctx.rotate(leaf.rotation);
+                        ctx.globalAlpha = leaf.opacity;
+                        
+                        const width = leafImg.width * leaf.scale;
+                        const height = leafImg.height * leaf.scale;
+                        ctx.drawImage(leafImg, -width/2, -height/2, width, height);
+                        
+                        ctx.restore();
+                    });
+                }
+
+                ctx.globalAlpha = 1;
+                requestAnimationFrame(animate);
+            }
+
+            // Iniciar cuando la imagen cargue
+            leafImg.onload = function() {
+                animate();
+            };
+            
+            if (leafImg.complete) {
+                animate();
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        // Volcano Canvas Animation - EFECTOS PREMIUM
+        function initVolcanoCanvas() {
+            const canvas = document.getElementById('volcanoCanvas');
+            const ctx = canvas.getContext('2d');
+            const content = document.querySelector('.content');
+            
+            function resizeCanvas() {
+                canvas.width = content.offsetWidth;
+                canvas.height = content.offsetHeight;
+            }
+            resizeCanvas();
+
+            let time = 0;
+
+            // CENIZA FLOTANDO - Principal
+            const ashes = [];
+            const ashCount = 60;
+
+            for (let i = 0; i < ashCount; i++) {
+                ashes.push(createAsh());
+            }
+
+            function createAsh() {
+                return {
+                    x: Math.random() * canvas.width,
+                    y: canvas.height + Math.random() * 50,
+                    size: Math.random() * 3 + 1,
+                    speedY: -(Math.random() * 0.8 + 0.3), // Sube lento
+                    speedX: (Math.random() - 0.3) * 0.5, // Diagonal
+                    opacity: Math.random() * 0.4 + 0.2,
+                    wobble: Math.random() * Math.PI * 2,
+                    wobbleSpeed: Math.random() * 0.02 + 0.01
+                };
+            }
+
+            function drawAshes() {
+                ashes.forEach((ash, index) => {
+                    ash.wobble += ash.wobbleSpeed;
+                    const wobbleX = Math.sin(ash.wobble) * 1.5;
+                    
+                    ash.y += ash.speedY;
+                    ash.x += ash.speedX + wobbleX * 0.1;
+
+                    if (ash.y < -20) {
+                        ashes[index] = createAsh();
+                    }
+
+                    ctx.save();
+                    ctx.globalAlpha = ash.opacity;
+                    ctx.fillStyle = '#3a3a3a';
+                    ctx.beginPath();
+                    ctx.arc(ash.x, ash.y, ash.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+            }
+
+            // BRILLO PULSANTE DE LAVA - Secundario
+            function drawLavaGlow() {
+                // Respiración de la lava
+                const breathe = Math.sin(time * 0.8) * 0.08 + 0.15;
+                const breathe2 = Math.sin(time * 0.5 + 1) * 0.05 + 0.12;
+                
+                // Glow principal desde abajo (centro)
+                const glowBottom = ctx.createRadialGradient(
+                    canvas.width * 0.5, canvas.height,
+                    0,
+                    canvas.width * 0.5, canvas.height,
+                    canvas.height * 0.6
+                );
+                glowBottom.addColorStop(0, `rgba(255, 100, 0, ${breathe})`);
+                glowBottom.addColorStop(0.3, `rgba(255, 60, 0, ${breathe * 0.5})`);
+                glowBottom.addColorStop(0.6, `rgba(200, 30, 0, ${breathe * 0.2})`);
+                glowBottom.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = glowBottom;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Glow lateral izquierdo
+                const glowLeft = ctx.createRadialGradient(
+                    canvas.width * 0.2, canvas.height * 0.9,
+                    0,
+                    canvas.width * 0.2, canvas.height * 0.9,
+                    canvas.width * 0.4
+                );
+                glowLeft.addColorStop(0, `rgba(255, 80, 0, ${breathe2})`);
+                glowLeft.addColorStop(0.5, `rgba(255, 50, 0, ${breathe2 * 0.3})`);
+                glowLeft.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = glowLeft;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Glow lateral derecho
+                const glowRight = ctx.createRadialGradient(
+                    canvas.width * 0.8, canvas.height * 0.85,
+                    0,
+                    canvas.width * 0.8, canvas.height * 0.85,
+                    canvas.width * 0.35
+                );
+                glowRight.addColorStop(0, `rgba(255, 90, 0, ${breathe * 0.8})`);
+                glowRight.addColorStop(0.5, `rgba(255, 40, 0, ${breathe * 0.25})`);
+                glowRight.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = glowRight;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // CHISPAS OCASIONALES
+            const sparks = [];
+            
+            function createSpark() {
+                return {
+                    x: canvas.width * 0.3 + Math.random() * canvas.width * 0.4,
+                    y: canvas.height * 0.7 + Math.random() * canvas.height * 0.2,
+                    size: Math.random() * 4 + 2,
+                    life: 1,
+                    decay: Math.random() * 0.03 + 0.02,
+                    speedY: -(Math.random() * 2 + 1),
+                    speedX: (Math.random() - 0.5) * 2
+                };
+            }
+
+            function drawSparks() {
+                // Crear chispas ocasionalmente
+                if (Math.random() < 0.03) {
+                    sparks.push(createSpark());
+                }
+
+                for (let i = sparks.length - 1; i >= 0; i--) {
+                    const spark = sparks[i];
+                    spark.life -= spark.decay;
+                    spark.y += spark.speedY;
+                    spark.x += spark.speedX;
+                    spark.speedY += 0.05; // Gravedad
+
+                    if (spark.life <= 0) {
+                        sparks.splice(i, 1);
+                        continue;
+                    }
+
+                    ctx.save();
+                    ctx.globalAlpha = spark.life;
+                    
+                    // Glow de la chispa
+                    const gradient = ctx.createRadialGradient(
+                        spark.x, spark.y, 0,
+                        spark.x, spark.y, spark.size * 3
+                    );
+                    gradient.addColorStop(0, '#ffff00');
+                    gradient.addColorStop(0.3, '#ff8800');
+                    gradient.addColorStop(1, 'transparent');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(spark.x, spark.y, spark.size * 3, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Centro brillante
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(spark.x, spark.y, spark.size * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.restore();
+                }
+            }
+
+            // ONDAS DE CALOR (heat distortion simulado)
+            function drawHeatWaves() {
+                const waveOpacity = 0.03 + Math.sin(time * 2) * 0.02;
+                
+                for (let i = 0; i < 3; i++) {
+                    const waveY = canvas.height * (0.5 + i * 0.1);
+                    const waveAmplitude = 20 + i * 10;
+                    
+                    ctx.save();
+                    ctx.globalAlpha = waveOpacity;
+                    ctx.strokeStyle = `rgba(255, 150, 50, 0.3)`;
+                    ctx.lineWidth = 30 + i * 20;
+                    ctx.lineCap = 'round';
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(0, waveY);
+                    
+                    for (let x = 0; x <= canvas.width; x += 10) {
+                        const y = waveY + Math.sin(x * 0.01 + time + i) * waveAmplitude;
+                        ctx.lineTo(x, y);
+                    }
+                    
+                    ctx.stroke();
+                    ctx.restore();
+                }
+            }
+
+            // ILUMINACIÓN DINÁMICA INFERIOR
+            function drawBottomLight() {
+                const intensity = 0.1 + Math.sin(time * 0.3) * 0.05;
+                
+                const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height * 0.6);
+                gradient.addColorStop(0, `rgba(255, 80, 20, ${intensity})`);
+                gradient.addColorStop(0.5, `rgba(255, 50, 0, ${intensity * 0.3})`);
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, canvas.height * 0.5, canvas.width, canvas.height * 0.5);
+            }
+
+            function animate() {
+                if (!content.classList.contains('bg-volcano')) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                time += 0.02;
+
+                // Aplicar efectos en orden
+                drawBottomLight();      // Iluminación base
+                drawHeatWaves();        // Ondas de calor
+                drawLavaGlow();         // Brillo pulsante
+                drawAshes();            // Ceniza flotando
+                drawSparks();           // Chispas ocasionales
+
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        // Ocean Canvas Animation - Burbujas
+        function initOceanCanvas() {
+            const canvas = document.getElementById('oceanCanvas');
+            const ctx = canvas.getContext('2d');
+            const content = document.querySelector('.content');
+            
+            function resizeCanvas() {
+                canvas.width = content.offsetWidth;
+                canvas.height = content.offsetHeight;
+            }
+            resizeCanvas();
+
+            // Más burbujas
+            const bubbles = [];
+            const bubbleCount = 50;
+
+            for (let i = 0; i < bubbleCount; i++) {
+                bubbles.push(createBubble());
+            }
+
+            function createBubble() {
+                return {
+                    x: Math.random() * canvas.width,
+                    y: canvas.height + Math.random() * 100,
+                    size: Math.random() * 8 + 2,
+                    speedY: -(Math.random() * 0.6 + 0.2),
+                    speedX: (Math.random() - 0.5) * 0.3,
+                    wobble: Math.random() * Math.PI * 2,
+                    wobbleSpeed: Math.random() * 0.02 + 0.01,
+                    opacity: Math.random() * 0.5 + 0.2
+                };
+            }
+
+            function drawBubble(bubble) {
+                ctx.save();
+                
+                const wobbleX = Math.sin(bubble.wobble) * 2;
+                
+                // Burbuja con brillo
+                ctx.globalAlpha = bubble.opacity;
+                ctx.beginPath();
+                ctx.arc(bubble.x + wobbleX, bubble.y, bubble.size, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(150, 220, 255, 0.6)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Reflejo de luz
+                ctx.beginPath();
+                ctx.arc(
+                    bubble.x + wobbleX - bubble.size * 0.3,
+                    bubble.y - bubble.size * 0.3,
+                    bubble.size * 0.3,
+                    0, Math.PI * 2
+                );
+                ctx.fillStyle = 'rgba(200, 240, 255, 0.5)';
+                ctx.fill();
+                
+                ctx.restore();
+            }
+
+            function animate() {
+                if (!content.classList.contains('bg-ocean')) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Dibujar y mover burbujas
+                bubbles.forEach((bubble, index) => {
+                    bubble.y += bubble.speedY;
+                    bubble.x += bubble.speedX;
+                    bubble.wobble += bubble.wobbleSpeed;
+
+                    if (bubble.y < -20) {
+                        bubbles[index] = createBubble();
+                    }
+
+                    drawBubble(bubble);
+                });
+
+                ctx.globalAlpha = 1;
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        // Sky Canvas Animation - Nubes con imagen PNG
+        function initSkyCanvas() {
+            const canvas = document.getElementById('skyCanvas');
+            const ctx = canvas.getContext('2d');
+            const content = document.querySelector('.content');
+            
+            // Cargar imagen de nube
+            const cloudImg = new Image();
+            cloudImg.src = 'cloud.png';
+            
+            function resizeCanvas() {
+                canvas.width = content.offsetWidth;
+                canvas.height = content.offsetHeight;
+            }
+            resizeCanvas();
+
+            // Nubes usando la imagen PNG
+            const clouds = [];
+            const cloudCount = 8;
+
+            function createCloud(index) {
+                return {
+                    x: index !== undefined ? (canvas.width / cloudCount) * index - 200 : -300,
+                    y: Math.random() * canvas.height * 0.7,
+                    scale: Math.random() * 0.4 + 0.3, // 30-70% del tamaño original
+                    speed: Math.random() * 0.4 + 0.2, // Velocidad visible
+                    opacity: Math.random() * 0.4 + 0.3 // 30-70% opacidad
+                };
+            }
+
+            // Inicializar nubes
+            for (let i = 0; i < cloudCount; i++) {
+                clouds.push(createCloud(i));
+            }
+
+            function animate() {
+                if (!content.classList.contains('bg-sky')) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Solo dibujar si la imagen está cargada
+                if (cloudImg.complete && cloudImg.naturalWidth > 0) {
+                    clouds.forEach((cloud, index) => {
+                        cloud.x += cloud.speed;
+
+                        // Resetear nube cuando sale de pantalla
+                        if (cloud.x > canvas.width + 100) {
+                            clouds[index] = createCloud();
+                            clouds[index].x = -cloudImg.width * clouds[index].scale;
+                        }
+
+                        // Dibujar nube con opacidad
+                        ctx.save();
+                        ctx.globalAlpha = cloud.opacity;
+                        ctx.drawImage(
+                            cloudImg,
+                            cloud.x,
+                            cloud.y,
+                            cloudImg.width * cloud.scale,
+                            cloudImg.height * cloud.scale
+                        );
+                        ctx.restore();
+                    });
+                }
+
+                requestAnimationFrame(animate);
+            }
+
+            // Iniciar animación cuando la imagen cargue
+            cloudImg.onload = function() {
+                animate();
+            };
+            
+            // Si ya está en cache, iniciar
+            if (cloudImg.complete) {
+                animate();
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        // Rain Canvas Animation - Lluvia digital
+        function initRainCanvas() {
+            const canvas = document.getElementById('rainCanvas');
+            const ctx = canvas.getContext('2d');
+            const content = document.querySelector('.content');
+            
+            function resizeCanvas() {
+                canvas.width = content.offsetWidth;
+                canvas.height = content.offsetHeight;
+            }
+            resizeCanvas();
+
+            // Gotas de lluvia digital - MÁS GRANDES Y NOTORIAS
+            const drops = [];
+            const dropCount = 100;
+
+            for (let i = 0; i < dropCount; i++) {
+                drops.push(createDrop());
+            }
+
+            function createDrop() {
+                const isTurquoise = Math.random() < 0.2; // 20% turquesa
+                return {
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height - canvas.height,
+                    length: Math.random() * 150 + 80, // Mucho más largas
+                    speed: Math.random() * 3 + 1.5, // Más rápidas
+                    opacity: Math.random() * 0.6 + 0.4, // Más opacas
+                    width: Math.random() * 2 + 1, // Más gruesas
+                    color: isTurquoise ? '#2dd4bf' : '#ffffff'
+                };
+            }
+
+            function drawDrop(drop) {
+                ctx.save();
+                
+                // Crear gradiente para la línea
+                const gradient = ctx.createLinearGradient(
+                    drop.x, drop.y,
+                    drop.x, drop.y + drop.length
+                );
+                
+                if (drop.color === '#2dd4bf') {
+                    gradient.addColorStop(0, `rgba(45, 212, 191, ${drop.opacity})`);
+                    gradient.addColorStop(0.4, `rgba(45, 212, 191, ${drop.opacity * 0.6})`);
+                    gradient.addColorStop(1, 'transparent');
+                } else {
+                    gradient.addColorStop(0, `rgba(255, 255, 255, ${drop.opacity})`);
+                    gradient.addColorStop(0.4, `rgba(255, 255, 255, ${drop.opacity * 0.5})`);
+                    gradient.addColorStop(1, 'transparent');
+                }
+                
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = drop.width;
+                ctx.lineCap = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(drop.x, drop.y);
+                ctx.lineTo(drop.x, drop.y + drop.length);
+                ctx.stroke();
+                
+                // Brillo en la punta - MÁS GRANDE
+                ctx.beginPath();
+                ctx.arc(drop.x, drop.y, drop.color === '#2dd4bf' ? 4 : 2, 0, Math.PI * 2);
+                ctx.fillStyle = drop.color === '#2dd4bf' 
+                    ? `rgba(45, 212, 191, ${drop.opacity})` 
+                    : `rgba(255, 255, 255, ${drop.opacity * 0.8})`;
+                ctx.fill();
+                
+                // Glow extra para turquesa
+                if (drop.color === '#2dd4bf') {
+                    ctx.beginPath();
+                    ctx.arc(drop.x, drop.y, 8, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(45, 212, 191, ${drop.opacity * 0.3})`;
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+
+            function animate() {
+                if (!content.classList.contains('bg-rain')) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                drops.forEach((drop, index) => {
+                    drop.y += drop.speed;
+
+                    // Resetear gota cuando sale de pantalla
+                    if (drop.y > canvas.height + drop.length) {
+                        drops[index] = createDrop();
+                        drops[index].y = -drops[index].length;
+                    }
+
+                    drawDrop(drop);
+                });
+
+                ctx.globalAlpha = 1;
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        // Aurora Canvas Animation - 3 EFECTOS PREMIUM
+        function initAuroraCanvas() {
+            const canvas = document.getElementById('auroraCanvas');
+            const ctx = canvas.getContext('2d');
+            const content = document.querySelector('.content');
+            
+            function resizeCanvas() {
+                canvas.width = content.offsetWidth;
+                canvas.height = content.offsetHeight;
+            }
+            resizeCanvas();
+
+            // Variables para animación
+            let time = 0;
+
+            // EFECTO 1: Cortinas de luz - franjas verticales
+            const curtains = [];
+            const curtainCount = 8;
+            
+            for (let i = 0; i < curtainCount; i++) {
+                curtains.push({
+                    x: (canvas.width / curtainCount) * i + Math.random() * 50,
+                    width: Math.random() * 80 + 40,
+                    speed: Math.random() * 0.3 + 0.1,
+                    opacity: Math.random() * 0.1 + 0.15, // 15-25%
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+
+            function drawCurtains() {
+                curtains.forEach(curtain => {
+                    const waveOffset = Math.sin(time * curtain.speed + curtain.phase) * 30;
+                    
+                    // Gradiente vertical con bordes difuminados
+                    const gradient = ctx.createLinearGradient(
+                        curtain.x + waveOffset - curtain.width/2, 0,
+                        curtain.x + waveOffset + curtain.width/2, 0
+                    );
+                    gradient.addColorStop(0, 'transparent');
+                    gradient.addColorStop(0.3, `rgba(80, 255, 120, ${curtain.opacity})`);
+                    gradient.addColorStop(0.5, `rgba(100, 255, 150, ${curtain.opacity * 1.2})`);
+                    gradient.addColorStop(0.7, `rgba(80, 255, 120, ${curtain.opacity})`);
+                    gradient.addColorStop(1, 'transparent');
+                    
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(curtain.x + waveOffset - curtain.width, 0, curtain.width * 2, canvas.height);
+                });
+            }
+
+            // EFECTO 2: Flujo magnético - ondas curvas
+            function drawMagneticFlow() {
+                ctx.save();
+                ctx.globalAlpha = 0.15; // 10-20% opacidad
+                
+                // Múltiples ondas de energía
+                for (let wave = 0; wave < 5; wave++) {
+                    ctx.beginPath();
+                    
+                    const baseY = canvas.height * 0.3 + wave * 60;
+                    const amplitude = 40 + wave * 10;
+                    const frequency = 0.003 + wave * 0.001;
+                    const phaseOffset = wave * 0.5;
+                    
+                    ctx.moveTo(0, baseY);
+                    
+                    for (let x = 0; x <= canvas.width; x += 5) {
+                        const y = baseY + 
+                            Math.sin(x * frequency + time * 0.5 + phaseOffset) * amplitude +
+                            Math.sin(x * frequency * 2 + time * 0.3) * (amplitude * 0.3);
+                        ctx.lineTo(x, y);
+                    }
+                    
+                    // Crear gradiente para la onda
+                    const waveGradient = ctx.createLinearGradient(0, baseY - amplitude, 0, baseY + amplitude);
+                    waveGradient.addColorStop(0, 'transparent');
+                    waveGradient.addColorStop(0.5, `rgba(50, 255, 100, 0.6)`);
+                    waveGradient.addColorStop(1, 'transparent');
+                    
+                    ctx.strokeStyle = waveGradient;
+                    ctx.lineWidth = 20 + wave * 5;
+                    ctx.lineCap = 'round';
+                    ctx.filter = 'blur(8px)';
+                    ctx.stroke();
+                }
+                
+                ctx.filter = 'none';
+                ctx.restore();
+            }
+
+            // EFECTO 3: Glow atmosférico - resplandor pulsante
+            function drawAtmosphericGlow() {
+                ctx.save();
+                
+                // Pulso de respiración
+                const breathe = Math.sin(time * 0.3) * 0.03 + 0.12; // 8-15% opacidad
+                
+                // Glow superior verde
+                const glowTop = ctx.createRadialGradient(
+                    canvas.width * 0.5, canvas.height * 0.2,
+                    0,
+                    canvas.width * 0.5, canvas.height * 0.2,
+                    canvas.width * 0.6
+                );
+                glowTop.addColorStop(0, `rgba(80, 255, 120, ${breathe})`);
+                glowTop.addColorStop(0.5, `rgba(50, 200, 100, ${breathe * 0.5})`);
+                glowTop.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = glowTop;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Glow lateral izquierdo
+                const glowLeft = ctx.createRadialGradient(
+                    0, canvas.height * 0.4,
+                    0,
+                    0, canvas.height * 0.4,
+                    canvas.width * 0.4
+                );
+                glowLeft.addColorStop(0, `rgba(100, 255, 150, ${breathe * 0.8})`);
+                glowLeft.addColorStop(0.6, `rgba(50, 200, 100, ${breathe * 0.3})`);
+                glowLeft.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = glowLeft;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Glow central pulsante
+                const pulseSize = canvas.width * 0.4 + Math.sin(time * 0.5) * 50;
+                const glowCenter = ctx.createRadialGradient(
+                    canvas.width * 0.5, canvas.height * 0.4,
+                    0,
+                    canvas.width * 0.5, canvas.height * 0.4,
+                    pulseSize
+                );
+                glowCenter.addColorStop(0, `rgba(100, 255, 130, ${breathe * 0.6})`);
+                glowCenter.addColorStop(0.4, `rgba(60, 220, 100, ${breathe * 0.3})`);
+                glowCenter.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = glowCenter;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.restore();
+            }
+
+            function animate() {
+                if (!content.classList.contains('bg-aurora')) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                time += 0.02;
+
+                // Aplicar efectos: glow + flujo magnético (sin cortinas)
+                drawAtmosphericGlow();  // Glow que respira (humito)
+                drawMagneticFlow();      // Ondas de energía
+
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        function updateInsufficientItems() {
+            document.querySelectorAll('.avatar-item').forEach(item => {
+                const price = parseInt(item.getAttribute('data-price'));
+                if (price > userBalance) {
+                    item.classList.add('insufficient');
+                } else {
+                    item.classList.remove('insufficient');
+                }
+            });
+
+            document.querySelectorAll('.background-item').forEach(item => {
+                const price = parseInt(item.getAttribute('data-price'));
+                const bgId = item.getAttribute('data-id');
+                if (price > userBalance && !ownedBackgrounds.includes(bgId)) {
+                    item.classList.add('insufficient');
+                } else {
+                    item.classList.remove('insufficient');
+                }
+            });
+
+            document.querySelectorAll('.product-card').forEach(card => {
+                const price = parseInt(card.getAttribute('data-price'));
+                const button = card.querySelector('.product-buy-btn');
+                if (price > userBalance) {
+                    card.classList.add('insufficient');
+                    button.disabled = true;
+                } else {
+                    card.classList.remove('insufficient');
+                    button.disabled = false;
+                }
+            });
+        }
+
+        function updateBalance(newBalance) {
+            const headerBalance = document.getElementById('user-balance-header');
+            headerBalance.textContent = newBalance.toLocaleString();
+            userBalance = newBalance;
+            updateInsufficientItems();
+        }
+
+        function showInsufficientModal(price) {
+            const modal = document.getElementById('insufficientModal');
+            document.getElementById('modal-price').textContent = price;
+            document.getElementById('modal-balance').textContent = userBalance;
+            document.getElementById('modal-needed').textContent = price - userBalance;
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('insufficientModal').classList.remove('show');
+        }
+
+        function showPurchaseModal(itemName, price, newBalance) {
+            const modal = document.getElementById('purchaseModal');
+            document.getElementById('purchase-message').textContent = `Has comprado: ${itemName}`;
+            document.getElementById('purchase-price').textContent = price;
+            document.getElementById('purchase-balance').textContent = newBalance;
+            modal.classList.add('show');
+        }
+
+        function closePurchaseModal() {
+            document.getElementById('purchaseModal').classList.remove('show');
+        }
+
+        // Función para equipar el fondo
+        function equipBackground(bgClass) {
+            const contentArea = document.querySelector('.content');
+            
+            // Remover todas las clases bg- del contenido
+            contentArea.classList.remove('bg-galaxy', 'bg-volcano', 'bg-ocean', 'bg-forest', 'bg-aurora', 'bg-sky', 'bg-rain', 'bg-default');
+            
+            // Añadir la nueva clase si no es default
+            if (bgClass !== 'bg-default') {
+                contentArea.classList.add(bgClass);
+            }
+            
+            // Remover badge "EQUIPADO" de todos los items
+            document.querySelectorAll('.background-item').forEach(item => {
+                const equippedBadge = item.querySelector('.equipped-badge');
+                if (equippedBadge) {
+                    equippedBadge.remove();
+                }
+            });
+            
+            // Añadir badge "EQUIPADO" al nuevo fondo
+            const newBgItem = document.querySelector(`[data-class="${bgClass}"]`);
+            if (newBgItem) {
+                const badge = document.createElement('div');
+                badge.className = 'equipped-badge';
+                badge.textContent = '★ EQUIPADO';
+                newBgItem.querySelector('.background-preview').appendChild(badge);
+            }
+            
+            currentEquippedBackground = bgClass;
+        }
+
+        function equipNow() {
+            if (lastPurchasedBackground) {
+                equipBackground(lastPurchasedBackground);
+                lastPurchasedBackground = null;
+            }
+            closePurchaseModal();
+        }
+
+        function equipLater() {
+            lastPurchasedBackground = null;
+            closePurchaseModal();
+        }
+
+        function selectAvatar(element, price, id) {
+            if (element.classList.contains('insufficient')) {
+                showInsufficientModal(price);
+                return;
+            }
+            document.querySelectorAll('.avatar-item').forEach(item => item.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedAvatarPrice = price;
+            selectedAvatarId = id;
+        }
+
+        function selectBackground(element, price, id, bgClass) {
+            if (element.classList.contains('insufficient')) {
+                showInsufficientModal(price);
+                return;
+            }
+            
+            // Si ya lo tiene, equiparlo directamente
+            if (ownedBackgrounds.includes(id)) {
+                equipBackground(bgClass);
+                return;
+            }
+            
+            document.querySelectorAll('.background-item').forEach(item => item.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedBackgroundPrice = price;
+            selectedBackgroundId = id;
+            selectedBackgroundClass = bgClass;
+        }
+
+        function buySelectedAvatar() {
+            if (selectedAvatarPrice === 0) {
+                alert('Por favor selecciona un avatar primero');
+                return;
+            }
+            if (userBalance >= selectedAvatarPrice) {
+                const newBalance = userBalance - selectedAvatarPrice;
+                updateBalance(newBalance);
+                showPurchaseModal('Avatar', selectedAvatarPrice, newBalance);
+                selectedAvatarPrice = 0;
+                document.querySelectorAll('.avatar-item').forEach(item => item.classList.remove('selected'));
+            } else {
+                showInsufficientModal(selectedAvatarPrice);
+            }
+        }
+
+        function buySelectedBackground() {
+            if (selectedBackgroundPrice === 0) {
+                alert('Por favor selecciona un fondo primero');
+                return;
+            }
+            if (userBalance >= selectedBackgroundPrice) {
+                const newBalance = userBalance - selectedBackgroundPrice;
+                updateBalance(newBalance);
+                
+                // Marcar como comprado
+                ownedBackgrounds.push(selectedBackgroundId);
+                const bgItem = document.querySelector(`[data-id="${selectedBackgroundId}"]`);
+                bgItem.classList.add('owned');
+                
+                // Añadir badge de comprado
+                const ownedBadge = document.createElement('div');
+                ownedBadge.className = 'owned-badge';
+                ownedBadge.textContent = '✓ TUYO';
+                bgItem.querySelector('.background-preview').appendChild(ownedBadge);
+                
+                // Cambiar el precio a "Comprado"
+                const priceSpan = bgItem.querySelector('.background-price');
+                priceSpan.textContent = '✓ Comprado';
+                
+                // Guardar para equipar después
+                lastPurchasedBackground = selectedBackgroundClass;
+                
+                showPurchaseModal('Fondo', selectedBackgroundPrice, newBalance);
+                
+                selectedBackgroundPrice = 0;
+                selectedBackgroundId = null;
+                selectedBackgroundClass = null;
+                document.querySelectorAll('.background-item').forEach(item => item.classList.remove('selected'));
+            } else {
+                showInsufficientModal(selectedBackgroundPrice);
+            }
+        }
+
+        function buyProduct(productName, price, button) {
+            if (userBalance >= price) {
+                const newBalance = userBalance - price;
+                updateBalance(newBalance);
+                showPurchaseModal(productName, price, newBalance);
+            } else {
+                showInsufficientModal(price);
+            }
+        }
+
+        // Close modals on backdrop click
+        document.getElementById('insufficientModal').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+        document.getElementById('purchaseModal').addEventListener('click', function(e) {
+            if (e.target === this) equipLater();
+        });
+    </script>
+</body>
+</html>

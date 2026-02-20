@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Favoritos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/favoritos.css">
+
+</head>
+<body>
+    <!-- Navbar Principal -->
+    <nav class="main-navbar">
+        <div class="navbar-left">
+            <button class="menu-toggle" onclick="toggleMenu()">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <span class="logo-text">Mi ProfesorIA</span>
+            </div>
+        </div>
+        <div class="navbar-stats">
+            <div class="stat-pill">
+                <img src="1f525.gif" alt="🔥" class="fire-gif">
+                <span class="stat-value">5</span>
+                <span class="stat-label">Racha</span>
+            </div>
+            <div class="stat-pill">
+                <img src="glowing-star_1f31f.gif" alt="⭐" class="star-gif">
+                <span class="stat-value">2,450</span>
+                <span class="stat-label">XP</span>
+            </div>
+            <div class="stat-pill">
+                <img src="source.gif" alt="💵" class="money-gif">
+                <span class="stat-value">850</span>
+                <span class="stat-label">Monedas</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Overlay -->
+    <div class="sidebar-overlay" onclick="toggleMenu()"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar-cards" id="sidebar">
+        <div class="user-profile">
+            <div class="user-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="user-name">Estudiante Pro</div>
+            <div class="user-level">Nivel 12</div>
+        </div>
+
+        <div class="nav-cards">
+            <!-- Perfil -->
+            <a href="#" class="nav-card" onclick="handleNavClick(event)">
+                <div class="nav-card-icon gradient-perfil">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Perfil</div>
+                    <div class="nav-card-desc">Tu información</div>
+                </div>
+            </a>
+
+            <!-- Modo Estudio - Con efecto dorado -->
+            <a href="#" class="nav-card modo-estudio" onclick="handleNavClick(event)">
+                <div class="nav-card-icon gradient-estudio">
+                    <i class="fas fa-book-open"></i>
+                </div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Modo Estudio</div>
+                    <div class="nav-card-desc">Aprende a tu ritmo</div>
+                </div>
+            </a>
+
+            <!-- Mi Profesor -->
+            <a href="#" class="nav-card" onclick="handleNavClick(event)">
+                <div class="nav-card-icon gradient-profesor">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Mi Profesor</div>
+                    <div class="nav-card-desc">Asistente IA</div>
+                </div>
+            </a>
+
+            <!-- Duelos -->
+            <a href="#" class="nav-card" onclick="handleNavClick(event)">
+                <div class="nav-card-icon gradient-duelo">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Duelos</div>
+                    <div class="nav-card-desc">Reta a otros</div>
+                </div>
+            </a>
+
+            <!-- Tienda -->
+            <a href="#" class="nav-card" onclick="handleNavClick(event)">
+                <div class="nav-card-icon gradient-tienda">
+                    <i class="fas fa-store"></i>
+                </div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Tienda</div>
+                    <div class="nav-card-desc">Personaliza tu perfil</div>
+                </div>
+            </a>
+
+            <!-- Favoritos -->
+            <a href="#" class="nav-card active" onclick="handleNavClick(event)">
+                <div class="nav-card-icon gradient-favoritos">
+                    <i class="fas fa-heart"></i>
+                </div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Favoritos</div>
+                    <div class="nav-card-desc">Contenido guardado</div>
+                </div>
+            </a>
+
+            <!-- Historial -->
+            <a href="#" class="nav-card" onclick="handleNavClick(event)">
+                <div class="nav-card-icon gradient-historial">
+                    <i class="fas fa-clock-rotate-left"></i>
+                </div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Historial</div>
+                    <div class="nav-card-desc">Tu actividad reciente</div>
+                </div>
+            </a>
+
+            <!-- Ajustes -->
+            <a href="#" class="nav-card" onclick="handleNavClick(event)">
+                <div class="nav-card-icon gradient-ajustes">
+                    <i class="fas fa-cog"></i>
+                </div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Ajustes</div>
+                    <div class="nav-card-desc">Configuración</div>
+                </div>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="content">
+        <div class="page-header">
+            <h2 class="page-title">
+                <i class="fas fa-heart"></i>
+                Favoritos
+            </h2>
+            <p class="page-subtitle">Tu contenido guardado en un solo lugar</p>
+        </div>
+
+        <div class="search-container">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Buscar en tus favoritos..." oninput="filterFavorites()">
+            </div>
+        </div>
+
+        <div class="filter-container">
+            <button class="filter-tab active" onclick="setFilter('all', this)">
+                <i class="fas fa-heart"></i>
+                Todos
+            </button>
+            <button class="filter-tab" onclick="setFilter('flashcard', this)">
+                <i class="fas fa-layer-group"></i>
+                Flashcards
+            </button>
+            <button class="filter-tab" onclick="setFilter('esquema', this)">
+                <i class="fas fa-project-diagram"></i>
+                Esquemas
+            </button>
+            <button class="filter-tab" onclick="setFilter('resumen', this)">
+                <i class="fas fa-file-alt"></i>
+                Resúmenes
+            </button>
+            <button class="filter-tab" onclick="setFilter('quiz', this)">
+                <i class="fas fa-clipboard-list"></i>
+                Quizzes
+            </button>
+        </div>
+
+        <div class="favorites-grid" id="favoritesGrid"></div>
+
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <i class="fas fa-heart-crack"></i>
+            <h3>No tienes favoritos aún</h3>
+            <p>Guarda tu contenido favorito desde flashcards, esquemas, resúmenes o quizzes.</p>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="removeModal">
+        <div class="modal">
+            <div class="modal-icon">
+                <i class="fas fa-heart-crack"></i>
+            </div>
+            <h3>¿Eliminar de favoritos?</h3>
+            <p>¿Estás seguro de quitar <span class="modal-item-name" id="modalItemName"></span> de tus favoritos?</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeRemoveModal()">Cancelar</button>
+                <button class="modal-btn confirm" onclick="confirmRemove()">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage">Eliminado de favoritos</span>
+    </div>
+
+    <script>
+        let favorites = [
+            { id: 1, type: 'flashcard', title: 'Tema de Física Moderna', category: 'Flashcard', likes: 223, icon: 'fas fa-layer-group' },
+            { id: 2, type: 'esquema', title: 'Ciclo de Krebs - Biología', category: 'Esquema', likes: 160, icon: 'fas fa-project-diagram' },
+            { id: 3, type: 'quiz', title: 'Quizzes sobre literatura', category: 'Quiz', likes: 95, icon: 'fas fa-clipboard-list' },
+            { id: 4, type: 'resumen', title: 'Teoría de la Relatividad', category: 'Resumen', likes: 178, icon: 'fas fa-file-alt' },
+            { id: 5, type: 'flashcard', title: 'Vocabulario Francés A1', category: 'Flashcard', likes: 230, icon: 'fas fa-layer-group' },
+            { id: 6, type: 'resumen', title: 'Resúmenes de química', category: 'Resumen', likes: 127, icon: 'fas fa-file-alt' },
+            { id: 7, type: 'esquema', title: 'Estructura del átomo', category: 'Esquema', likes: 102, icon: 'fas fa-project-diagram' }
+        ];
+
+        let currentFilter = 'all';
+        let itemToRemove = null;
+
+        function generateStars() {
+            let starsHTML = '';
+            for (let i = 0; i < 20; i++) {
+                const size = 1 + Math.random() * 2;
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                const delay = Math.random() * 2;
+                starsHTML += `<div class="star" style="width:${size}px;height:${size}px;left:${left}%;top:${top}%;animation-delay:${delay}s"></div>`;
+            }
+            return starsHTML;
+        }
+
+        function renderFavorites() {
+            const grid = document.getElementById('favoritesGrid');
+            const emptyState = document.getElementById('emptyState');
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            let filtered = favorites.filter(item => {
+                const matchesFilter = currentFilter === 'all' || item.type === currentFilter;
+                const matchesSearch = item.title.toLowerCase().includes(searchTerm);
+                return matchesFilter && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                grid.style.display = 'none';
+                emptyState.style.display = 'block';
+            } else {
+                grid.style.display = 'grid';
+                emptyState.style.display = 'none';
+                
+                grid.innerHTML = filtered.map(item => `
+                    <div class="favorite-card ${item.type}" onclick="openItem(${item.id})">
+                        <div class="card-stars">${generateStars()}</div>
+                        <span class="card-type-badge ${item.type}">${item.type.toUpperCase()}</span>
+                        <i class="fas fa-star card-star"></i>
+                        <div class="card-preview ${item.type}">
+                            <i class="${item.icon} card-preview-icon"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3 class="card-title">${item.title}</h3>
+                            <div class="card-category ${item.type}">
+                                <i class="${item.icon}"></i>
+                                ${item.category}
+                            </div>
+                            <div class="card-actions">
+                                <button class="card-btn-ver" onclick="event.stopPropagation(); openItem(${item.id})">
+                                    <i class="fas fa-play"></i> Ver
+                                </button>
+                                <button class="card-btn-heart active" onclick="event.stopPropagation(); toggleFavorite(${item.id}, this)">
+                                    <i class="fas fa-heart"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function setFilter(filter, element) {
+            currentFilter = filter;
+            document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
+            element.classList.add('active');
+            renderFavorites();
+        }
+
+        function filterFavorites() { renderFavorites(); }
+        function openItem(id) { console.log('Abriendo item:', id); }
+
+        function toggleFavorite(id, btn) {
+            // Toggle la clase active con animación
+            if (btn.classList.contains('active')) {
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="far fa-heart"></i>';
+                
+                // Mostrar modal de confirmación para quitar de favoritos
+                const item = favorites.find(f => f.id === id);
+                if (item) {
+                    showRemoveModal(id, item.title);
+                }
+            } else {
+                btn.classList.add('active');
+                btn.classList.add('animating');
+                btn.innerHTML = '<i class="fas fa-heart"></i>';
+                
+                // Crear sparkles
+                createSparkles(btn);
+                
+                // Quitar clase animating después de la animación
+                setTimeout(() => btn.classList.remove('animating'), 500);
+            }
+        }
+
+        function createSparkles(btn) {
+            // Crear contenedor de sparkles
+            const container = document.createElement('div');
+            container.className = 'sparkle-container';
+            btn.appendChild(container);
+
+            // Crear 8 sparkles en diferentes direcciones
+            const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+            angles.forEach((angle, i) => {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                
+                // Calcular posición final basada en el ángulo
+                const distance = 25 + Math.random() * 15;
+                const rad = (angle * Math.PI) / 180;
+                const x = Math.cos(rad) * distance;
+                const y = Math.sin(rad) * distance;
+                
+                sparkle.style.setProperty('--sparkle-end', `translate(${x}px, ${y}px)`);
+                container.appendChild(sparkle);
+            });
+
+            // Remover contenedor después de la animación
+            setTimeout(() => container.remove(), 700);
+        }
+
+        function showRemoveModal(id, title) {
+            itemToRemove = id;
+            document.getElementById('modalItemName').textContent = `"${title}"`;
+            document.getElementById('removeModal').classList.add('show');
+        }
+
+        function closeRemoveModal() {
+            document.getElementById('removeModal').classList.remove('show');
+            itemToRemove = null;
+        }
+
+        function confirmRemove() {
+            if (itemToRemove) {
+                favorites = favorites.filter(f => f.id !== itemToRemove);
+                closeRemoveModal();
+                renderFavorites();
+                showToast('Eliminado de favoritos');
+            }
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function toggleMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+            document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
+        }
+
+        function handleNavClick(event) {
+            if (window.innerWidth <= 768) {
+                toggleMenu();
+            }
+            document.querySelectorAll('.nav-card').forEach(card => card.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar.classList.contains('active')) {
+                    toggleMenu();
+                }
+            }
+        });
+
+        document.getElementById('removeModal').addEventListener('click', function(e) {
+            if (e.target === this) closeRemoveModal();
+        });
+
+        renderFavorites();
+    </script>
+</body>
+</html>
