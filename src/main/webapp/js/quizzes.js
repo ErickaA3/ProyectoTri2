@@ -1,5 +1,3 @@
-// Funcionalidad interactiva para la plataforma educativa
-
 document.addEventListener('DOMContentLoaded', function() {
     
     // Animación de entrada para las tarjetas de quiz
