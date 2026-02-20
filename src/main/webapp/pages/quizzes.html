@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Plataforma Educativa</title>
+    <link rel="stylesheet" href="../css/quizzes.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="logo-container">
+            <div class="logo-icon">
+                <i class="fas fa-robot"></i>
+            </div>
+            <h1>Mi ProfesorIA</h1>
+        </div>
+        
+        <div class="header-stats">
+            <div class="stat-badge">
+                <i class="fas fa-fire"></i>
+                <span>2</span>
+            </div>
+            <div class="stat-badge">
+                <span class="lxp">4 LXP</span>
+            </div>
+            <div class="stat-badge coins">
+                <span>$1,250</span>
+            </div>
+            <button class="settings-btn">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <nav class="nav-menu">
+                <a href="#" class="nav-item">
+                    <i class="fas fa-user"></i>
+                    <span>Perfil</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-rocket"></i>
+                    <span>Funciones</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Resúmenes</span>
+                </a>
+                <a href="#" class="nav-item active">
+                    <i class="fas fa-check-square"></i>
+                    <span>Cuestionarios</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Duelos</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>Modo examen</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-project-diagram"></i>
+                    <span>Esquemas</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-robot"></i>
+                    <span>Mi profesorIA</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-shopping-bag"></i>
+                    <span>Tienda</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <span>Mi profesor</span>
+                </a>
+                <a href="#" class="nav-item">
+                    <i class="fas fa-heart"></i>
+                    <span>Favoritos</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            <div class="content-header">
+                <h2>Quizzes</h2>
+            </div>
+
+            <div class="action-bar">
+                <button class="btn-primary">
+                    <i class="fas fa-plus"></i>
+                    Nuevo Quiz +
+                </button>
+                <button class="btn-secondary">
+                    <i class="fas fa-history"></i>
+                    Historial
+                </button>
+                <select class="topic-select">
+                    <option>Temas: Todos</option>
+                    <option>Ciencias</option>
+                    <option>Historia</option>
+                    <option>Matemáticas</option>
+                    <option>Biología</option>
+                </select>
+            </div>
+
+            <div class="quiz-list">
+                <!-- Quiz Card 1 -->
+                <div class="quiz-card">
+                    <div class="quiz-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                        <i class="fas fa-globe-europe"></i>
+                    </div>
+                    <div class="quiz-info">
+                        <h3>Capitales de Europa</h3>
+                        <div class="quiz-meta">
+                            <span class="question-count">
+                                <i class="fas fa-clipboard-list"></i>
+                                20 cuestiones
+                            </span>
+                            <span class="best-score">
+                                <i class="fas fa-trophy"></i>
+                                Besto: 16/20
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn-start">
+                        Empezar →
+                    </button>
+                </div>
+
+                <!-- Quiz Card 2 -->
+                <div class="quiz-card">
+                    <div class="quiz-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">
+                        <i class="fas fa-book-open"></i>
+                    </div>
+                    <div class="quiz-info">
+                        <h3>Historia Universal</h3>
+                        <div class="quiz-meta">
+                            <span class="question-count">
+                                <i class="fas fa-clipboard-list"></i>
+                                15 cuestiones
+                            </span>
+                            <span class="best-score">
+                                <i class="fas fa-trophy"></i>
+                                Besto: 12/15
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn-start">
+                        Empezar →
+                    </button>
+                </div>
+
+                <!-- Quiz Card 3 -->
+                <div class="quiz-card">
+                    <div class="quiz-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                        <i class="fas fa-heart"></i>
+                    </div>
+                    <div class="quiz-info">
+                        <h3>Sistema Digestivo</h3>
+                        <div class="quiz-meta">
+                            <span class="question-count">
+                                <i class="fas fa-clipboard-list"></i>
+                                10 cuestiones
+                            </span>
+                            <span class="best-score">
+                                <i class="fas fa-trophy"></i>
+                                Besto: 9/10
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn-start">
+                        Empezar →
+                    </button>
+                </div>
+
+                <!-- Quiz Card 4 -->
+                <div class="quiz-card">
+                    <div class="quiz-icon" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">
+                        <i class="fas fa-seedling"></i>
+                    </div>
+                    <div class="quiz-info">
+                        <h3>Photosynthesis</h3>
+                        <div class="quiz-meta">
+                            <span class="question-count">
+                                <i class="fas fa-clipboard-list"></i>
+                                15 cuestiones
+                            </span>
+                            <span class="best-score">
+                                <i class="fas fa-trophy"></i>
+                                Besto: 13/15
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn-start">
+                        Empezar →
+                    </button>
+                </div>
+
+                <!-- Quiz Card 5 -->
+                <div class="quiz-card">
+                    <div class="quiz-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                        <i class="fas fa-calculator"></i>
+                    </div>
+                    <div class="quiz-info">
+                        <h3>Álgebra Básica</h3>
+                        <div class="quiz-meta">
+                            <span class="question-count">
+                                <i class="fas fa-clipboard-list"></i>
+                                25 cuestiones
+                            </span>
+                            <span class="best-score">
+                                <i class="fas fa-trophy"></i>
+                                Besto: 20/25
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn-start">
+                        Empezar →
+                    </button>
+                </div>
+
+                <!-- Quiz Card 6 -->
+                <div class="quiz-card">
+                    <div class="quiz-icon" style="background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);">
+                        <i class="fas fa-atom"></i>
+                    </div>
+                    <div class="quiz-info">
+                        <h3>Química Orgánica</h3>
+                        <div class="quiz-meta">
+                            <span class="question-count">
+                                <i class="fas fa-clipboard-list"></i>
+                                18 cuestiones
+                            </span>
+                            <span class="best-score">
+                                <i class="fas fa-trophy"></i>
+                                Besto: 15/18
+                            </span>
+                        </div>
+                    </div>
+                    <button class="btn-start">
+                        Empezar →
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/quizzes.js"></script>
+</body>
+</html>
