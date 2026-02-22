@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Resumen</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+    <link rel="stylesheet" href="../css/resumenes.css">
+</head>
+<body data-page="resumenes">
+    
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <!-- Fondo con estrellas -->
+    <div class="stars-background" id="starsBackground"></div>
+
+    <main class="content">
+        <!-- Header con navegación -->
+        <div class="resumen-header">
+            <button class="back-btn" onclick="goBack()">
+                <i class="fas fa-arrow-left"></i>
+                Volver
+            </button>
+            <div class="header-actions">
+                <!-- Botón favorito con efecto de chispas -->
+                <div class="favorite-wrapper">
+                    <button class="action-btn favorite-btn" id="favoriteBtn" onclick="toggleFavorite()">
+                        <i class="far fa-heart"></i>
+                    </button>
+                    <div class="sparkles-container" id="sparklesContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card principal del resumen -->
+        <div class="resumen-card">
+            <!-- Título del tema -->
+            <div class="resumen-title-section">
+                <div class="title-icon">
+                    <i class="fas fa-atom"></i>
+                    <div class="icon-glow"></div>
+                </div>
+                <h1 class="resumen-title">Teoría de la Relatividad</h1>
+                <p class="resumen-meta">
+                    <span><i class="fas fa-book"></i> Física</span>
+                    <span><i class="fas fa-clock"></i> 5 min lectura</span>
+                    <span><i class="fas fa-heart"></i> 178 likes</span>
+                </p>
+            </div>
+
+            <!-- Contenido del resumen -->
+            <div class="resumen-content">
+                <section class="resumen-section">
+                    <h2 class="section-title">
+                        <span class="section-number">01</span>
+                        Introducción
+                    </h2>
+                    <p class="resumen-text">
+                        La <span class="keyword">Teoría de la Relatividad</span> fue desarrollada por <span class="keyword">Albert Einstein</span> a principios del siglo XX. Esta teoría revolucionó nuestra comprensión del <span class="keyword">espacio</span>, el <span class="keyword">tiempo</span> y la <span class="keyword">gravedad</span>, cambiando para siempre la física moderna.
+                    </p>
+                    <p class="resumen-text">
+                        Se divide en dos partes fundamentales: la <span class="keyword">Relatividad Especial</span> (1905) y la <span class="keyword">Relatividad General</span> (1915), cada una abordando diferentes aspectos de la naturaleza del universo.
+                    </p>
+                </section>
+
+                <section class="resumen-section">
+                    <h2 class="section-title">
+                        <span class="section-number">02</span>
+                        Relatividad Especial
+                    </h2>
+                    <p class="resumen-text">
+                        La <span class="keyword">Relatividad Especial</span> se basa en dos postulados fundamentales. El primero establece que las leyes de la física son las mismas para todos los observadores en <span class="keyword">movimiento rectilíneo uniforme</span>. El segundo afirma que la <span class="keyword">velocidad de la luz</span> en el vacío es constante para todos los observadores.
+                    </p>
+                    <p class="resumen-text">
+                        Uno de los resultados más famosos es la ecuación <span class="keyword formula">E = mc²</span>, que demuestra la equivalencia entre <span class="keyword">masa</span> y <span class="keyword">energía</span>. Esta fórmula indica que una pequeña cantidad de masa puede convertirse en una enorme cantidad de energía.
+                    </p>
+                    
+                    <!-- Caja destacada -->
+                    <div class="highlight-box">
+                        <div class="highlight-icon">
+                            <i class="fas fa-lightbulb"></i>
+                        </div>
+                        <div class="highlight-content">
+                            <h4>Dato importante</h4>
+                            <p>La dilatación del tiempo significa que un reloj en movimiento marcará el tiempo más lentamente que un reloj en reposo.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="resumen-section">
+                    <h2 class="section-title">
+                        <span class="section-number">03</span>
+                        Relatividad General
+                    </h2>
+                    <p class="resumen-text">
+                        La <span class="keyword">Relatividad General</span> amplía los conceptos de la relatividad especial para incluir la <span class="keyword">gravedad</span>. Einstein propuso que la gravedad no es una fuerza en el sentido tradicional, sino una <span class="keyword">curvatura del espacio-tiempo</span> causada por la presencia de masa y energía.
+                    </p>
+                    <p class="resumen-text">
+                        Los objetos masivos como planetas y estrellas curvan el espacio-tiempo a su alrededor, y otros objetos siguen estas curvaturas, lo que percibimos como <span class="keyword">atracción gravitacional</span>. Esta teoría predijo fenómenos como las <span class="keyword">ondas gravitacionales</span> y la existencia de <span class="keyword">agujeros negros</span>.
+                    </p>
+                </section>
+
+                <section class="resumen-section">
+                    <h2 class="section-title">
+                        <span class="section-number">04</span>
+                        Aplicaciones Modernas
+                    </h2>
+                    <p class="resumen-text">
+                        La teoría de la relatividad tiene aplicaciones prácticas en nuestra vida cotidiana. El sistema <span class="keyword">GPS</span> que utilizamos debe tener en cuenta los efectos de la relatividad para proporcionar ubicaciones precisas. Sin estas correcciones, la navegación GPS tendría errores de varios kilómetros.
+                    </p>
+                    <p class="resumen-text">
+                        También es fundamental para entender la <span class="keyword">cosmología</span> moderna, incluyendo el <span class="keyword">Big Bang</span>, la expansión del universo y la formación de estructuras a gran escala en el cosmos.
+                    </p>
+                </section>
+
+                <!-- Sección de palabras clave -->
+                <div class="keywords-section">
+                    <h3 class="keywords-title">
+                        <i class="fas fa-key"></i>
+                        Palabras clave
+                    </h3>
+                    <div class="keywords-container">
+                        <span class="keyword-tag">Relatividad</span>
+                        <span class="keyword-tag">Einstein</span>
+                        <span class="keyword-tag">Espacio-tiempo</span>
+                        <span class="keyword-tag">E=mc²</span>
+                        <span class="keyword-tag">Gravedad</span>
+                        <span class="keyword-tag">Velocidad de la luz</span>
+                        <span class="keyword-tag">Dilatación del tiempo</span>
+                        <span class="keyword-tag">Ondas gravitacionales</span>
+                        <span class="keyword-tag">Agujeros negros</span>
+                        <span class="keyword-tag">GPS</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Barra de acciones -->
+            <div class="actions-bar">
+                <button class="action-main-btn notes-btn" onclick="openNotesModal()">
+                    <i class="fas fa-sticky-note"></i>
+                    Mis notas
+                </button>
+                <button class="action-main-btn download-btn" onclick="downloadPDF()">
+                    <i class="fas fa-arrow-down-to-line"></i>
+                    Descargar PDF
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal de Notas -->
+    <div class="modal-overlay" id="notesModal">
+        <div class="modal notes-modal">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-icon notes-icon">
+                        <i class="fas fa-sticky-note"></i>
+                    </div>
+                    <h3>Mis notas</h3>
+                </div>
+                <button class="modal-close" onclick="closeNotesModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="notes-sparkles" id="notesSparkles"></div>
+                <p class="notes-hint">
+                    <i class="fas fa-info-circle"></i>
+                    Escribe tus apuntes personales sobre este resumen
+                </p>
+                <textarea 
+                    class="notes-textarea" 
+                    id="notesTextarea" 
+                    placeholder="Escribe aquí tus notas..."
+                    rows="8"
+                ></textarea>
+                <div class="notes-counter">
+                    <span id="charCounter">0</span>/2000 caracteres
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeNotesModal()">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </button>
+                <button class="modal-btn save" onclick="saveNotes()">
+                    <i class="fas fa-save"></i>
+                    Guardar nota
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de descarga -->
+    <div class="modal-overlay" id="downloadModal">
+        <div class="modal download-modal">
+            <div class="modal-icon download-icon">
+                <i class="fas fa-file-pdf"></i>
+                <div class="download-spinner"></div>
+            </div>
+            <h3 id="downloadTitle">Preparando descarga...</h3>
+            <p id="downloadMessage">Tu PDF estará listo en un momento</p>
+            <div class="download-bar">
+                <div class="download-bar-fill" id="downloadBarFill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle" id="toastIcon"></i>
+        <span id="toastMessage">Acción completada</span>
+    </div>
+
+    <script src="../js/components.js"></script>
+
+    <script>
+        let isFavorite = false;
+        let savedNotes = '';
+
+        // Generar estrellas de fondo
+        function generateStars() {
+            const container = document.getElementById('starsBackground');
+            let starsHTML = '';
+            for (let i = 0; i < 100; i++) {
+                const size = 1 + Math.random() * 2;
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                const delay = Math.random() * 3;
+                const duration = 2 + Math.random() * 2;
+                starsHTML += `<div class="bg-star" style="width:${size}px;height:${size}px;left:${left}%;top:${top}%;animation-delay:${delay}s;animation-duration:${duration}s"></div>`;
+            }
+            container.innerHTML = starsHTML;
+        }
+
+        // Generar partículas en la card
+        function generateParticles() {
+            const container = document.getElementById('cardParticles');
+            let particlesHTML = '';
+            for (let i = 0; i < 30; i++) {
+                const size = 2 + Math.random() * 4;
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                const delay = Math.random() * 5;
+                const duration = 3 + Math.random() * 4;
+                particlesHTML += `<div class="particle" style="width:${size}px;height:${size}px;left:${left}%;top:${top}%;animation-delay:${delay}s;animation-duration:${duration}s"></div>`;
+            }
+            container.innerHTML = particlesHTML;
+        }
+
+        // Generar sparkles en el modal de notas
+        function generateNotesSparkles() {
+            const container = document.getElementById('notesSparkles');
+            let sparklesHTML = '';
+            for (let i = 0; i < 15; i++) {
+                const size = 3 + Math.random() * 5;
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                const delay = Math.random() * 2;
+                sparklesHTML += `<div class="sparkle" style="width:${size}px;height:${size}px;left:${left}%;top:${top}%;animation-delay:${delay}s"></div>`;
+            }
+            container.innerHTML = sparklesHTML;
+        }
+
+        // Efecto de chispas para el corazón
+        function createHeartSparkles() {
+            const container = document.getElementById('sparklesContainer');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < 12; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'heart-sparkle';
+                
+                // Posición aleatoria alrededor del botón
+                const angle = (i / 12) * 360;
+                const distance = 20 + Math.random() * 30;
+                const x = Math.cos(angle * Math.PI / 180) * distance;
+                const y = Math.sin(angle * Math.PI / 180) * distance;
+                
+                sparkle.style.setProperty('--x', `${x}px`);
+                sparkle.style.setProperty('--y', `${y}px`);
+                sparkle.style.animationDelay = `${Math.random() * 0.3}s`;
+                
+                container.appendChild(sparkle);
+            }
+            
+            // Limpiar después de la animación
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 800);
+        }
+
+        function goBack() {
+            window.history.back();
+        }
+
+        function toggleFavorite() {
+            isFavorite = !isFavorite;
+            const btn = document.getElementById('favoriteBtn');
+            const icon = btn.querySelector('i');
+            
+            if (isFavorite) {
+                icon.classList.remove('far');
+                icon.classList.add('fas');
+                btn.classList.add('active');
+                createHeartSparkles(); // Efecto de chispas
+                showToast('Añadido a favoritos', 'fa-heart');
+            } else {
+                icon.classList.remove('fas');
+                icon.classList.add('far');
+                btn.classList.remove('active');
+                showToast('Eliminado de favoritos', 'fa-heart-crack');
+            }
+        }
+
+        function openNotesModal() {
+            document.getElementById('notesModal').classList.add('show');
+            document.getElementById('notesTextarea').value = savedNotes;
+            updateCharCounter();
+            generateNotesSparkles();
+        }
+
+        function closeNotesModal() {
+            document.getElementById('notesModal').classList.remove('show');
+        }
+
+        function updateCharCounter() {
+            const textarea = document.getElementById('notesTextarea');
+            const counter = document.getElementById('charCounter');
+            counter.textContent = textarea.value.length;
+            
+            if (textarea.value.length > 1800) {
+                counter.style.color = '#ff6b6b';
+            } else {
+                counter.style.color = 'var(--text-secondary)';
+            }
+        }
+
+        function saveNotes() {
+            const textarea = document.getElementById('notesTextarea');
+            if (textarea.value.length > 2000) {
+                showToast('El texto excede el límite', 'fa-exclamation-triangle');
+                return;
+            }
+            savedNotes = textarea.value;
+            closeNotesModal();
+            showToast('Nota guardada correctamente', 'fa-check-circle');
+        }
+
+        function downloadPDF() {
+            const modal = document.getElementById('downloadModal');
+            const progressBar = document.getElementById('downloadBarFill');
+            const title = document.getElementById('downloadTitle');
+            const message = document.getElementById('downloadMessage');
+            
+            modal.classList.add('show');
+            progressBar.style.width = '0%';
+            title.textContent = 'Preparando descarga...';
+            message.textContent = 'Tu PDF estará listo en un momento';
+            
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    title.textContent = '¡Descarga completa!';
+                    message.textContent = 'Tu PDF ha sido descargado';
+                    setTimeout(() => {
+                        modal.classList.remove('show');
+                        showToast('PDF descargado correctamente', 'fa-file-pdf');
+                    }, 1500);
+                }
+                progressBar.style.width = progress + '%';
+            }, 200);
+        }
+
+        function showToast(message, icon = 'fa-check-circle') {
+            const toast = document.getElementById('toast');
+            const toastIcon = document.getElementById('toastIcon');
+            const toastMessage = document.getElementById('toastMessage');
+            
+            toastIcon.className = 'fas ' + icon;
+            toastMessage.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // Event listeners
+        document.getElementById('notesTextarea').addEventListener('input', updateCharCounter);
+        
+        document.getElementById('notesModal').addEventListener('click', function(e) {
+            if (e.target === this) closeNotesModal();
+        });
+
+        document.getElementById('downloadModal').addEventListener('click', function(e) {
+            if (e.target === this && document.getElementById('downloadBarFill').style.width === '100%') {
+                this.classList.remove('show');
+            }
+        });
+
+        // Inicializar
+        generateStars();
+    </script>
+</body>
+</html>

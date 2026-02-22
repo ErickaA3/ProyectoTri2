@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Historial</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+    <link rel="stylesheet" href="../css/historial.css">
+</head>
+<body data-page="historial">
+
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="content">
+
+        <div class="page-header">
+            <div class="page-header-left">
+                <h2 class="page-title">
+                    <i class="fas fa-clock-rotate-left"></i>
+                    Historial
+                </h2>
+                <p class="page-subtitle">Revisa tu actividad reciente</p>
+            </div>
+            <button class="btn-limpiar" onclick="showClearModal()">
+                Limpiar historial
+            </button>
+        </div>
+
+        <div class="controls-bar">
+            <div class="controls-left">
+                <div class="filter-tabs">
+                    <button class="filter-tab active" onclick="setFilter('recientes', this)">Recientes</button>
+                    <button class="filter-tab" onclick="setFilter('tipo', this)">Por tipo</button>
+                </div>
+                <div class="date-picker-wrapper">
+                    <i class="fas fa-calendar-alt"></i>
+                    <input type="date" id="datePicker" onchange="renderHistory()">
+                    <button class="btn-clear-date" id="btnClearDate" onclick="clearDate()" title="Quitar filtro de fecha">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="historial-search">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Buscar en tu historial..." oninput="renderHistory()">
+            </div>
+        </div>
+
+        <div id="historyContainer"></div>
+
+        <div class="empty-state" id="emptyState">
+            <i class="fas fa-clock-rotate-left"></i>
+            <h3>No se encontraron resultados</h3>
+            <p>Intenta con otro nombre o selecciona otra fecha en el calendario.</p>
+        </div>
+
+    </main>
+
+    <!-- Modal limpiar TODO -->
+    <div class="modal-overlay" id="clearModal">
+        <div class="modal">
+            <div class="modal-icon warning">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3>¿Limpiar todo el historial?</h3>
+            <p>Se eliminarán todos los registros de actividad. Esta acción no se puede deshacer.</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeClearModal()">Cancelar</button>
+                <button class="modal-btn confirm" onclick="clearAllHistory()">Limpiar todo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal eliminar UN item -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <div class="modal-icon warning">
+                <i class="fas fa-trash-alt"></i>
+            </div>
+            <h3>¿Eliminar del historial?</h3>
+            <p>¿Estás seguro de eliminar <span class="highlight" id="deleteItemName"></span> de tu historial?</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeDeleteModal()">Cancelar</button>
+                <button class="modal-btn confirm" onclick="confirmDelete()">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast toast-success" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage"></span>
+    </div>
+
+    <script src="../js/components.js"></script>
+
+    <script>
+        // ===== DATA =====
+        let historyItems = [
+            { id: 1, type: 'flashcard', title: 'Vocabulario Francés A1', icon: 'fas fa-layer-group', time: '11:30 AM', date: '2026-02-14', dateLabel: 'Hoy', fav: false },
+            { id: 2, type: 'esquema', title: 'Estructura del átomo', icon: 'fas fa-project-diagram', time: '09:15 AM', date: '2026-02-14', dateLabel: 'Hoy', fav: false },
+            { id: 3, type: 'esquema', title: 'Ciclo de Krebs - Biología', icon: 'fas fa-project-diagram', time: '08:45 AM', date: '2026-02-14', dateLabel: 'Hoy', fav: false },
+            { id: 4, type: 'flashcard', title: 'Tema de Física Moderna', icon: 'fas fa-layer-group', time: '07:30 AM', date: '2026-02-14', dateLabel: 'Hoy', fav: false },
+            { id: 5, type: 'resumen', title: 'Teoría de la Relatividad', icon: 'fas fa-file-alt', time: '04:20 PM', date: '2026-02-13', dateLabel: 'Ayer', fav: false },
+            { id: 6, type: 'quiz', title: 'Quizzes sobre literatura', icon: 'fas fa-clipboard-list', time: '02:15 PM', date: '2026-02-13', dateLabel: 'Ayer', fav: false },
+            { id: 7, type: 'resumen', title: 'Resúmenes de química', icon: 'fas fa-file-alt', time: '01:00 PM', date: '2026-02-13', dateLabel: 'Ayer', fav: false },
+        ];
+
+        let currentView = 'recientes';
+        let itemToDelete = null;
+
+        // ===== STARS =====
+        function generateStars(count = 15) {
+            let html = '';
+            for (let i = 0; i < count; i++) {
+                const size = 1 + Math.random() * 1.5;
+                const left = Math.random() * 100;
+                const top = Math.random() * 100;
+                const delay = Math.random() * 2;
+                html += `<div class="item-star" style="width:${size}px;height:${size}px;left:${left}%;top:${top}%;animation-delay:${delay}s"></div>`;
+            }
+            return html;
+        }
+
+        // ===== RENDER =====
+        function renderHistory() {
+            const container = document.getElementById('historyContainer');
+            const emptyState = document.getElementById('emptyState');
+            const search = document.getElementById('searchInput').value.toLowerCase().trim();
+            const dateFilter = document.getElementById('datePicker').value; // formato YYYY-MM-DD
+
+            // Mostrar/ocultar botón de limpiar fecha
+            const btnClear = document.getElementById('btnClearDate');
+            btnClear.classList.toggle('visible', dateFilter !== '');
+
+            let filtered = historyItems.filter(item => {
+                const matchesSearch = item.title.toLowerCase().includes(search) || item.type.toLowerCase().includes(search);
+                const matchesDate = !dateFilter || item.date === dateFilter;
+                return matchesSearch && matchesDate;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+
+            if (currentView === 'recientes') {
+                renderByDate(container, filtered);
+            } else {
+                renderByType(container, filtered);
+            }
+        }
+
+        function renderByDate(container, items) {
+            const groups = {};
+            const order = [];
+            items.forEach(item => {
+                if (!groups[item.dateLabel]) {
+                    groups[item.dateLabel] = [];
+                    order.push(item.dateLabel);
+                }
+                groups[item.dateLabel].push(item);
+            });
+
+            let html = '';
+            order.forEach(label => {
+                html += `
+                    <div class="date-group">
+                        <div class="date-label">${label}</div>
+                        <div class="history-list">
+                            ${groups[label].map(renderItem).join('')}
+                        </div>
+                    </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderByType(container, items) {
+            const typeLabels = { flashcard: 'Flashcards', esquema: 'Esquemas', resumen: 'Resúmenes', quiz: 'Quizzes' };
+            const groups = {};
+            const order = [];
+            items.forEach(item => {
+                const label = typeLabels[item.type] || item.type;
+                if (!groups[label]) {
+                    groups[label] = [];
+                    order.push(label);
+                }
+                groups[label].push(item);
+            });
+
+            let html = '';
+            order.forEach(label => {
+                html += `
+                    <div class="date-group">
+                        <div class="date-label">${label}</div>
+                        <div class="history-list">
+                            ${groups[label].map(renderItem).join('')}
+                        </div>
+                    </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderItem(item) {
+            return `
+                <div class="history-item ${item.type}" onclick="openItem(${item.id})">
+                    <div class="item-stars">${generateStars()}</div>
+
+                    <div class="history-icon ${item.type}">
+                        <i class="${item.icon}"></i>
+                    </div>
+
+                    <div class="history-info">
+                        <div class="history-title">
+                            <i class="fas fa-bookmark icon-${item.type}"></i>
+                            ${item.title}
+                        </div>
+                        <div class="history-meta">
+                            <span class="history-type-badge">${item.type.charAt(0).toUpperCase() + item.type.slice(1)}</span>
+                        </div>
+                    </div>
+
+                    <div class="history-right">
+                        <span class="history-time">${item.time}</span>
+
+                        <button class="btn-fav ${item.fav ? 'active' : ''}" onclick="event.stopPropagation(); toggleFav(${item.id}, this)" title="Guardar en favoritos">
+                            <i class="${item.fav ? 'fas' : 'far'} fa-heart"></i>
+                        </button>
+
+                        <button class="btn-delete" onclick="event.stopPropagation(); showDeleteModal(${item.id})" title="Eliminar">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </div>`;
+        }
+
+        // ===== FILTRO =====
+        function setFilter(view, el) {
+            currentView = view;
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+            renderHistory();
+        }
+
+        // ===== FECHA =====
+        function clearDate() {
+            document.getElementById('datePicker').value = '';
+            renderHistory();
+        }
+
+        // ===== FAVORITOS CON SPARKLE =====
+        function toggleFav(id, btnEl) {
+            const item = historyItems.find(i => i.id === id);
+            if (!item) return;
+
+            item.fav = !item.fav;
+
+            if (item.fav && btnEl) {
+                btnEl.classList.add('active', 'animating');
+                btnEl.querySelector('i').className = 'fas fa-heart';
+                createSparkles(btnEl);
+                setTimeout(() => btnEl.classList.remove('animating'), 500);
+                showToast('Agregado a favoritos', 'toast-fav', 'fas fa-heart');
+            } else {
+                if (btnEl) {
+                    btnEl.classList.remove('active');
+                    btnEl.querySelector('i').className = 'far fa-heart';
+                }
+                showToast('Eliminado de favoritos', 'toast-danger', 'fas fa-heart-crack');
+            }
+        }
+
+        function createSparkles(btn) {
+            const container = document.createElement('div');
+            container.className = 'sparkle-container';
+
+            const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+            const distances = [18, 22, 16, 24, 20, 18, 22, 16];
+
+            angles.forEach((angle, i) => {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                const rad = (angle * Math.PI) / 180;
+                const x = Math.cos(rad) * distances[i];
+                const y = Math.sin(rad) * distances[i];
+                sparkle.style.setProperty('--sparkle-end', `translate(${x}px, ${y}px)`);
+                container.appendChild(sparkle);
+            });
+
+            btn.appendChild(container);
+            setTimeout(() => container.remove(), 700);
+        }
+
+        // ===== ABRIR =====
+        function openItem(id) {
+            console.log('Abriendo item:', id);
+        }
+
+        // ===== ELIMINAR CON MODAL =====
+        function showDeleteModal(id) {
+            const item = historyItems.find(i => i.id === id);
+            if (!item) return;
+            itemToDelete = id;
+            document.getElementById('deleteItemName').textContent = `"${item.title}"`;
+            document.getElementById('deleteModal').classList.add('show');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('show');
+            itemToDelete = null;
+        }
+
+        function confirmDelete() {
+            if (itemToDelete !== null) {
+                historyItems = historyItems.filter(i => i.id !== itemToDelete);
+                closeDeleteModal();
+                renderHistory();
+                showToast('Eliminado del historial', 'toast-danger', 'fas fa-trash-alt');
+            }
+        }
+
+        document.getElementById('deleteModal').addEventListener('click', function(e) {
+            if (e.target === this) closeDeleteModal();
+        });
+
+        // ===== MODAL LIMPIAR TODO =====
+        function showClearModal() {
+            document.getElementById('clearModal').classList.add('show');
+        }
+
+        function closeClearModal() {
+            document.getElementById('clearModal').classList.remove('show');
+        }
+
+        function clearAllHistory() {
+            historyItems = [];
+            closeClearModal();
+            renderHistory();
+            showToast('Historial limpiado', 'toast-danger', 'fas fa-trash-alt');
+        }
+
+        document.getElementById('clearModal').addEventListener('click', function(e) {
+            if (e.target === this) closeClearModal();
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeClearModal();
+                closeDeleteModal();
+            }
+        });
+
+        // ===== TOAST =====
+        function showToast(message, type = 'toast-success', iconClass = 'fas fa-check-circle') {
+            const toast = document.getElementById('toast');
+            toast.querySelector('i').className = iconClass;
+            document.getElementById('toastMessage').textContent = message;
+            toast.className = `toast show ${type}`;
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => toast.className = 'toast', 3000);
+        }
+
+        // ===== INIT =====
+        renderHistory();
+    </script>
+</body>
+</html>

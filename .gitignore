@@ -1,0 +1,17 @@
+# ===== Maven =====
+/target/
+
+# ===== Archivos sensibles =====
+src/main/resources/config/database.properties
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.iml
+
+# ===== Logs =====
+*.log
+
+# ===== Sistema operativo =====
+.DS_Store
+Thumbs.db

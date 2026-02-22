@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Flashcards</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/flashcards.css">
+</head>
+<body>
+
+    <!-- Stars Canvas -->
+    <canvas id="starsCanvas"></canvas>
+
+    <!-- Toast XP -->
+    <div class="fc-xp-toast" id="xpToast">
+        <img src="../images/flashcards/glowing-star_1f31f.gif" alt="star">
+        <span class="xp-text">+</span>
+        <span class="xp-amount" id="xpAmount">25 XP</span>
+    </div>
+
+    <!-- Confetti container -->
+    <div class="confetti-container" id="confettiContainer"></div>
+
+    <div class="flashcard-wrapper">
+
+        <!-- ===== VISTA DE ESTUDIO ===== -->
+        <div class="fc-study-view" id="studyView">
+
+            <!-- Header -->
+            <div class="fc-header">
+                <button class="fc-back-btn" title="Volver al Modo Estudio">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <div class="fc-title-area">
+                    <div class="fc-title">
+                        <i class="fas fa-layer-group"></i>
+                        Flashcards
+                    </div>
+                    <div class="fc-subtitle" id="topicLabel">Programación Orientada a Objetos</div>
+                </div>
+                <div class="fc-high-score">
+                    <img src="../images/flashcards/glowing-star_1f31f.gif" alt="star">
+                    <span id="highScoreDisplay">85%</span>
+                </div>
+            </div>
+
+            <!-- Barra de progreso -->
+            <div class="fc-progress-bar">
+                <div class="fc-progress-fill" id="progressFill" style="width: 3%"></div>
+            </div>
+
+            <!-- Contador -->
+            <div class="fc-counter">
+                Tarjeta <span id="currentNum">1</span> de <span id="totalNum">10</span>
+            </div>
+
+            <!-- Zona de tarjeta -->
+            <div class="fc-card-zone">
+                <button class="fc-nav-arrow" id="prevBtn" disabled onclick="prevCard()">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+
+                <div class="fc-card-container" onclick="flipCard()">
+                    <div class="fc-card" id="flashcard">
+                        <!-- FRENTE -->
+                        <div class="fc-card-face fc-card-front">
+                            <div class="fc-face-label">
+                                <i class="fas fa-question-circle"></i>
+                                Pregunta
+                            </div>
+                            <div class="fc-face-text" id="questionText">
+                                ¿Qué es la encapsulación en POO?
+                            </div>
+                            <div class="fc-tap-hint">
+                                <i class="fas fa-hand-pointer"></i>
+                                Toca para ver respuesta
+                            </div>
+                        </div>
+                        <!-- DETRÁS -->
+                        <div class="fc-card-face fc-card-back">
+                            <div class="fc-face-label">
+                                <i class="fas fa-lightbulb"></i>
+                                Respuesta
+                            </div>
+                            <div class="fc-face-text" id="answerText">
+                                Es el mecanismo que restringe el acceso directo a los componentes de un objeto, agrupando datos y métodos en una unidad y usando modificadores de acceso (public, private, protected).
+                            </div>
+                            <div class="fc-tap-hint">
+                                <i class="fas fa-check-double"></i>
+                                ¿La sabías?
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="fc-nav-arrow" id="nextBtn" onclick="nextCard()">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+
+            <!-- Botones de evaluación -->
+            <div class="fc-eval-buttons" id="evalButtons">
+                <button class="fc-eval-btn correct" onclick="markAnswer(true)">
+                    <i class="fas fa-check"></i>
+                    La sabía
+                </button>
+                <button class="fc-eval-btn incorrect" onclick="markAnswer(false)">
+                    <i class="fas fa-times"></i>
+                    No la sabía
+                </button>
+            </div>
+
+            <!-- Dots indicadores -->
+            <div class="fc-dots" id="dotsContainer"></div>
+
+            <!-- Atajos de teclado -->
+            <div class="fc-keyboard-hints">
+                <div class="fc-key-hint"><span class="fc-key">Espacio</span> voltear</div>
+                <div class="fc-key-hint"><span class="fc-key">←</span><span class="fc-key">→</span> navegar</div>
+                <div class="fc-key-hint"><span class="fc-key">1</span> correcta</div>
+                <div class="fc-key-hint"><span class="fc-key">2</span> incorrecta</div>
+            </div>
+        </div>
+
+        <!-- ===== VISTA DE RESULTADOS ===== -->
+        <div class="fc-results" id="resultsView">
+            <div class="fc-results-card">
+                <img class="fc-results-emoji" id="resultsEmoji" src="../images/flashcards/giphy.gif" alt="resultado">
+                <div class="fc-results-title" id="resultsTitle">¡Excelente trabajo!</div>
+                <div class="fc-results-subtitle" id="resultsSubtitle">Has completado todas las flashcards</div>
+
+                <!-- New High Score -->
+                <div class="fc-new-highscore" id="newHighscore">
+                    <img src="../images/flashcards/glowing-star_1f31f.gif" alt="star">
+                    <span>¡Nuevo récord personal!</span>
+                    <img src="../images/flashcards/glowing-star_1f31f.gif" alt="star">
+                </div>
+
+                <!-- Score Ring -->
+                <div class="fc-score-ring-container">
+                    <svg class="fc-score-ring" viewBox="0 0 180 180">
+                        <circle class="fc-score-ring-bg" cx="90" cy="90" r="75" />
+                        <circle class="fc-score-ring-fill" id="scoreRing" cx="90" cy="90" r="75"
+                            stroke-dasharray="471.24" stroke-dashoffset="471.24" />
+                    </svg>
+                    <div class="fc-score-center">
+                        <div class="fc-score-number" id="scoreNumber">0%</div>
+                        <div class="fc-score-label">Nota Final</div>
+                    </div>
+                </div>
+
+                <!-- Stats -->
+                <div class="fc-stats-row">
+                    <div class="fc-stat-box">
+                        <div class="fc-stat-icon stat-green"><i class="fas fa-check-circle"></i></div>
+                        <div class="fc-stat-value stat-green" id="correctCount">0</div>
+                        <div class="fc-stat-name">Correctas</div>
+                    </div>
+                    <div class="fc-stat-box">
+                        <div class="fc-stat-icon stat-red"><i class="fas fa-times-circle"></i></div>
+                        <div class="fc-stat-value stat-red" id="incorrectCount">0</div>
+                        <div class="fc-stat-name">Incorrectas</div>
+                    </div>
+                    <div class="fc-stat-box">
+                        <div class="fc-stat-icon stat-yellow"><i class="fas fa-trophy"></i></div>
+                        <div class="fc-stat-value stat-yellow" id="highScoreResult">0%</div>
+                        <div class="fc-stat-name">High Score</div>
+                    </div>
+                </div>
+
+                <!-- Detalle de respuestas -->
+                <div class="fc-answers-detail" id="answersDetail">
+                    <div class="fc-answers-title">
+                        <i class="fas fa-list-check"></i>
+                        Detalle de respuestas
+                    </div>
+                </div>
+
+                <!-- Acciones -->
+                <div class="fc-results-actions">
+                    <button class="fc-action-btn primary" onclick="restartFlashcards()">
+                        <i class="fas fa-redo"></i>
+                        Intentar de nuevo
+                    </button>
+                    <button class="fc-action-btn secondary" onclick="reviewMistakes()">
+                        <i class="fas fa-search"></i>
+                        Repasar errores
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // ===== DATOS DE FLASHCARDS (en producción vendrían del backend Java) =====
+        const originalFlashcards = [
+            {
+                question: "¿Qué es la encapsulación en POO?",
+                answer: "Es el mecanismo que restringe el acceso directo a los componentes de un objeto, agrupando datos y métodos en una unidad y usando modificadores de acceso (public, private, protected)."
+            },
+            {
+                question: "¿Cuáles son los 4 pilares de la POO?",
+                answer: "Encapsulación, Herencia, Polimorfismo y Abstracción. Estos son los principios fundamentales que definen la programación orientada a objetos."
+            },
+            {
+                question: "¿Qué es el polimorfismo?",
+                answer: "Es la capacidad de un objeto de tomar muchas formas. Permite que una misma referencia se comporte de diferentes maneras según el objeto al que apunte (sobrecarga y sobreescritura)."
+            },
+            {
+                question: "¿Qué diferencia hay entre una clase y un objeto?",
+                answer: "Una clase es un molde/plantilla que define atributos y métodos. Un objeto es una instancia concreta de esa clase, con valores específicos en memoria."
+            },
+            {
+                question: "¿Qué es la herencia en Java?",
+                answer: "Es un mecanismo donde una clase (hija) hereda atributos y métodos de otra clase (padre), usando la palabra clave 'extends'. Permite la reutilización de código."
+            },
+            {
+                question: "¿Qué es una interfaz en Java?",
+                answer: "Es un contrato que define métodos abstractos que una clase debe implementar usando 'implements'. Permite simular herencia múltiple y define comportamientos comunes."
+            },
+            {
+                question: "¿Qué es un constructor?",
+                answer: "Es un método especial con el mismo nombre de la clase que se ejecuta automáticamente al crear un objeto con 'new'. Inicializa los atributos del objeto."
+            },
+            {
+                question: "¿Qué es la abstracción?",
+                answer: "Es el proceso de ocultar los detalles de implementación y mostrar solo la funcionalidad esencial. Se logra con clases abstractas e interfaces."
+            },
+            {
+                question: "¿Qué significa 'static' en Java?",
+                answer: "Indica que un atributo o método pertenece a la clase y no a una instancia específica. Se puede acceder sin crear un objeto: NombreClase.metodo()."
+            },
+            {
+                question: "¿Qué es la sobreescritura de métodos (@Override)?",
+                answer: "Es cuando una clase hija redefine un método heredado de la clase padre con la misma firma. Permite dar comportamiento específico a la subclase."
+            }
+        ];
+
+        let flashcardsData = [...originalFlashcards];
+
+        // ===== ESTADO =====
+        let currentIndex = 0;
+        let isFlipped = false;
+        let answers = new Array(flashcardsData.length).fill(null);
+        let highScore = 85;
+
+        // ===== INIT =====
+        function init() {
+            initStars();
+            generateDots();
+            updateCard();
+            updateProgress();
+            updateNavButtons();
+            document.getElementById('totalNum').textContent = flashcardsData.length;
+        }
+
+        // ===== STARS CANVAS ANIMATION =====
+        function initStars() {
+            const canvas = document.getElementById('starsCanvas');
+            const ctx = canvas.getContext('2d');
+
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+
+            const stars = [];
+            const starCount = 150;
+
+            for (let i = 0; i < starCount; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 0.3,
+                    speedX: (Math.random() - 0.5) * 0.1,
+                    speedY: (Math.random() - 0.5) * 0.1,
+                    opacity: Math.random() * 0.4 + 0.1,
+                    opacityChange: (Math.random() - 0.5) * 0.012,
+                    color: ['#ffffff', '#ffffff', '#ffe9c4', '#d4f1ff', '#c4b5fd', '#aaddff'][Math.floor(Math.random() * 6)]
+                });
+            }
+
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                stars.forEach(star => {
+                    star.x += star.speedX;
+                    star.y += star.speedY;
+
+                    if (star.x < 0) star.x = canvas.width;
+                    if (star.x > canvas.width) star.x = 0;
+                    if (star.y < 0) star.y = canvas.height;
+                    if (star.y > canvas.height) star.y = 0;
+
+                    star.opacity += star.opacityChange;
+                    if (star.opacity <= 0.05 || star.opacity >= 0.8) {
+                        star.opacityChange *= -1;
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    ctx.fillStyle = star.color;
+                    ctx.globalAlpha = star.opacity;
+                    ctx.fill();
+
+                    // Glow for bigger stars
+                    if (star.size > 1.5) {
+                        ctx.beginPath();
+                        ctx.arc(star.x, star.y, star.size * 2.5, 0, Math.PI * 2);
+                        ctx.fillStyle = star.color;
+                        ctx.globalAlpha = star.opacity * 0.2;
+                        ctx.fill();
+                    }
+                });
+
+                ctx.globalAlpha = 1;
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+            window.addEventListener('resize', resizeCanvas);
+        }
+
+        function generateDots() {
+            const container = document.getElementById('dotsContainer');
+            let html = '';
+            for (let i = 0; i < flashcardsData.length; i++) {
+                html += `<div class="fc-dot${i === 0 ? ' current' : ''}" id="dot-${i}"></div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        function updateDots() {
+            for (let i = 0; i < flashcardsData.length; i++) {
+                const dot = document.getElementById(`dot-${i}`);
+                if (!dot) continue;
+                dot.className = 'fc-dot';
+                if (i === currentIndex) dot.classList.add('current');
+                if (answers[i] === true) dot.classList.add('correct');
+                if (answers[i] === false) dot.classList.add('incorrect');
+            }
+        }
+
+        // ===== FLIP =====
+        function flipCard() {
+            const card = document.getElementById('flashcard');
+            isFlipped = !isFlipped;
+            card.classList.toggle('flipped', isFlipped);
+
+            if (isFlipped && answers[currentIndex] === null) {
+                document.getElementById('evalButtons').classList.add('visible');
+            }
+        }
+
+        // ===== MARK ANSWER =====
+        function markAnswer(correct) {
+            if (answers[currentIndex] !== null) return;
+            answers[currentIndex] = correct;
+
+            document.getElementById('evalButtons').classList.remove('visible');
+            updateDots();
+            updateProgress();
+
+            if (correct) showXpToast(10);
+
+            const allAnswered = answers.every(a => a !== null);
+            if (allAnswered) {
+                setTimeout(showResults, 1000);
+            } else {
+                setTimeout(() => {
+                    let next = currentIndex + 1;
+                    while (next < flashcardsData.length && answers[next] !== null) next++;
+                    if (next >= flashcardsData.length) {
+                        next = 0;
+                        while (next < flashcardsData.length && answers[next] !== null) next++;
+                    }
+                    if (next < flashcardsData.length) {
+                        currentIndex = next;
+                        resetCardFlip();
+                        updateCard();
+                        updateNavButtons();
+                        updateDots();
+                    }
+                }, 600);
+            }
+        }
+
+        // ===== NAV =====
+        function nextCard() {
+            if (currentIndex < flashcardsData.length - 1) {
+                currentIndex++;
+                resetCardFlip();
+                updateCard();
+                updateNavButtons();
+                updateDots();
+            }
+        }
+
+        function prevCard() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                resetCardFlip();
+                updateCard();
+                updateNavButtons();
+                updateDots();
+            }
+        }
+
+        function resetCardFlip() {
+            isFlipped = false;
+            document.getElementById('flashcard').classList.remove('flipped');
+            document.getElementById('evalButtons').classList.remove('visible');
+        }
+
+        // ===== UPDATE UI =====
+        function updateCard() {
+            const card = flashcardsData[currentIndex];
+            document.getElementById('questionText').textContent = card.question;
+            document.getElementById('answerText').textContent = card.answer;
+            document.getElementById('currentNum').textContent = currentIndex + 1;
+
+            if (answers[currentIndex] !== null) {
+                document.getElementById('evalButtons').classList.remove('visible');
+            }
+        }
+
+        function updateProgress() {
+            const answered = answers.filter(a => a !== null).length;
+            const percent = (answered / flashcardsData.length) * 100;
+            document.getElementById('progressFill').style.width = `${Math.max(percent, 3)}%`;
+        }
+
+        function updateNavButtons() {
+            document.getElementById('prevBtn').disabled = currentIndex === 0;
+            document.getElementById('nextBtn').disabled = currentIndex === flashcardsData.length - 1;
+        }
+
+        // ===== RESULTS =====
+        function showResults() {
+            const correctCount = answers.filter(a => a === true).length;
+            const incorrectCount = answers.filter(a => a === false).length;
+            const score = Math.round((correctCount / flashcardsData.length) * 100);
+            const isNewHighScore = score > highScore;
+            if (isNewHighScore) highScore = score;
+
+            document.getElementById('studyView').classList.add('hidden');
+            document.getElementById('resultsView').classList.add('active');
+
+            const emoji = document.getElementById('resultsEmoji');
+            const title = document.getElementById('resultsTitle');
+            const subtitle = document.getElementById('resultsSubtitle');
+
+            if (score >= 90) {
+                emoji.src = '../images/flashcards/giphy.gif';
+                title.textContent = '¡Increíble, eres un crack!';
+                subtitle.textContent = 'Dominas este tema a la perfección';
+            } else if (score >= 70) {
+                emoji.src = '../images/flashcards/giphy.gif';
+                title.textContent = '¡Muy bien hecho!';
+                subtitle.textContent = 'Tienes un buen dominio del tema';
+            } else if (score >= 50) {
+                emoji.src = '../images/flashcards/flexed-biceps_1f4aa.gif';
+                title.textContent = '¡Buen intento!';
+                subtitle.textContent = 'Sigue practicando para mejorar';
+            } else {
+                emoji.src = '../images/flashcards/WZ6R8rSOyG.gif';
+                title.textContent = 'A seguir estudiando';
+                subtitle.textContent = 'Repasa el material y vuelve a intentar';
+            }
+
+            document.getElementById('correctCount').textContent = correctCount;
+            document.getElementById('incorrectCount').textContent = incorrectCount;
+            document.getElementById('highScoreResult').textContent = highScore + '%';
+
+            if (isNewHighScore) document.getElementById('newHighscore').classList.add('show');
+
+            // Ring animation
+            const ring = document.getElementById('scoreRing');
+            const circumference = 2 * Math.PI * 75;
+            const offset = circumference - (score / 100) * circumference;
+
+            let ringColor;
+            if (score >= 80) ringColor = '#22c55e';
+            else if (score >= 60) ringColor = '#2dd4bf';
+            else if (score >= 40) ringColor = '#fbbf24';
+            else ringColor = '#ef4444';
+
+            ring.style.stroke = ringColor;
+            setTimeout(() => { ring.style.strokeDashoffset = offset; }, 300);
+
+            animateNumber('scoreNumber', 0, score, 1500, '%');
+
+            // Detalle
+            const detailContainer = document.getElementById('answersDetail');
+            let detailHTML = `<div class="fc-answers-title"><i class="fas fa-list-check"></i> Detalle de respuestas</div>`;
+            flashcardsData.forEach((card, i) => {
+                const isCorrect = answers[i] === true;
+                detailHTML += `
+                    <div class="fc-answer-item ${isCorrect ? 'is-correct' : 'is-incorrect'}">
+                        <div class="fc-answer-status ${isCorrect ? 'green' : 'red'}">
+                            <i class="fas fa-${isCorrect ? 'check' : 'times'}"></i>
+                        </div>
+                        <div class="fc-answer-text">
+                            <div class="fc-answer-q">${card.question}</div>
+                            <div class="fc-answer-a"><i class="fas fa-arrow-right" style="font-size:0.7rem;margin-right:0.3rem;opacity:0.5"></i>${card.answer}</div>
+                        </div>
+                    </div>`;
+            });
+            detailContainer.innerHTML = detailHTML;
+
+            if (score >= 70) launchConfetti();
+
+            const xpEarned = correctCount * 10 + (isNewHighScore ? 25 : 0);
+            setTimeout(() => showXpToast(xpEarned), 1500);
+        }
+
+        function animateNumber(id, start, end, duration, suffix = '') {
+            const el = document.getElementById(id);
+            const startTime = performance.now();
+            function update(t) {
+                const elapsed = t - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                el.textContent = Math.round(start + (end - start) * eased) + suffix;
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        }
+
+        function showXpToast(amount) {
+            const toast = document.getElementById('xpToast');
+            document.getElementById('xpAmount').textContent = `+${amount} XP`;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function launchConfetti() {
+            const container = document.getElementById('confettiContainer');
+            const colors = ['#2dd4bf', '#8b5cf6', '#ec4899', '#fbbf24', '#22c55e', '#3b82f6', '#f97316'];
+            let html = '';
+            for (let i = 0; i < 60; i++) {
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                const left = Math.random() * 100;
+                const size = 6 + Math.random() * 8;
+                const dur = 1.5 + Math.random() * 2;
+                const delay = Math.random() * 0.8;
+                const shape = Math.random() > 0.5 ? '50%' : '2px';
+                html += `<div class="confetti-piece" style="left:${left}%;width:${size}px;height:${size * (Math.random() > 0.5 ? 1 : 1.5)}px;background:${color};border-radius:${shape};animation-duration:${dur}s;animation-delay:${delay}s"></div>`;
+            }
+            container.innerHTML = html;
+            setTimeout(() => container.innerHTML = '', 4000);
+        }
+
+        // ===== RESTART =====
+        function restartFlashcards() {
+            flashcardsData = [...originalFlashcards];
+            currentIndex = 0;
+            isFlipped = false;
+            answers = new Array(flashcardsData.length).fill(null);
+
+            document.getElementById('resultsView').classList.remove('active');
+            document.getElementById('studyView').classList.remove('hidden');
+            document.getElementById('newHighscore').classList.remove('show');
+            document.getElementById('highScoreDisplay').textContent = highScore + '%';
+            document.getElementById('scoreRing').style.strokeDashoffset = '471.24';
+            document.getElementById('topicLabel').textContent = 'Programación Orientada a Objetos';
+            document.getElementById('totalNum').textContent = flashcardsData.length;
+
+            resetCardFlip();
+            generateDots();
+            updateCard();
+            updateProgress();
+            updateNavButtons();
+        }
+
+        function reviewMistakes() {
+            const mistakes = [];
+            flashcardsData.forEach((card, i) => {
+                if (answers[i] === false) mistakes.push(card);
+            });
+
+            if (mistakes.length === 0) {
+                showXpToast(0);
+                return;
+            }
+
+            flashcardsData = [...mistakes];
+            currentIndex = 0;
+            isFlipped = false;
+            answers = new Array(flashcardsData.length).fill(null);
+
+            document.getElementById('resultsView').classList.remove('active');
+            document.getElementById('studyView').classList.remove('hidden');
+            document.getElementById('newHighscore').classList.remove('show');
+            document.getElementById('totalNum').textContent = flashcardsData.length;
+            document.getElementById('topicLabel').textContent = 'Repaso de errores 🔄';
+            document.getElementById('scoreRing').style.strokeDashoffset = '471.24';
+
+            resetCardFlip();
+            generateDots();
+            updateCard();
+            updateProgress();
+            updateNavButtons();
+        }
+
+        // ===== KEYBOARD =====
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('resultsView').classList.contains('active')) return;
+            switch(e.key) {
+                case ' ':
+                case 'Enter':
+                    e.preventDefault();
+                    flipCard();
+                    break;
+                case 'ArrowRight':
+                    if (!document.getElementById('nextBtn').disabled) nextCard();
+                    break;
+                case 'ArrowLeft':
+                    if (!document.getElementById('prevBtn').disabled) prevCard();
+                    break;
+                case '1':
+                    if (isFlipped && answers[currentIndex] === null) markAnswer(true);
+                    break;
+                case '2':
+                    if (isFlipped && answers[currentIndex] === null) markAnswer(false);
+                    break;
+            }
+        });
+
+        // GO
+        init();
+    </script>
+</body>
+</html>

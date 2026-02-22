@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Configurar Evaluación</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+    <link rel="stylesheet" href="../css/config-examen.css">
+</head>
+<body data-page="modo-estudio">
+
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="content">
+
+        <!-- Topbar con breadcrumb -->
+        <div class="config-topbar">
+            <button class="btn-volver" onclick="history.back()">
+                <i class="fas fa-arrow-left"></i> Volver
+            </button>
+            <div class="breadcrumb">
+                Modo Estudio <i class="fas fa-chevron-right"></i> <span>Evaluación</span>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="config-header">
+            <h2 class="config-title">Elige tu modo de evaluación</h2>
+            <p class="config-subtitle">Selecciona cómo quieres poner a prueba tus conocimientos</p>
+        </div>
+
+        <!-- Mode Cards -->
+        <div class="modes-grid">
+
+            <!-- MODO QUIZ -->
+            <div class="mode-card quiz" onclick="selectMode('quiz')">
+                <div class="mode-radio"></div>
+                <div class="mode-illustration quiz-illus">
+                    <svg viewBox="0 0 280 140" fill="none">
+                        <!-- Fondo sutil -->
+                        <rect x="30" y="20" width="220" height="100" rx="14" fill="rgba(45,212,191,0.06)" stroke="rgba(45,212,191,0.15)" stroke-width="1"/>
+                        <!-- Pregunta card -->
+                        <rect x="55" y="32" width="170" height="22" rx="6" fill="rgba(45,212,191,0.2)"/>
+                        <rect x="65" y="38" width="90" height="3" rx="1.5" fill="rgba(45,212,191,0.5)"/>
+                        <rect x="65" y="44" width="60" height="3" rx="1.5" fill="rgba(45,212,191,0.3)"/>
+                        <!-- Opciones -->
+                        <rect x="55" y="62" width="80" height="18" rx="6" fill="rgba(139,92,246,0.2)" stroke="rgba(139,92,246,0.3)" stroke-width="1"/>
+                        <rect x="145" y="62" width="80" height="18" rx="6" fill="rgba(45,212,191,0.25)" stroke="rgba(45,212,191,0.5)" stroke-width="1.5"/>
+                        <!-- Check en opción correcta -->
+                        <circle cx="157" cy="71" r="5" fill="rgba(45,212,191,0.8)"/>
+                        <path d="M155 71 L156.5 72.5 L159.5 69.5" stroke="white" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <rect x="55" y="86" width="80" height="18" rx="6" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.2)" stroke-width="1"/>
+                        <rect x="145" y="86" width="80" height="18" rx="6" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.2)" stroke-width="1"/>
+                        <!-- Estrellita -->
+                        <text x="240" y="38" font-size="16">✨</text>
+                        <!-- Bulb -->
+                        <circle cx="45" cy="75" r="12" fill="rgba(251,191,36,0.2)"/>
+                        <text x="40" y="80" font-size="14">💡</text>
+                    </svg>
+                </div>
+                <div class="mode-badge formativo"><i class="fas fa-seedling"></i> Formativo</div>
+                <div class="mode-name">Modo Quiz</div>
+                <div class="mode-desc">Practica y aprende mientras respondes. Ideal para repasar.</div>
+                <div class="mode-features">
+                    <div class="mode-feature"><i class="fas fa-check-circle"></i> Feedback inmediato por pregunta</div>
+                    <div class="mode-feature"><i class="fas fa-check-circle"></i> Explicación de respuesta correcta</div>
+                    <div class="mode-feature"><i class="fas fa-check-circle"></i> Temporizador opcional</div>
+                    <div class="mode-feature"><i class="fas fa-check-circle"></i> Puedes repetir cuantas veces quieras</div>
+                    <div class="mode-feature"><i class="fas fa-check-circle"></i> Sin penalización fuerte</div>
+                </div>
+            </div>
+
+            <!-- MODO EXPERTO -->
+            <div class="mode-card experto" onclick="selectMode('experto')">
+                <div class="mode-radio"></div>
+                <div class="mode-illustration experto-illus">
+                    <svg viewBox="0 0 280 140" fill="none">
+                        <!-- Fondo centrado -->
+                        <rect x="40" y="15" width="200" height="110" rx="14" fill="rgba(249,115,22,0.06)" stroke="rgba(249,115,22,0.12)" stroke-width="1"/>
+                        <!-- Timer prominente centrado -->
+                        <circle cx="140" cy="55" r="28" fill="rgba(249,115,22,0.1)" stroke="rgba(249,115,22,0.4)" stroke-width="2"/>
+                        <circle cx="140" cy="55" r="28" fill="none" stroke="rgba(249,115,22,0.8)" stroke-width="2.5" stroke-dasharray="132" stroke-dashoffset="38" stroke-linecap="round"/>
+                        <text x="140" y="60" font-size="14" fill="rgba(249,115,22,0.9)" font-family="monospace" font-weight="bold" text-anchor="middle">12:30</text>
+                        <!-- Progress bar centrada -->
+                        <rect x="70" y="96" width="140" height="6" rx="3" fill="rgba(249,115,22,0.1)"/>
+                        <rect x="70" y="96" width="88" height="6" rx="3" fill="rgba(249,115,22,0.6)"/>
+                        <circle cx="158" cy="99" r="4" fill="rgba(249,115,22,0.9)"/>
+                        <!-- Lock icons simétricos -->
+                        <rect x="58" y="42" width="20" height="20" rx="5" fill="rgba(239,68,68,0.15)"/>
+                        <text x="61" y="57" font-size="11">🔒</text>
+                        <rect x="202" y="42" width="20" height="20" rx="5" fill="rgba(239,68,68,0.15)"/>
+                        <text x="205" y="57" font-size="11">🔒</text>
+                        <!-- Trophy centrado -->
+                        <text x="140" y="122" font-size="16" text-anchor="middle">🏆</text>
+                        <!-- Stars simétricas -->
+                        <text x="62" y="28" font-size="10" opacity="0.6">⭐</text>
+                        <text x="208" y="28" font-size="10" opacity="0.6">⭐</text>
+                    </svg>
+                </div>
+                <div class="mode-badge evaluativo"><i class="fas fa-graduation-cap"></i> Evaluativo</div>
+                <div class="mode-name">Modo Experto</div>
+                <div class="mode-desc">Evaluación real con presión controlada. Mide tu conocimiento.</div>
+                <div class="mode-features">
+                    <div class="mode-feature"><i class="fas fa-check-circle"></i> Temporizador obligatorio</div>
+                    <div class="mode-feature"><i class="fas fa-check-circle"></i> Resultados solo al final</div>
+                    <div class="mode-feature"><i class="fas fa-check-circle"></i> Sistema de calificación completo</div>
+                    <div class="mode-feature"><i class="fas fa-check-circle"></i> Afecta XP y ranking</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Config Options (aparecen al seleccionar) -->
+        <div class="config-options" id="configOptions">
+            <div class="config-options-title">
+                <i class="fas fa-sliders-h"></i>
+                <span id="optionsTitle">Configuración</span>
+            </div>
+            <div class="options-grid" id="optionsGrid"></div>
+        </div>
+
+        <!-- Botón continuar -->
+        <div class="config-footer">
+            <button class="btn-continuar" id="btnContinuar" onclick="startExam()">
+                Continuar <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+
+    </main>
+
+    <script src="../js/components.js"></script>
+
+    <script>
+        let selectedMode = null;
+
+        function selectMode(mode) {
+            selectedMode = mode;
+
+            // Toggle selected
+            document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+            document.querySelector(`.mode-card.${mode}`).classList.add('selected');
+
+            // Show config
+            const configEl = document.getElementById('configOptions');
+            configEl.classList.add('visible');
+
+            // Update button
+            const btn = document.getElementById('btnContinuar');
+            btn.classList.add('active');
+            btn.className = `btn-continuar active ${mode === 'quiz' ? 'quiz-theme' : 'experto-theme'}`;
+
+            // Render options
+            renderOptions(mode);
+        }
+
+        function renderOptions(mode) {
+            const grid = document.getElementById('optionsGrid');
+            const title = document.getElementById('optionsTitle');
+
+            if (mode === 'quiz') {
+                title.textContent = 'Configura tu Quiz';
+                grid.innerHTML = `
+                    <div class="option-card">
+                        <div class="option-icon cyan"><i class="fas fa-list-ol"></i></div>
+                        <div class="option-info">
+                            <div class="option-label">Cantidad de preguntas</div>
+                            <div class="option-hint">Elige cuántas preguntas quieres</div>
+                        </div>
+                        <select class="option-select" id="optQuestions">
+                            <option value="5">5</option>
+                            <option value="10" selected>10</option>
+                            <option value="15">15</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+
+                    <div class="option-card">
+                        <div class="option-icon purple"><i class="fas fa-clock"></i></div>
+                        <div class="option-info">
+                            <div class="option-label">Temporizador</div>
+                            <div class="option-hint">Activa si quieres límite de tiempo</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="optTimer" onchange="toggleTimerSelect()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="option-card" id="timerDurationCard" style="opacity:0.4; pointer-events:none;">
+                        <div class="option-icon purple"><i class="fas fa-hourglass-half"></i></div>
+                        <div class="option-info">
+                            <div class="option-label">Duración del temporizador</div>
+                            <div class="option-hint">Tiempo total en minutos</div>
+                        </div>
+                        <select class="option-select" id="optTimerDuration">
+                            <option value="5">5 min</option>
+                            <option value="10" selected>10 min</option>
+                            <option value="15">15 min</option>
+                            <option value="20">20 min</option>
+                        </select>
+                    </div>
+
+                    <div class="option-card">
+                        <div class="option-icon green"><i class="fas fa-lightbulb"></i></div>
+                        <div class="option-info">
+                            <div class="option-label">Mostrar explicaciones</div>
+                            <div class="option-hint">Explica por qué es correcta</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                `;
+            } else {
+                title.textContent = 'Configura tu Examen';
+                grid.innerHTML = `
+                    <div class="option-card">
+                        <div class="option-icon orange"><i class="fas fa-list-ol"></i></div>
+                        <div class="option-info">
+                            <div class="option-label">Cantidad de preguntas</div>
+                            <div class="option-hint">Número fijo de preguntas</div>
+                        </div>
+                        <select class="option-select" id="optQuestions">
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="20" selected>20</option>
+                            <option value="30">30</option>
+                        </select>
+                    </div>
+
+                    <div class="option-card" style="position:relative;">
+                        <div class="option-icon orange"><i class="fas fa-clock"></i></div>
+                        <div class="option-info">
+                            <div class="option-label">Temporizador</div>
+                            <div class="option-hint">Siempre activo en modo experto</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked disabled>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="option-card">
+                        <div class="option-icon orange"><i class="fas fa-hourglass-half"></i></div>
+                        <div class="option-info">
+                            <div class="option-label">Duración del temporizador</div>
+                            <div class="option-hint">Tiempo total del examen</div>
+                        </div>
+                        <select class="option-select" id="optTimerDuration">
+                            <option value="10">10 min</option>
+                            <option value="15">15 min</option>
+                            <option value="20" selected>20 min</option>
+                            <option value="30">30 min</option>
+                            <option value="45">45 min</option>
+                        </select>
+                    </div>
+
+                    <div class="option-card">
+                        <div class="option-icon green"><i class="fas fa-bolt"></i></div>
+                        <div class="option-info">
+                            <div class="option-label">Penalización por abandono</div>
+                            <div class="option-hint">Pierdes XP si sales antes</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleTimerSelect() {
+            const checked = document.getElementById('optTimer').checked;
+            const card = document.getElementById('timerDurationCard');
+            if (card) {
+                card.style.opacity = checked ? '1' : '0.4';
+                card.style.pointerEvents = checked ? 'auto' : 'none';
+            }
+        }
+
+        function startExam() {
+            if (!selectedMode) return;
+
+            const questions = document.getElementById('optQuestions')?.value || 10;
+            const timerDuration = document.getElementById('optTimerDuration')?.value || 15;
+            let hasTimer = true;
+
+            if (selectedMode === 'quiz') {
+                const timerCheckbox = document.getElementById('optTimer');
+                hasTimer = timerCheckbox ? timerCheckbox.checked : false;
+            }
+
+            const config = {
+                mode: selectedMode,
+                questions: parseInt(questions),
+                timer: hasTimer,
+                timerMinutes: parseInt(timerDuration)
+            };
+
+            console.log('Iniciando examen con config:', config);
+
+            // Aquí redirigirías a examen.html pasando la config
+            // window.location.href = `examen.html?mode=${config.mode}&q=${config.questions}&timer=${config.timer}&time=${config.timerMinutes}`;
+        }
+    </script>
+</body>
+</html>
