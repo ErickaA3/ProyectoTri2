@@ -7,111 +7,16 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/seleccion-esquema.css">
 
+    
 </head>
-<body>
-    <!-- Navbar -->
-    <nav class="main-navbar">
-        <div class="navbar-left">
-            <button class="menu-toggle" onclick="toggleMenu()">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div class="logo">
-                <div class="logo-icon"><i class="fas fa-robot"></i></div>
-                <span class="logo-text">Mi ProfesorIA</span>
-            </div>
-        </div>
-        <div class="navbar-stats">
-            <div class="stat-pill">
-                <img src="../images/" alt="🔥" class="fire-gif">
-                <span class="stat-value">5</span>
-                <span class="stat-label">Racha</span>
-            </div>
-            <div class="stat-pill">
-                <img src="glowing-star_1f31f.gif" alt="⭐" class="star-gif">
-                <span class="stat-value">2,450</span>
-                <span class="stat-label">XP</span>
-            </div>
-            <div class="stat-pill">
-                <img src="source.gif" alt="💵" class="money-gif">
-                <span class="stat-value">850</span>
-                <span class="stat-label">Monedas</span>
-            </div>
-        </div>
-    </nav>
+<body data-page="modo-estudio">
 
-    <!-- Overlay -->
-    <div class="sidebar-overlay" onclick="toggleMenu()"></div>
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
 
-    <!-- Sidebar -->
-    <aside class="sidebar-cards" id="sidebar">
-        <div class="user-profile">
-            <div class="user-avatar"><i class="fas fa-user"></i></div>
-            <div class="user-name">Estudiante Pro</div>
-            <div class="user-level">Nivel 12</div>
-        </div>
-        <div class="nav-cards">
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-perfil"><i class="fas fa-user"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Perfil</div>
-                    <div class="nav-card-desc">Tu información</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card modo-estudio active" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-estudio"><i class="fas fa-book-open"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Modo Estudio</div>
-                    <div class="nav-card-desc">Aprende a tu ritmo</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-profesor"><i class="fas fa-robot"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Mi Profesor</div>
-                    <div class="nav-card-desc">Asistente IA</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-duelo"><i class="fas fa-shield-alt"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Duelos</div>
-                    <div class="nav-card-desc">Reta a otros</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-tienda"><i class="fas fa-store"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Tienda</div>
-                    <div class="nav-card-desc">Personaliza tu perfil</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-favoritos"><i class="fas fa-heart"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Favoritos</div>
-                    <div class="nav-card-desc">Contenido guardado</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-historial"><i class="fas fa-clock-rotate-left"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Historial</div>
-                    <div class="nav-card-desc">Tu actividad reciente</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-ajustes"><i class="fas fa-cog"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Ajustes</div>
-                    <div class="nav-card-desc">Configuración</div>
-                </div>
-            </a>
-        </div>
-    </aside>
-
-    <!-- Contenido Principal -->
     <main class="content" id="mainContent">
         <canvas id="starsCanvas"></canvas>
+
         <!-- Nav / Breadcrumb -->
         <div class="esquema-nav">
             <a href="#" class="back-btn" onclick="goBack(event)">
@@ -160,39 +65,25 @@
                                 <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
                             </filter>
                         </defs>
-
-                        <!-- Lines: root → mid row -->
                         <line x1="100" y1="25" x2="100" y2="38"/>
                         <line x1="42" y1="38" x2="158" y2="38"/>
                         <line x1="42" y1="38" x2="42" y2="48"/>
                         <line x1="100" y1="38" x2="100" y2="48"/>
                         <line x1="158" y1="38" x2="158" y2="48"/>
-
-                        <!-- Lines: mid1 → leaves -->
                         <line x1="42" y1="68" x2="42" y2="76"/>
                         <line x1="20" y1="76" x2="64" y2="76"/>
                         <line x1="20" y1="76" x2="20" y2="86"/>
                         <line x1="64" y1="76" x2="64" y2="86"/>
-
-                        <!-- Lines: mid2 → leaf -->
                         <line x1="100" y1="68" x2="100" y2="86"/>
-
-                        <!-- Lines: mid3 → leaves -->
                         <line x1="158" y1="68" x2="158" y2="76"/>
                         <line x1="136" y1="76" x2="180" y2="76"/>
                         <line x1="136" y1="76" x2="136" y2="86"/>
                         <line x1="180" y1="76" x2="180" y2="86"/>
-
-                        <!-- Root node -->
                         <rect class="j-root-r" x="70" y="8" width="60" height="17"/>
                         <text x="100" y="17">Tema</text>
-
-                        <!-- Mid nodes -->
                         <rect class="j-mid-r" x="17" y="48" width="50" height="20"/>
                         <rect class="j-mid-r" x="75" y="48" width="50" height="20"/>
                         <rect class="j-mid-r" x="133" y="48" width="50" height="20"/>
-
-                        <!-- Leaf nodes -->
                         <rect class="j-leaf-r" x="4" y="86" width="32" height="16"/>
                         <rect class="j-leaf-r" x="48" y="86" width="32" height="16"/>
                         <rect class="j-leaf-r" x="84" y="86" width="32" height="16"/>
@@ -208,19 +99,12 @@
             <div class="esquema-card" onclick="selectEsquema(this, 'conceptual')">
                 <div class="esquema-check"><i class="fas fa-check"></i></div>
                 <div class="esquema-illustration illus-conceptual">
-                    <!-- SVG lines connecting center to bubbles -->
                     <svg class="c-lines-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                        <!-- center(50,50) → b1 top-center(50,13) -->
                         <line x1="50" y1="50" x2="50" y2="13"/>
-                        <!-- center → b2 top-right(86,28) -->
                         <line x1="50" y1="50" x2="86" y2="28"/>
-                        <!-- center → b3 bottom-right(83,72) -->
                         <line x1="50" y1="50" x2="83" y2="72"/>
-                        <!-- center → b4 bottom-center(50,87) -->
                         <line x1="50" y1="50" x2="50" y2="87"/>
-                        <!-- center → b5 bottom-left(16,72) -->
                         <line x1="50" y1="50" x2="16" y2="72"/>
-                        <!-- center → b6 top-left(16,28) -->
                         <line x1="50" y1="50" x2="16" y2="28"/>
                     </svg>
                     <div class="c-bubble c-b1"></div>
@@ -262,49 +146,34 @@
             <div class="esquema-card" onclick="selectEsquema(this, 'causa-efecto')">
                 <div class="esquema-check"><i class="fas fa-check"></i></div>
                 <div class="esquema-illustration illus-causa">
-                    <!-- Tail -->
                     <div class="fish-tail"></div>
-                    <!-- Spine -->
                     <div class="fish-spine"></div>
-                    <!-- Head -->
                     <div class="fish-head"></div>
                     <div class="fish-head-label">Efecto</div>
-
-                    <!-- Top branches -->
                     <div class="fish-branch top fb-1"></div>
                     <div class="fish-branch top fb-2"></div>
                     <div class="fish-branch top fb-3"></div>
-
-                    <!-- Bottom branches -->
                     <div class="fish-branch bottom fb-1"></div>
                     <div class="fish-branch bottom fb-2"></div>
                     <div class="fish-branch bottom fb-3"></div>
-
-                    <!-- Cause lines top -->
                     <div class="cause-line cl-1a"></div>
                     <div class="cause-line cl-1b"></div>
                     <div class="cause-line cl-2a"></div>
                     <div class="cause-line cl-2b"></div>
                     <div class="cause-line cl-3a"></div>
                     <div class="cause-line cl-3b"></div>
-
-                    <!-- Cause lines bottom -->
                     <div class="cause-line cl-4a"></div>
                     <div class="cause-line cl-4b"></div>
                     <div class="cause-line cl-5a"></div>
                     <div class="cause-line cl-5b"></div>
                     <div class="cause-line cl-6a"></div>
                     <div class="cause-line cl-6b"></div>
-
-                    <!-- Causa text labels top -->
                     <span class="causa-label top-1a">Causa</span>
                     <span class="causa-label top-1b">Causa</span>
                     <span class="causa-label top-2a">Causa</span>
                     <span class="causa-label top-2b">Causa</span>
                     <span class="causa-label top-3a">Causa</span>
                     <span class="causa-label top-3b">Causa</span>
-
-                    <!-- Causa text labels bottom -->
                     <span class="causa-label bot-4a">Causa</span>
                     <span class="causa-label bot-4b">Causa</span>
                     <span class="causa-label bot-5a">Causa</span>
@@ -351,21 +220,17 @@
         <span id="toastMessage">Tipo seleccionado</span>
     </div>
 
+    <script src="../js/components.js"></script>
+
     <script>
         let selectedType = null;
 
         function selectEsquema(card, type) {
-            // Deselect all
             document.querySelectorAll('.esquema-card').forEach(c => c.classList.remove('selected'));
-            
-            // Select clicked
             card.classList.add('selected');
             selectedType = type;
-            
-            // Enable button
             document.getElementById('confirmBtn').disabled = false;
-            
-            // Map types to names
+
             const names = {
                 'jerarquico': 'Jerárquico',
                 'conceptual': 'Conceptual',
@@ -373,19 +238,15 @@
                 'causa-efecto': 'Causa y efecto',
                 'ciclico': 'Cíclico'
             };
-            
             showToast(`Esquema ${names[type]} seleccionado`);
         }
 
         function confirmSelection() {
             if (!selectedType) return;
-            
             const btn = document.getElementById('confirmBtn');
             btn.innerHTML = '<div style="width:22px;height:22px;border:3px solid rgba(45,212,191,0.3);border-top-color:#2dd4bf;border-radius:50%;animation:spin 1s linear infinite"></div> <span>Cargando...</span>';
             btn.disabled = true;
-            
             console.log('Tipo de esquema seleccionado:', selectedType);
-            
             setTimeout(() => {
                 btn.innerHTML = '<span>Continuar</span>';
                 btn.disabled = false;
@@ -396,38 +257,17 @@
         function goBack(e) {
             e.preventDefault();
             showToast('Volviendo a Modo Estudio...');
-            // In production: window.location.href = 'modo-estudio.html';
         }
 
         function showToast(message) {
             const toast = document.getElementById('toast');
             document.getElementById('toastMessage').textContent = message;
             toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
+            clearTimeout(toast._t);
+            toast._t = setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
-        function toggleMenu() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.querySelector('.sidebar-overlay');
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
-        }
-
-        function handleNavClick(event) {
-            if (window.innerWidth <= 768) toggleMenu();
-            document.querySelectorAll('.nav-card').forEach(card => card.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-        }
-
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && window.innerWidth <= 768) {
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar.classList.contains('active')) toggleMenu();
-            }
-        });
-
-        // ===== STARS CANVAS ANIMATION =====
+        // ===== STARS CANVAS =====
         (function initStars() {
             const canvas = document.getElementById('starsCanvas');
             const ctx = canvas.getContext('2d');
@@ -457,28 +297,20 @@
 
             function animate() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-
                 stars.forEach(star => {
                     star.x += star.speedX;
                     star.y += star.speedY;
-
                     if (star.x < 0) star.x = canvas.width;
                     if (star.x > canvas.width) star.x = 0;
                     if (star.y < 0) star.y = canvas.height;
                     if (star.y > canvas.height) star.y = 0;
-
                     star.opacity += star.opacityChange;
-                    if (star.opacity <= 0.05 || star.opacity >= 0.8) {
-                        star.opacityChange *= -1;
-                    }
-
+                    if (star.opacity <= 0.05 || star.opacity >= 0.8) star.opacityChange *= -1;
                     ctx.beginPath();
                     ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
                     ctx.fillStyle = star.color;
                     ctx.globalAlpha = star.opacity;
                     ctx.fill();
-
-                    // Glow for bigger stars
                     if (star.size > 1.5) {
                         ctx.beginPath();
                         ctx.arc(star.x, star.y, star.size * 2.5, 0, Math.PI * 2);
@@ -487,7 +319,6 @@
                         ctx.fill();
                     }
                 });
-
                 ctx.globalAlpha = 1;
                 requestAnimationFrame(animate);
             }
