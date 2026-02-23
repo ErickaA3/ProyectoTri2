@@ -5,147 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi ProfesorIA - Modo Estudio</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
     <link rel="stylesheet" href="../css/modo-estudio.css">
-    
 </head>
-<body>
-    <!-- Navbar Principal -->
-    <nav class="main-navbar">
-        <div class="navbar-left">
-            <button class="menu-toggle" onclick="toggleMenu()">
-                <i class="fas fa-bars"></i>
-            </button>
-            <div class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <span class="logo-text">Mi ProfesorIA</span>
-            </div>
-        </div>
-        <div class="navbar-stats">
-            <div class="stat-pill">
-                <img src="1f525.gif" alt="🔥" class="fire-gif">
-                <span class="stat-value">5</span>
-                <span class="stat-label">Racha</span>
-            </div>
-            <div class="stat-pill">
-                <img src="glowing-star_1f31f.gif" alt="⭐" class="star-gif">
-                <span class="stat-value">2,450</span>
-                <span class="stat-label">XP</span>
-            </div>
-            <div class="stat-pill">
-                <img src="source.gif" alt="💵" class="money-gif">
-                <span class="stat-value">850</span>
-                <span class="stat-label">Monedas</span>
-            </div>
-        </div>
-    </nav>
+<body data-page="modo-estudio">
 
-    <!-- Overlay -->
-    <div class="sidebar-overlay" onclick="toggleMenu()"></div>
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
 
-    <!-- Sidebar -->
-    <aside class="sidebar-cards" id="sidebar">
-        <div class="user-profile">
-            <div class="user-avatar">
-                <i class="fas fa-user"></i>
-            </div>
-            <div class="user-name">Estudiante Pro</div>
-            <div class="user-level">Nivel 12</div>
-        </div>
-
-        <div class="nav-cards">
-            <!-- Perfil -->
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-perfil">
-                    <i class="fas fa-user"></i>
-                </div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Perfil</div>
-                    <div class="nav-card-desc">Tu información</div>
-                </div>
-            </a>
-
-            <!-- Modo Estudio - Con efecto dorado -->
-            <a href="#" class="nav-card modo-estudio active" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-estudio">
-                    <i class="fas fa-book-open"></i>
-                </div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Modo Estudio</div>
-                    <div class="nav-card-desc">Aprende a tu ritmo</div>
-                </div>
-            </a>
-
-            <!-- Mi Profesor -->
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-profesor">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Mi Profesor</div>
-                    <div class="nav-card-desc">Asistente IA</div>
-                </div>
-            </a>
-
-            <!-- Duelos -->
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-duelo">
-                    <i class="fas fa-shield-alt"></i>
-                </div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Duelos</div>
-                    <div class="nav-card-desc">Reta a otros</div>
-                </div>
-            </a>
-
-            <!-- Tienda -->
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-tienda">
-                    <i class="fas fa-store"></i>
-                </div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Tienda</div>
-                    <div class="nav-card-desc">Personaliza tu perfil</div>
-                </div>
-            </a>
-
-            <!-- Favoritos -->
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-favoritos">
-                    <i class="fas fa-heart"></i>
-                </div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Favoritos</div>
-                    <div class="nav-card-desc">Contenido guardado</div>
-                </div>
-            </a>
-
-            <!-- Historial -->
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-historial">
-                    <i class="fas fa-clock-rotate-left"></i>
-                </div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Historial</div>
-                    <div class="nav-card-desc">Tu actividad reciente</div>
-                </div>
-            </a>
-
-            <!-- Ajustes -->
-            <a href="#" class="nav-card" onclick="handleNavClick(event)">
-                <div class="nav-card-icon gradient-ajustes">
-                    <i class="fas fa-cog"></i>
-                </div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Ajustes</div>
-                    <div class="nav-card-desc">Configuración</div>
-                </div>
-            </a>
-        </div>
-    </aside>
-
-    <!-- Contenido Principal -->
     <main class="content">
         <div class="modo-estudio-wrapper">
             <!-- Header -->
@@ -259,6 +126,8 @@
         <span id="toastMessage">Sesión generada</span>
     </div>
 
+    <script src="../js/components.js"></script>
+
     <script>
         // Estado de la aplicación
         let selectedOptions = ['esquemas', 'flashcards', 'quizzes', 'resumenes'];
@@ -271,53 +140,26 @@
             const container = document.getElementById('sparklesContainer');
             
             // SVG de estrella de 4 puntas
-            const starSVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" fill="url(#goldGradient)"/>
-                <defs>
-                    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style="stop-color:#FFF8DC"/>
-                        <stop offset="30%" style="stop-color:#FFD700"/>
-                        <stop offset="60%" style="stop-color:#FFC125"/>
-                        <stop offset="100%" style="stop-color:#FFB347"/>
-                    </linearGradient>
-                </defs>
-            </svg>`;
+            const starSVG = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" fill="url(#goldGradient)"/><defs><linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#FFF8DC"/><stop offset="30%" style="stop-color:#FFD700"/><stop offset="60%" style="stop-color:#FFC125"/><stop offset="100%" style="stop-color:#FFB347"/></linearGradient></defs></svg>';
 
             const starPositions = [
-                // Esquina superior izquierda
                 { left: -5, top: -5, size: 'large', delay: 0, anim: 'star-glow' },
                 { left: 8, top: 15, size: 'small', delay: 0.8, anim: 'star-twinkle' },
                 { left: -2, top: 35, size: 'tiny', delay: 1.5, anim: 'star-glow-alt' },
-                
-                // Superior centro-izquierda
                 { left: 20, top: -8, size: 'small', delay: 0.3, anim: 'star-glow-alt' },
-                
-                // Superior centro-derecha
                 { left: 75, top: -6, size: 'small', delay: 0.6, anim: 'star-twinkle' },
-                
-                // Esquina superior derecha
                 { left: 98, top: -8, size: 'large', delay: 0.2, anim: 'star-glow' },
                 { left: 92, top: 12, size: 'tiny', delay: 1.2, anim: 'star-glow-alt' },
                 { left: 105, top: 25, size: 'small', delay: 0.9, anim: 'star-twinkle' },
-                
-                // Lado izquierdo
                 { left: -8, top: 55, size: 'small', delay: 0.4, anim: 'star-glow' },
                 { left: 3, top: 75, size: 'tiny', delay: 1.8, anim: 'star-twinkle' },
-                
-                // Lado derecho
                 { left: 102, top: 50, size: 'small', delay: 0.7, anim: 'star-glow-alt' },
                 { left: 95, top: 70, size: 'tiny', delay: 1.1, anim: 'star-glow' },
-                
-                // Esquina inferior izquierda
                 { left: -6, top: 95, size: 'large', delay: 0.5, anim: 'star-glow' },
                 { left: 10, top: 88, size: 'tiny', delay: 1.6, anim: 'star-twinkle' },
                 { left: 5, top: 108, size: 'small', delay: 0.1, anim: 'star-glow-alt' },
-                
-                // Inferior centro
                 { left: 35, top: 105, size: 'tiny', delay: 1.3, anim: 'star-glow' },
                 { left: 65, top: 103, size: 'small', delay: 0.4, anim: 'star-twinkle' },
-                
-                // Esquina inferior derecha
                 { left: 100, top: 92, size: 'large', delay: 0.3, anim: 'star-glow-alt' },
                 { left: 88, top: 105, size: 'small', delay: 1.0, anim: 'star-glow' },
                 { left: 105, top: 75, size: 'tiny', delay: 1.7, anim: 'star-twinkle' },
@@ -326,7 +168,7 @@
             let sparklesHTML = '';
             starPositions.forEach((pos) => {
                 const duration = 2 + Math.random() * 2;
-                sparklesHTML += `<div class="star-sparkle ${pos.size}" style="left:${pos.left}%;top:${pos.top}%;animation:${pos.anim} ${duration}s ease-in-out infinite;animation-delay:${pos.delay}s">${starSVG}</div>`;
+                sparklesHTML += '<div class="star-sparkle ' + pos.size + '" style="left:' + pos.left + '%;top:' + pos.top + '%;animation:' + pos.anim + ' ' + duration + 's ease-in-out infinite;animation-delay:' + pos.delay + 's">' + starSVG + '</div>';
             });
             container.innerHTML = sparklesHTML;
         }
@@ -354,17 +196,15 @@
                 uploadedFile = file;
                 selectedDataType = 'file';
                 
-                // Actualizar UI
                 document.getElementById('fileOption').classList.add('selected');
                 document.getElementById('textOption').classList.remove('selected');
                 document.getElementById('textInputContainer').classList.remove('show');
                 
-                // Mostrar archivo adjuntado
                 document.getElementById('fileName').textContent = file.name;
                 document.getElementById('fileSize').textContent = formatFileSize(file.size);
                 document.getElementById('fileAttached').classList.add('show');
                 
-                showToast(`Archivo adjuntado: ${file.name}`);
+                showToast('Archivo adjuntado: ' + file.name);
             }
         }
 
@@ -394,12 +234,10 @@
             const fileOption = document.getElementById('fileOption');
             
             if (textContainer.classList.contains('show')) {
-                // Cerrar
                 textContainer.classList.remove('show');
                 textOption.classList.remove('selected');
                 selectedDataType = null;
             } else {
-                // Abrir
                 textContainer.classList.add('show');
                 textOption.classList.add('selected');
                 fileOption.classList.remove('selected');
@@ -420,6 +258,8 @@
                 userText = this.value;
                 charCount.textContent = this.value.length.toLocaleString();
             });
+
+            generateSparkles();
         });
 
         // Actualizar estado del botón
@@ -435,7 +275,6 @@
                 return;
             }
 
-            // Obtener texto si está seleccionado
             if (selectedDataType === 'text') {
                 userText = document.getElementById('textInput').value;
             }
@@ -450,12 +289,10 @@
 
             console.log('Sesión de estudio generada:', session);
             
-            // Mostrar loading
             const btn = document.getElementById('generateBtn');
             btn.innerHTML = '<div class="loading-spinner"></div> <span class="generate-btn-text">Generando...</span>';
             btn.disabled = true;
             
-            // Simulación de carga
             setTimeout(() => {
                 btn.innerHTML = '<span class="generate-btn-text">Generar</span>';
                 btn.disabled = false;
@@ -470,37 +307,6 @@
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
-
-        // Toggle menú móvil
-        function toggleMenu() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.querySelector('.sidebar-overlay');
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
-            document.body.style.overflow = sidebar.classList.contains('active') ? 'hidden' : '';
-        }
-
-        // Manejar clicks en navegación
-        function handleNavClick(event) {
-            if (window.innerWidth <= 768) {
-                toggleMenu();
-            }
-            document.querySelectorAll('.nav-card').forEach(card => card.classList.remove('active'));
-            event.currentTarget.classList.add('active');
-        }
-
-        // Cerrar sidebar con Escape
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && window.innerWidth <= 768) {
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar.classList.contains('active')) {
-                    toggleMenu();
-                }
-            }
-        });
-
-        // Inicializar
-        generateSparkles();
     </script>
 </body>
 </html>
