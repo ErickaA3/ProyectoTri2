@@ -112,6 +112,10 @@
         /* ===== SIDEBAR ===== */
         .sidebar-cards {
             width: 300px;
+            height: calc(100vh - 65px);
+            position: fixed;
+            top: 65px;
+            left: 0;
             background: var(--secondary-bg);
             border-right: 1px solid var(--border-color);
             padding: 1.5rem;
@@ -231,11 +235,10 @@
         /* ===== CONTENIDO PRINCIPAL ===== */
         .content {
             flex: 1;
+            margin-left: 300px;
             padding: 2rem 3rem;
             overflow-y: auto;
-            background: radial-gradient(ellipse at 20% 30%, rgba(88, 28, 135, 0.25) 0%, transparent 50%),
-                        radial-gradient(ellipse at 80% 70%, rgba(30, 64, 175, 0.15) 0%, transparent 50%),
-                        var(--primary-bg);
+            background: var(--primary-bg);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -457,6 +460,15 @@
         .esquema-card:hover .j-svg line {
             stroke: rgba(139, 92, 246, 0.5);
         }
+        .esquema-card:hover .j-svg .j-root-r {
+            filter: url(#jGlow) drop-shadow(0 0 8px rgba(139, 92, 246, 0.6));
+        }
+        .esquema-card:hover .j-svg .j-mid-r {
+            filter: url(#jGlowSm) drop-shadow(0 0 6px rgba(167, 139, 250, 0.5));
+        }
+        .esquema-card:hover .j-svg .j-leaf-r {
+            filter: drop-shadow(0 0 5px rgba(196, 181, 253, 0.4));
+        }
 
         /* -- Conceptual -- */
         .illus-conceptual { position: relative; }
@@ -513,6 +525,12 @@
         .esquema-card:hover .c-center {
             box-shadow: 0 0 35px rgba(251, 191, 36, 0.6);
         }
+        .esquema-card:hover .c-b1 { box-shadow: 0 0 18px rgba(59,130,246,0.6); }
+        .esquema-card:hover .c-b2 { box-shadow: 0 0 18px rgba(34,197,94,0.6); }
+        .esquema-card:hover .c-b3 { box-shadow: 0 0 18px rgba(236,72,153,0.6); }
+        .esquema-card:hover .c-b4 { box-shadow: 0 0 18px rgba(139,92,246,0.6); }
+        .esquema-card:hover .c-b5 { box-shadow: 0 0 18px rgba(249,115,22,0.6); }
+        .esquema-card:hover .c-b6 { box-shadow: 0 0 18px rgba(45,212,191,0.6); }
 
         /* -- Línea del tiempo (CSS with proper alignment) -- */
         .illus-timeline { position: relative; width: 90%; height: 100%; }
@@ -753,11 +771,21 @@
             border-right-color: rgba(34, 197, 94, 0.8);
             border-bottom-color: rgba(249, 115, 22, 0.8);
             border-left-color: rgba(236, 72, 153, 0.8);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.3), inset 0 0 15px rgba(139, 92, 246, 0.15);
         }
+        .esquema-card:hover .cy-center-icon {
+            color: rgba(139, 92, 246, 1);
+            text-shadow: 0 0 12px rgba(139, 92, 246, 0.6);
+        }
+        .esquema-card:hover .cy-arrow-top { border-bottom-color: rgba(59, 130, 246, 0.9); filter: drop-shadow(0 0 4px rgba(59,130,246,0.5)); }
+        .esquema-card:hover .cy-arrow-right { border-left-color: rgba(34, 197, 94, 0.9); filter: drop-shadow(0 0 4px rgba(34,197,94,0.5)); }
+        .esquema-card:hover .cy-arrow-bottom { border-top-color: rgba(249, 115, 22, 0.9); filter: drop-shadow(0 0 4px rgba(249,115,22,0.5)); }
+        .esquema-card:hover .cy-arrow-left { border-right-color: rgba(236, 72, 153, 0.9); filter: drop-shadow(0 0 4px rgba(236,72,153,0.5)); }
 
         .cy-arrow {
             position: absolute;
             width: 0; height: 0;
+            transition: all 0.4s ease;
         }
         .cy-arrow-top {
             top: -6px; right: 20px;
@@ -805,6 +833,7 @@
             transform: translate(-50%, -50%);
             font-size: 1.3rem;
             color: rgba(139, 92, 246, 0.7);
+            transition: all 0.4s ease;
         }
 
         /* ===== CONFIRM BUTTON ===== */
@@ -908,7 +937,7 @@
         /* ===== RESPONSIVE ===== */
         @media (max-width: 1024px) {
             .sidebar-cards { width: 260px; }
-            .content { padding: 1.5rem; }
+            .content { margin-left: 260px; padding: 1.5rem; }
             .stat-pill .stat-label { display: none; }
             .esquema-grid { grid-template-columns: repeat(2, 1fr); }
             .esquema-grid-bottom { grid-template-columns: repeat(2, 1fr); max-width: 100%; }
@@ -933,7 +962,7 @@
             }
             .sidebar-cards.active { transform: translateX(0); }
 
-            .content { padding: 1.5rem 1rem; }
+            .content { margin-left: 0; padding: 1.5rem 1rem; }
             .esquema-grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
             .esquema-grid-bottom { grid-template-columns: 1fr; max-width: 360px; }
             .esquema-title { font-size: 1.7rem; }
@@ -954,4 +983,4 @@
             .esquema-title { font-size: 1.5rem; }
             .esquema-card { padding: 1.5rem 1rem; }
             .confirm-btn { width: 100%; justify-content: center; padding: 1rem 2rem; font-size: 1.15rem; }
-        }
+        }   
