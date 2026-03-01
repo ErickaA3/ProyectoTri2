@@ -70,7 +70,8 @@ public class RegisterServlet extends HttpServlet {
 
         } catch (SQLException e) {
             e.printStackTrace();
-            JsonUtil.sendError(response, 500, "Error interno del servidor.");
+            JsonUtil.sendError(response, 500, e.getMessage());
+            
         }
     }
 

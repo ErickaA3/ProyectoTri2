@@ -10,9 +10,8 @@ import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.project.database.DatabaseConnection;
-
 import com.project.dao.interfaces.IUserDAO;
+import com.project.database.DatabaseConnection;
 import com.project.model.users.Statistics;
 import com.project.model.users.User;
 
@@ -70,11 +69,11 @@ public class UserDAOImpl implements IUserDAO {
     @Override
     public User register(User user) throws SQLException {
         // 1. Insertar en users y recuperar el UUID generado
-        String sqlUser = """
-                INSERT INTO users (username, email, password_hash, full_name, language)
-                VALUES (?, ?, ?, ?, ?)
-                RETURNING id, username, email, full_name, language, country, birthdate, created_at
-                """;
+       String sqlUser = """
+        INSERT INTO users (username, email, password_hash, full_name)
+        VALUES (?, ?, ?, ?)
+        RETURNING id, username, email, password_hash, full_name, created_at
+        """;
 
         try (PreparedStatement ps = conn().prepareStatement(sqlUser)) {
             ps.setString(1, user.getUsername());
