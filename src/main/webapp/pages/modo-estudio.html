@@ -15,62 +15,41 @@
 
     <main class="content">
         <div class="modo-estudio-wrapper">
-            <!-- Header -->
             <div class="modo-estudio-header">
                 <img src="../images/modo-estudio/modo-estudio-logo.png" alt="Modo Estudio" class="modo-estudio-logo">
             </div>
 
-            <!-- Card Principal -->
             <div class="modo-estudio-card">
-                <!-- Chispas doradas -->
                 <div class="sparkles-container" id="sparklesContainer"></div>
-                
+
                 <!-- Opciones de Estudio -->
                 <div class="study-options">
                     <div class="study-option selected" onclick="toggleOption(this)" data-type="esquemas">
-                        <div class="study-option-icon">
-                            <i class="fas fa-project-diagram"></i>
-                        </div>
+                        <div class="study-option-icon"><i class="fas fa-project-diagram"></i></div>
                         <div class="study-option-label">
-                            <div class="study-checkbox">
-                                <i class="fas fa-check"></i>
-                            </div>
+                            <div class="study-checkbox"><i class="fas fa-check"></i></div>
                             Esquemas
                         </div>
                     </div>
-
                     <div class="study-option selected" onclick="toggleOption(this)" data-type="flashcards">
-                        <div class="study-option-icon">
-                            <i class="fas fa-layer-group"></i>
-                        </div>
+                        <div class="study-option-icon"><i class="fas fa-layer-group"></i></div>
                         <div class="study-option-label">
-                            <div class="study-checkbox">
-                                <i class="fas fa-check"></i>
-                            </div>
+                            <div class="study-checkbox"><i class="fas fa-check"></i></div>
                             Flashcards
                         </div>
                     </div>
-
-                    <div class="study-option selected" onclick="toggleOption(this)" data-type="quizzes">
-                        <div class="study-option-icon">
-                            <i class="fas fa-question-circle"></i>
-                        </div>
+                    <!-- "Quizzes" renombrado a "Examen" -->
+                    <div class="study-option selected" onclick="toggleOption(this)" data-type="examenes">
+                        <div class="study-option-icon"><i class="fas fa-file-signature"></i></div>
                         <div class="study-option-label">
-                            <div class="study-checkbox">
-                                <i class="fas fa-check"></i>
-                            </div>
-                            Quizzes
+                            <div class="study-checkbox"><i class="fas fa-check"></i></div>
+                            Examen
                         </div>
                     </div>
-
                     <div class="study-option selected" onclick="toggleOption(this)" data-type="resumenes">
-                        <div class="study-option-icon">
-                            <i class="fas fa-file-alt"></i>
-                        </div>
+                        <div class="study-option-icon"><i class="fas fa-file-alt"></i></div>
                         <div class="study-option-label">
-                            <div class="study-checkbox">
-                                <i class="fas fa-check"></i>
-                            </div>
+                            <div class="study-checkbox"><i class="fas fa-check"></i></div>
                             Resúmenes
                         </div>
                     </div>
@@ -90,223 +69,247 @@
                             Escribir texto
                         </div>
                     </div>
-
-                    <!-- Archivo adjuntado -->
                     <div class="file-attached" id="fileAttached">
                         <i class="fas fa-file-lines"></i>
                         <div class="file-info">
                             <div class="file-name" id="fileName">documento.pdf</div>
                             <div class="file-size" id="fileSize">2.4 MB</div>
                         </div>
-                        <button class="file-remove" onclick="removeFile()">
-                            <i class="fas fa-times"></i>
-                        </button>
+                        <button class="file-remove" onclick="removeFile()"><i class="fas fa-times"></i></button>
                     </div>
-
-                    <!-- Caja de texto -->
                     <div class="text-input-container" id="textInputContainer">
                         <textarea class="text-input" id="textInput" placeholder="Escribe o pega aquí el contenido que quieres estudiar..."></textarea>
-                        <div class="text-input-hint">
-                            <span id="charCount">0</span> caracteres
-                        </div>
+                        <div class="text-input-hint"><span id="charCount">0</span> caracteres</div>
                     </div>
                 </div>
 
-                <!-- Botón Generar -->
-                <button class="generate-btn" onclick="generateStudySession()" id="generateBtn">
-                    <span class="generate-btn-text">Generar</span>
+                <!-- Preview de pasos de configuración -->
+                <div class="steps-preview" id="stepsPreview" style="display:none;">
+                    <div class="steps-preview-label"><i class="fas fa-sliders-h"></i> Pasos de configuración:</div>
+                    <div class="steps-preview-list" id="stepsPreviewList"></div>
+                </div>
+
+                <!-- Botón Siguiente -->
+                <button class="generate-btn" onclick="goToNextStep()" id="generateBtn">
+                    <span class="generate-btn-text">
+                        Siguiente &nbsp;<i class="fas fa-arrow-right" style="font-size:0.85em"></i>
+                    </span>
                 </button>
             </div>
         </div>
     </main>
 
-    <!-- Toast -->
     <div class="toast" id="toast">
         <i class="fas fa-check-circle"></i>
-        <span id="toastMessage">Sesión generada</span>
+        <span id="toastMessage">Listo</span>
     </div>
 
     <script src="../js/components.js"></script>
-
     <script>
-        // Estado de la aplicación
-        let selectedOptions = ['esquemas', 'flashcards', 'quizzes', 'resumenes'];
+        // ================================================================
+        // ESTADO
+        // ================================================================
+        let selectedOptions  = ['esquemas', 'flashcards', 'examenes', 'resumenes'];
         let selectedDataType = null;
-        let uploadedFile = null;
-        let userText = '';
+        let uploadedFile     = null;
+        let userText         = '';
 
-        // Generar estrellas doradas con glow
+        // Opciones que requieren una página de configuración propia
+        const CONFIG_REQUIRED = {
+            esquemas: { label: 'Tipo de esquema',   icon: 'fa-project-diagram', page: '../pages/seleccion-esquema.html' },
+            examenes: { label: 'Configurar examen', icon: 'fa-file-signature',  page: '../pages/config-examen.html'     }
+        };
+
+        // ================================================================
+        // SPARKLES (sin cambios)
+        // ================================================================
         function generateSparkles() {
             const container = document.getElementById('sparklesContainer');
-            
-            // SVG de estrella de 4 puntas
             const starSVG = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z" fill="url(#goldGradient)"/><defs><linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#FFF8DC"/><stop offset="30%" style="stop-color:#FFD700"/><stop offset="60%" style="stop-color:#FFC125"/><stop offset="100%" style="stop-color:#FFB347"/></linearGradient></defs></svg>';
-
-            const starPositions = [
-                { left: -5, top: -5, size: 'large', delay: 0, anim: 'star-glow' },
-                { left: 8, top: 15, size: 'small', delay: 0.8, anim: 'star-twinkle' },
-                { left: -2, top: 35, size: 'tiny', delay: 1.5, anim: 'star-glow-alt' },
-                { left: 20, top: -8, size: 'small', delay: 0.3, anim: 'star-glow-alt' },
-                { left: 75, top: -6, size: 'small', delay: 0.6, anim: 'star-twinkle' },
-                { left: 98, top: -8, size: 'large', delay: 0.2, anim: 'star-glow' },
-                { left: 92, top: 12, size: 'tiny', delay: 1.2, anim: 'star-glow-alt' },
-                { left: 105, top: 25, size: 'small', delay: 0.9, anim: 'star-twinkle' },
-                { left: -8, top: 55, size: 'small', delay: 0.4, anim: 'star-glow' },
-                { left: 3, top: 75, size: 'tiny', delay: 1.8, anim: 'star-twinkle' },
-                { left: 102, top: 50, size: 'small', delay: 0.7, anim: 'star-glow-alt' },
-                { left: 95, top: 70, size: 'tiny', delay: 1.1, anim: 'star-glow' },
-                { left: -6, top: 95, size: 'large', delay: 0.5, anim: 'star-glow' },
-                { left: 10, top: 88, size: 'tiny', delay: 1.6, anim: 'star-twinkle' },
-                { left: 5, top: 108, size: 'small', delay: 0.1, anim: 'star-glow-alt' },
-                { left: 35, top: 105, size: 'tiny', delay: 1.3, anim: 'star-glow' },
-                { left: 65, top: 103, size: 'small', delay: 0.4, anim: 'star-twinkle' },
-                { left: 100, top: 92, size: 'large', delay: 0.3, anim: 'star-glow-alt' },
-                { left: 88, top: 105, size: 'small', delay: 1.0, anim: 'star-glow' },
-                { left: 105, top: 75, size: 'tiny', delay: 1.7, anim: 'star-twinkle' },
+            const positions = [
+                {left:-5,top:-5,size:'large',delay:0,anim:'star-glow'},{left:8,top:15,size:'small',delay:0.8,anim:'star-twinkle'},
+                {left:-2,top:35,size:'tiny',delay:1.5,anim:'star-glow-alt'},{left:20,top:-8,size:'small',delay:0.3,anim:'star-glow-alt'},
+                {left:75,top:-6,size:'small',delay:0.6,anim:'star-twinkle'},{left:98,top:-8,size:'large',delay:0.2,anim:'star-glow'},
+                {left:92,top:12,size:'tiny',delay:1.2,anim:'star-glow-alt'},{left:105,top:25,size:'small',delay:0.9,anim:'star-twinkle'},
+                {left:-8,top:55,size:'small',delay:0.4,anim:'star-glow'},{left:3,top:75,size:'tiny',delay:1.8,anim:'star-twinkle'},
+                {left:102,top:50,size:'small',delay:0.7,anim:'star-glow-alt'},{left:95,top:70,size:'tiny',delay:1.1,anim:'star-glow'},
+                {left:-6,top:95,size:'large',delay:0.5,anim:'star-glow'},{left:10,top:88,size:'tiny',delay:1.6,anim:'star-twinkle'},
+                {left:5,top:108,size:'small',delay:0.1,anim:'star-glow-alt'},{left:35,top:105,size:'tiny',delay:1.3,anim:'star-glow'},
+                {left:65,top:103,size:'small',delay:0.4,anim:'star-twinkle'},{left:100,top:92,size:'large',delay:0.3,anim:'star-glow-alt'},
+                {left:88,top:105,size:'small',delay:1.0,anim:'star-glow'},{left:105,top:75,size:'tiny',delay:1.7,anim:'star-twinkle'}
             ];
-
-            let sparklesHTML = '';
-            starPositions.forEach((pos) => {
-                const duration = 2 + Math.random() * 2;
-                sparklesHTML += '<div class="star-sparkle ' + pos.size + '" style="left:' + pos.left + '%;top:' + pos.top + '%;animation:' + pos.anim + ' ' + duration + 's ease-in-out infinite;animation-delay:' + pos.delay + 's">' + starSVG + '</div>';
-            });
-            container.innerHTML = sparklesHTML;
+            container.innerHTML = positions.map(p => {
+                const dur = 2 + Math.random() * 2;
+                return `<div class="star-sparkle ${p.size}" style="left:${p.left}%;top:${p.top}%;animation:${p.anim} ${dur}s ease-in-out infinite;animation-delay:${p.delay}s">${starSVG}</div>`;
+            }).join('');
         }
 
-        // Toggle opción de estudio
-        function toggleOption(element) {
-            element.classList.toggle('selected');
-            const type = element.dataset.type;
-            
-            if (element.classList.contains('selected')) {
-                if (!selectedOptions.includes(type)) {
-                    selectedOptions.push(type);
-                }
+        // ================================================================
+        // TOGGLE OPCIONES
+        // ================================================================
+        function toggleOption(el) {
+            el.classList.toggle('selected');
+            const type = el.dataset.type;
+            if (el.classList.contains('selected')) {
+                if (!selectedOptions.includes(type)) selectedOptions.push(type);
             } else {
-                selectedOptions = selectedOptions.filter(opt => opt !== type);
+                selectedOptions = selectedOptions.filter(o => o !== type);
             }
-            
             updateGenerateButton();
+            updateStepsPreview();
         }
 
-        // Manejar selección de archivo
+        function updateGenerateButton() {
+            document.getElementById('generateBtn').disabled = selectedOptions.length === 0;
+        }
+
+        // Muestra el resumen de pasos de config que habrá
+        function updateStepsPreview() {
+            const queue   = selectedOptions.filter(o => CONFIG_REQUIRED[o]);
+            const preview = document.getElementById('stepsPreview');
+            const list    = document.getElementById('stepsPreviewList');
+
+            if (queue.length === 0) { preview.style.display = 'none'; return; }
+
+            preview.style.display = 'flex';
+            list.innerHTML = queue.map((opt, i) =>
+                `${i > 0 ? '<div class="step-arrow"><i class="fas fa-chevron-right"></i></div>' : ''}
+                 <div class="step-preview-item">
+                     <div class="step-preview-num">${i + 1}</div>
+                     <i class="fas ${CONFIG_REQUIRED[opt].icon}"></i>
+                     <span>${CONFIG_REQUIRED[opt].label}</span>
+                 </div>`
+            ).join('');
+        }
+
+        // ================================================================
+        // ARCHIVO / TEXTO
+        // ================================================================
         function handleFileSelect(event) {
             const file = event.target.files[0];
-            if (file) {
-                uploadedFile = file;
-                selectedDataType = 'file';
-                
-                document.getElementById('fileOption').classList.add('selected');
-                document.getElementById('textOption').classList.remove('selected');
-                document.getElementById('textInputContainer').classList.remove('show');
-                
-                document.getElementById('fileName').textContent = file.name;
-                document.getElementById('fileSize').textContent = formatFileSize(file.size);
-                document.getElementById('fileAttached').classList.add('show');
-                
-                showToast('Archivo adjuntado: ' + file.name);
-            }
+            if (!file) return;
+            uploadedFile     = file;
+            selectedDataType = 'file';
+            document.getElementById('fileOption').classList.add('selected');
+            document.getElementById('textOption').classList.remove('selected');
+            document.getElementById('textInputContainer').classList.remove('show');
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileAttached').classList.add('show');
+            showToast('Archivo adjuntado: ' + file.name);
         }
 
-        // Formatear tamaño de archivo
         function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            if (!bytes) return '0 Bytes';
+            const k = 1024, sizes = ['Bytes','KB','MB','GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
-        // Remover archivo
         function removeFile() {
-            uploadedFile = null;
-            selectedDataType = null;
+            uploadedFile = null; selectedDataType = null;
             document.getElementById('fileInput').value = '';
             document.getElementById('fileOption').classList.remove('selected');
             document.getElementById('fileAttached').classList.remove('show');
             showToast('Archivo eliminado');
         }
 
-        // Toggle caja de texto
         function toggleTextInput() {
-            const textContainer = document.getElementById('textInputContainer');
-            const textOption = document.getElementById('textOption');
-            const fileOption = document.getElementById('fileOption');
-            
-            if (textContainer.classList.contains('show')) {
-                textContainer.classList.remove('show');
-                textOption.classList.remove('selected');
-                selectedDataType = null;
+            const tc  = document.getElementById('textInputContainer');
+            const to  = document.getElementById('textOption');
+            const fo  = document.getElementById('fileOption');
+            if (tc.classList.contains('show')) {
+                tc.classList.remove('show'); to.classList.remove('selected'); selectedDataType = null;
             } else {
-                textContainer.classList.add('show');
-                textOption.classList.add('selected');
-                fileOption.classList.remove('selected');
+                tc.classList.add('show'); to.classList.add('selected');
+                fo.classList.remove('selected');
                 document.getElementById('fileAttached').classList.remove('show');
-                uploadedFile = null;
-                document.getElementById('fileInput').value = '';
-                selectedDataType = 'text';
-                document.getElementById('textInput').focus();
+                uploadedFile = null; document.getElementById('fileInput').value = '';
+                selectedDataType = 'text'; document.getElementById('textInput').focus();
             }
         }
 
-        // Contador de caracteres
-        document.addEventListener('DOMContentLoaded', function() {
-            const textInput = document.getElementById('textInput');
-            const charCount = document.getElementById('charCount');
-            
-            textInput.addEventListener('input', function() {
-                userText = this.value;
-                charCount.textContent = this.value.length.toLocaleString();
-            });
-
-            generateSparkles();
-        });
-
-        // Actualizar estado del botón
-        function updateGenerateButton() {
-            const btn = document.getElementById('generateBtn');
-            btn.disabled = selectedOptions.length === 0;
-        }
-
-        // Generar sesión de estudio
-        function generateStudySession() {
+        // ================================================================
+        // FLUJO PRINCIPAL — "Siguiente"
+        // ================================================================
+        function goToNextStep() {
+            // Validar opciones
             if (selectedOptions.length === 0) {
-                showToast('Selecciona al menos una opción');
+                showToast('Selecciona al menos una opción de estudio'); return;
+            }
+
+            // Leer texto si aplica
+            if (selectedDataType === 'text') userText = document.getElementById('textInput').value;
+
+            // Validar contenido
+            if (!uploadedFile && (!userText || !userText.trim())) {
+                showToast('Agrega texto o adjunta un archivo primero'); return;
+            }
+
+            // Verificar sesión → si no hay cuenta redirigir a index
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) {
+                showToast('Debes iniciar sesión primero');
+                setTimeout(() => window.location.href = '../index.html', 1200);
                 return;
             }
 
-            if (selectedDataType === 'text') {
-                userText = document.getElementById('textInput').value;
-            }
-
-            const session = {
-                options: selectedOptions,
-                dataType: selectedDataType,
-                file: uploadedFile ? uploadedFile.name : null,
-                text: userText || null,
-                timestamp: new Date().toISOString()
+            // Construir el objeto de flujo y guardarlo
+            const configQueue = selectedOptions.filter(o => CONFIG_REQUIRED[o]);
+            const flow = {
+                userId,
+                options:            [...selectedOptions],
+                dataType:           selectedDataType || 'text',
+                text:               selectedDataType === 'text' ? userText : null,
+                fileName:           uploadedFile ? uploadedFile.name : null,
+                configs:            {},
+                configQueue,
+                currentConfigIndex: 0
             };
+            sessionStorage.setItem('modoEstudioFlow', JSON.stringify(flow));
 
-            console.log('Sesión de estudio generada:', session);
-            
-            const btn = document.getElementById('generateBtn');
-            btn.innerHTML = '<div class="loading-spinner"></div> <span class="generate-btn-text">Generando...</span>';
-            btn.disabled = true;
-            
-            setTimeout(() => {
-                btn.innerHTML = '<span class="generate-btn-text">Generar</span>';
-                btn.disabled = false;
-                showToast('¡Sesión lista! Redirigiendo...');
-            }, 2500);
+            // Ir a la primera config, o directo a generar si no hay configs
+            if (configQueue.length > 0) {
+                window.location.href = CONFIG_REQUIRED[configQueue[0]].page;
+            } else {
+                window.location.href = '../pages/sesion-estudio.html';
+            }
         }
 
-        // Mostrar toast
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toastMessage').textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
+        // ================================================================
+        // TOAST / INIT
+        // ================================================================
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+            t.classList.add('show');
+            clearTimeout(t._t);
+            t._t = setTimeout(() => t.classList.remove('show'), 3000);
         }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('textInput').addEventListener('input', function () {
+                userText = this.value;
+                document.getElementById('charCount').textContent = this.value.length.toLocaleString();
+            });
+            generateSparkles();
+            updateStepsPreview();
+        });
     </script>
+
+    <style>
+        .steps-preview {
+            display: flex; flex-direction: column; gap: 10px;
+            margin: 16px 0 4px; padding: 14px 16px;
+            background: rgba(139,92,246,0.08);
+            border: 1px solid rgba(139,92,246,0.2);
+            border-radius: 12px;
+        }
+        .steps-preview-label { font-size: 0.72rem; color: rgba(255,255,255,0.45); text-transform: uppercase; letter-spacing: 0.08em; }
+        .steps-preview-list  { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+        .step-preview-item   { display: flex; align-items: center; gap: 6px; background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); border-radius: 20px; padding: 4px 12px 4px 6px; font-size: 0.78rem; color: #c4b5fd; }
+        .step-preview-num    { width:18px; height:18px; background:#8b5cf6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.65rem; font-weight:700; color:#fff; flex-shrink:0; }
+        .step-arrow          { color: rgba(255,255,255,0.25); font-size: 0.65rem; }
+    </style>
 </body>
 </html>
