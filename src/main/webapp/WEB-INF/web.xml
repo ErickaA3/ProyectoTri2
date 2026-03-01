@@ -1,0 +1,26 @@
+
+#Modo Estudio
+<servlet>
+    <servlet-name>ModoEstudioServlet</servlet-name>
+    <servlet-class>com.educationalplatform.servlet.ModoEstudioServlet</servlet-class>
+</servlet>
+<servlet-mapping>
+    <servlet-name>ModoEstudioServlet</servlet-name>
+    <url-pattern>/modo-estudio/generar</url-pattern>
+</servlet-mapping>
+
+#Tienda
+<servlet>
+    <servlet-name>ShopServlet</servlet-name>
+    <servlet-class>com.project.servlet.ShopServlet</servlet-class>
+</servlet>
+<servlet-mapping>
+    <servlet-name>ShopServlet</servlet-name>
+    <url-pattern>/shop/*</url-pattern>
+</servlet-mapping>
+#Hans
+
+
+
+
+#Ericka

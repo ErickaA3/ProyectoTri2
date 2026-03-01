@@ -208,8 +208,29 @@
             window.addEventListener('resize', resizeCanvas);
         })();
 
-        // ===== DATA =====
-        const originalFlashcards = [
+        // ===== DATA — carga desde sessionStorage (generado por Modo Estudio) =====
+        function loadFlashcardsFromSession() {
+            const raw = sessionStorage.getItem('studyResults');
+            if (!raw) return null;
+            try {
+                const results = JSON.parse(raw);
+                const fc = results.flashcards;
+                if (!fc || !fc.cards || fc.cards.length === 0) return null;
+                // La IA devuelve { front, back } → mapeamos a { question, answer }
+                return {
+                    title: fc.title || 'Flashcards',
+                    cards: fc.cards.map(c => ({ question: c.front, answer: c.back }))
+                };
+            } catch (e) {
+                console.error('Error leyendo flashcards del sessionStorage:', e);
+                return null;
+            }
+        }
+
+        const sessionData = loadFlashcardsFromSession();
+
+        // Si hay datos del backend los usamos; si no, usamos los de demo
+        const originalFlashcards = sessionData ? sessionData.cards : [
             { question: "¿Qué es la encapsulación en POO?", answer: "Es el mecanismo que restringe el acceso directo a los componentes de un objeto, agrupando datos y métodos en una unidad y usando modificadores de acceso (public, private, protected)." },
             { question: "¿Cuáles son los 4 pilares de la POO?", answer: "Encapsulación, Herencia, Polimorfismo y Abstracción. Estos son los principios fundamentales que definen la programación orientada a objetos." },
             { question: "¿Qué es el polimorfismo?", answer: "Es la capacidad de un objeto de tomar muchas formas. Permite que una misma referencia se comporte de diferentes maneras según el objeto al que apunte (sobrecarga y sobreescritura)." },
@@ -222,14 +243,18 @@
             { question: "¿Qué es la sobreescritura de métodos (@Override)?", answer: "Es cuando una clase hija redefine un método heredado de la clase padre con la misma firma. Permite dar comportamiento específico a la subclase." }
         ];
 
+        const flashcardTopic = sessionData ? sessionData.title : 'Programación Orientada a Objetos';
+
         let flashcardsData = [...originalFlashcards];
         let currentIndex = 0;
         let isFlipped = false;
         let answers = new Array(flashcardsData.length).fill(null);
-        let highScore = 85;
+        let highScore = 0;
 
         // ===== INIT =====
         function init() {
+            // Poner el título dinámico del tema generado por la IA
+            document.getElementById('topicLabel').textContent = flashcardTopic;
             generateDots();
             updateCard();
             updateProgress();
@@ -405,7 +430,7 @@
             document.getElementById('newHighscore').classList.remove('show');
             document.getElementById('highScoreDisplay').textContent = highScore + '%';
             document.getElementById('scoreRing').style.strokeDashoffset = '471.24';
-            document.getElementById('topicLabel').textContent = 'Programación Orientada a Objetos';
+            document.getElementById('topicLabel').textContent = flashcardTopic;
             document.getElementById('totalNum').textContent = flashcardsData.length;
             resetCardFlip(); generateDots(); updateCard(); updateProgress(); updateNavButtons();
         }
