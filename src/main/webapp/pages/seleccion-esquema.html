@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Tipo de Esquema</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/seleccion-esquema.css">
+</head>
+<body data-page="modo-estudio">
+
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="content" id="mainContent">
+        <canvas id="starsCanvas"></canvas>
+
+        <!-- Breadcrumb con indicador de progreso del flujo -->
+        <div class="esquema-nav">
+            <a href="#" class="back-btn" onclick="goBack(event)">
+                <i class="fas fa-arrow-left"></i> Volver
+            </a>
+            <div class="breadcrumb-trail">
+                <span>Modo Estudio</span>
+                <span class="sep"><i class="fas fa-chevron-right" style="font-size:0.6rem"></i></span>
+                <span class="current">Tipo de Esquema</span>
+            </div>
+            <!-- Indicador de paso actual -->
+            <div class="flow-step-indicator" id="stepIndicator"></div>
+        </div>
+
+        <div class="esquema-header">
+            <h1 class="esquema-title">Selecciona un tipo de esquema</h1>
+            <p class="esquema-subtitle">Elige el formato que mejor se adapte a tu contenido</p>
+        </div>
+
+        <!-- Grid top (3 cards) -->
+        <div class="esquema-grid">
+            <div class="esquema-card" onclick="selectEsquema(this, 'jerarquico')">
+                <div class="esquema-check"><i class="fas fa-check"></i></div>
+                <div class="esquema-illustration illus-jerarquico">
+                    <svg class="j-svg" viewBox="0 0 200 130" preserveAspectRatio="xMidYMid meet">
+                        <defs>
+                            <linearGradient id="jGrad1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient>
+                            <linearGradient id="jGrad2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#a78bfa"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient>
+                            <linearGradient id="jGrad3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#c4b5fd"/><stop offset="100%" stop-color="#a78bfa"/></linearGradient>
+                        </defs>
+                        <line x1="100" y1="25" x2="100" y2="38"/><line x1="42" y1="38" x2="158" y2="38"/>
+                        <line x1="42" y1="38" x2="42" y2="48"/><line x1="100" y1="38" x2="100" y2="48"/><line x1="158" y1="38" x2="158" y2="48"/>
+                        <line x1="42" y1="68" x2="42" y2="76"/><line x1="20" y1="76" x2="64" y2="76"/>
+                        <line x1="20" y1="76" x2="20" y2="86"/><line x1="64" y1="76" x2="64" y2="86"/>
+                        <line x1="100" y1="68" x2="100" y2="86"/>
+                        <line x1="158" y1="68" x2="158" y2="76"/><line x1="136" y1="76" x2="180" y2="76"/>
+                        <line x1="136" y1="76" x2="136" y2="86"/><line x1="180" y1="76" x2="180" y2="86"/>
+                        <rect class="j-root-r" x="70" y="8" width="60" height="17"/><text x="100" y="17">Tema</text>
+                        <rect class="j-mid-r" x="17" y="48" width="50" height="20"/><rect class="j-mid-r" x="75" y="48" width="50" height="20"/><rect class="j-mid-r" x="133" y="48" width="50" height="20"/>
+                        <rect class="j-leaf-r" x="4" y="86" width="32" height="16"/><rect class="j-leaf-r" x="48" y="86" width="32" height="16"/>
+                        <rect class="j-leaf-r" x="84" y="86" width="32" height="16"/><rect class="j-leaf-r" x="120" y="86" width="32" height="16"/><rect class="j-leaf-r" x="164" y="86" width="32" height="16"/>
+                    </svg>
+                </div>
+                <div class="esquema-card-title">Jerárquico</div>
+                <div class="esquema-card-desc">Organiza ideas de lo general a lo específico</div>
+            </div>
+
+            <div class="esquema-card" onclick="selectEsquema(this, 'conceptual')">
+                <div class="esquema-check"><i class="fas fa-check"></i></div>
+                <div class="esquema-illustration illus-conceptual">
+                    <svg class="c-lines-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                        <line x1="50" y1="50" x2="50" y2="13"/><line x1="50" y1="50" x2="86" y2="28"/>
+                        <line x1="50" y1="50" x2="83" y2="72"/><line x1="50" y1="50" x2="50" y2="87"/>
+                        <line x1="50" y1="50" x2="16" y2="72"/><line x1="50" y1="50" x2="16" y2="28"/>
+                    </svg>
+                    <div class="c-bubble c-b1"></div><div class="c-bubble c-b2"></div><div class="c-bubble c-b3"></div>
+                    <div class="c-bubble c-b4"></div><div class="c-bubble c-b5"></div><div class="c-bubble c-b6"></div>
+                    <div class="c-center"><i class="fas fa-lightbulb" style="color:#fff"></i></div>
+                </div>
+                <div class="esquema-card-title">Conceptual</div>
+                <div class="esquema-card-desc">Conecta conceptos e ideas relacionadas</div>
+            </div>
+
+            <div class="esquema-card" onclick="selectEsquema(this, 'timeline')">
+                <div class="esquema-check"><i class="fas fa-check"></i></div>
+                <div class="esquema-illustration illus-timeline">
+                    <div class="t-line-main"></div>
+                    <div class="t-dot t-dot-1"></div><div class="t-dot t-dot-2"></div><div class="t-dot t-dot-3"></div>
+                    <div class="t-dot t-dot-4"></div><div class="t-dot t-dot-5"></div>
+                    <div class="t-card t-card-1 t-card-above"><div class="t-stem t-stem-up"></div></div>
+                    <div class="t-card t-card-2 t-card-below"><div class="t-stem t-stem-down"></div></div>
+                    <div class="t-card t-card-3 t-card-above"><div class="t-stem t-stem-up"></div></div>
+                    <div class="t-card t-card-4 t-card-below"><div class="t-stem t-stem-down"></div></div>
+                    <div class="t-card t-card-5 t-card-above"><div class="t-stem t-stem-up"></div></div>
+                </div>
+                <div class="esquema-card-title">Línea del tiempo</div>
+                <div class="esquema-card-desc">Eventos ordenados cronológicamente</div>
+            </div>
+        </div>
+
+        <!-- Grid bottom (2 cards centradas) -->
+        <div class="esquema-grid-bottom">
+            <div class="esquema-card" onclick="selectEsquema(this, 'causa-efecto')">
+                <div class="esquema-check"><i class="fas fa-check"></i></div>
+                <div class="esquema-illustration illus-causa">
+                    <div class="fish-tail"></div><div class="fish-spine"></div><div class="fish-head"></div>
+                    <div class="fish-head-label">Efecto</div>
+                    <div class="fish-branch top fb-1"></div><div class="fish-branch top fb-2"></div><div class="fish-branch top fb-3"></div>
+                    <div class="fish-branch bottom fb-1"></div><div class="fish-branch bottom fb-2"></div><div class="fish-branch bottom fb-3"></div>
+                    <div class="cause-line cl-1a"></div><div class="cause-line cl-1b"></div><div class="cause-line cl-2a"></div>
+                    <div class="cause-line cl-2b"></div><div class="cause-line cl-3a"></div><div class="cause-line cl-3b"></div>
+                    <div class="cause-line cl-4a"></div><div class="cause-line cl-4b"></div><div class="cause-line cl-5a"></div>
+                    <div class="cause-line cl-5b"></div><div class="cause-line cl-6a"></div><div class="cause-line cl-6b"></div>
+                    <span class="causa-label top-1a">Causa</span><span class="causa-label top-1b">Causa</span>
+                    <span class="causa-label top-2a">Causa</span><span class="causa-label top-2b">Causa</span>
+                    <span class="causa-label top-3a">Causa</span><span class="causa-label top-3b">Causa</span>
+                    <span class="causa-label bot-4a">Causa</span><span class="causa-label bot-4b">Causa</span>
+                    <span class="causa-label bot-5a">Causa</span><span class="causa-label bot-5b">Causa</span>
+                    <span class="causa-label bot-6a">Causa</span><span class="causa-label bot-6b">Causa</span>
+                </div>
+                <div class="esquema-card-title">Causa y efecto</div>
+                <div class="esquema-card-desc">Identifica causas y sus consecuencias</div>
+            </div>
+
+            <div class="esquema-card" onclick="selectEsquema(this, 'ciclico')">
+                <div class="esquema-check"><i class="fas fa-check"></i></div>
+                <div class="esquema-illustration illus-ciclico">
+                    <div class="cy-ring">
+                        <div class="cy-arrow cy-arrow-top"></div><div class="cy-arrow cy-arrow-right"></div>
+                        <div class="cy-arrow cy-arrow-bottom"></div><div class="cy-arrow cy-arrow-left"></div>
+                        <div class="cy-center-icon"><i class="fas fa-sync-alt"></i></div>
+                        <div class="cy-label cy-label-1">Fase 1</div><div class="cy-label cy-label-2">Fase 2</div>
+                        <div class="cy-label cy-label-3">Fase 3</div><div class="cy-label cy-label-4">Fase 4</div>
+                    </div>
+                </div>
+                <div class="esquema-card-title">Cíclico</div>
+                <div class="esquema-card-desc">Procesos que se repiten en un ciclo</div>
+            </div>
+        </div>
+
+        <div class="confirm-btn-wrapper">
+            <button class="confirm-btn" id="confirmBtn" onclick="confirmSelection()" disabled>
+                <span id="confirmBtnText">Continuar</span>
+            </button>
+        </div>
+    </main>
+
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage">Tipo seleccionado</span>
+    </div>
+
+    <script src="../js/components.js"></script>
+    <script>
+        let selectedType = null;
+
+        // ================================================================
+        // FLOW MANAGER — lee y avanza el flujo del sessionStorage
+        // ================================================================
+        function getFlow()       { return JSON.parse(sessionStorage.getItem('modoEstudioFlow') || 'null'); }
+        function saveFlow(flow)  { sessionStorage.setItem('modoEstudioFlow', JSON.stringify(flow)); }
+
+        // Calcula a qué página ir después de esta config
+        function getNextPage(flow) {
+            const next = flow.currentConfigIndex + 1;
+            const CONFIG_PAGES = {
+                esquemas: '../pages/seleccion-esquema.html',
+                examenes: '../pages/config-examen.html'
+            };
+            if (next < flow.configQueue.length) {
+                return CONFIG_PAGES[flow.configQueue[next]];
+            }
+            return '../pages/sesion-estudio.html'; // ya terminaron todas las configs
+        }
+
+        // ================================================================
+        // INIT — mostrar indicador de paso
+        // ================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const flow = getFlow();
+            if (!flow) { window.location.href = '../pages/modo-estudio.html'; return; }
+
+            const idx   = flow.configQueue.indexOf('esquemas');
+            const total = flow.configQueue.length;
+            if (idx >= 0) {
+                document.getElementById('stepIndicator').innerHTML =
+                    `<span>Paso ${idx + 1} de ${total}</span>`;
+            }
+        });
+
+        // ================================================================
+        // SELECCIÓN Y CONFIRMACIÓN
+        // ================================================================
+        function selectEsquema(card, type) {
+            document.querySelectorAll('.esquema-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            selectedType = type;
+            document.getElementById('confirmBtn').disabled = false;
+            const names = { jerarquico:'Jerárquico', conceptual:'Conceptual', timeline:'Línea del tiempo', 'causa-efecto':'Causa y efecto', ciclico:'Cíclico' };
+            showToast(`Esquema ${names[type]} seleccionado`);
+        }
+
+        function confirmSelection() {
+            if (!selectedType) return;
+
+            const flow = getFlow();
+            if (!flow) { window.location.href = '../pages/modo-estudio.html'; return; }
+
+            // Guardar la config de esquemas en el flujo
+            flow.configs.esquemas = { tipo: selectedType };
+            flow.currentConfigIndex++;
+            saveFlow(flow);
+
+            // Cambiar botón a loading
+            const btn = document.getElementById('confirmBtn');
+            btn.disabled = true;
+            document.getElementById('confirmBtnText').innerHTML =
+                '<div style="width:20px;height:20px;border:3px solid rgba(45,212,191,0.3);border-top-color:#2dd4bf;border-radius:50%;animation:spin 1s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px"></div> Guardando...';
+
+            setTimeout(() => window.location.href = getNextPage(flow), 600);
+        }
+
+        function goBack(e) {
+            e.preventDefault();
+            // Retroceder en el flujo
+            const flow = getFlow();
+            if (flow && flow.currentConfigIndex > 0) {
+                flow.currentConfigIndex--;
+                saveFlow(flow);
+            }
+            window.location.href = '../pages/modo-estudio.html';
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+            t.classList.add('show');
+            clearTimeout(t._t);
+            t._t = setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // ===== STARS CANVAS =====
+        (function initStars() {
+            const canvas = document.getElementById('starsCanvas');
+            const ctx = canvas.getContext('2d');
+            const content = document.getElementById('mainContent');
+            function resizeCanvas() { canvas.width = content.offsetWidth; canvas.height = content.scrollHeight; }
+            resizeCanvas();
+            const stars = Array.from({length:150}, () => ({
+                x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+                size: Math.random()*2+0.3, speedX: (Math.random()-0.5)*0.1, speedY: (Math.random()-0.5)*0.1,
+                opacity: Math.random()*0.4+0.1, opacityChange: (Math.random()-0.5)*0.012,
+                color: ['#ffffff','#ffffff','#ffe9c4','#d4f1ff','#c4b5fd','#aaddff'][Math.floor(Math.random()*6)]
+            }));
+            function animate() {
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                stars.forEach(s => {
+                    s.x+=s.speedX; s.y+=s.speedY;
+                    if(s.x<0)s.x=canvas.width; if(s.x>canvas.width)s.x=0;
+                    if(s.y<0)s.y=canvas.height; if(s.y>canvas.height)s.y=0;
+                    s.opacity+=s.opacityChange;
+                    if(s.opacity<=0.05||s.opacity>=0.8)s.opacityChange*=-1;
+                    ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI*2);
+                    ctx.fillStyle=s.color; ctx.globalAlpha=s.opacity; ctx.fill();
+                });
+                ctx.globalAlpha=1; requestAnimationFrame(animate);
+            }
+            animate(); window.addEventListener('resize',resizeCanvas);
+        })();
+    </script>
+
+    <style>
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .flow-step-indicator { font-size: 0.75rem; color: rgba(255,255,255,0.35); background: rgba(255,255,255,0.06); padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</body>
+</html>

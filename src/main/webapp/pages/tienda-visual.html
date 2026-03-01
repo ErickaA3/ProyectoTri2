@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Tienda</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/tienda.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+
+
+</head>
+
+<body>
+
+    <!-- ===== NAVBAR (idéntico al de historial) ===== -->
+    <nav class="main-navbar">
+        <div class="navbar-left">
+            <button class="menu-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-bars"></i>
+            </button>
+            <a href="#" class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <span class="logo-text">Mi ProfesorIA</span>
+            </a>
+        </div>
+
+        <div class="navbar-stats">
+            <div class="stat-pill">
+                <img src="../images/gifs/fire.gif" class="fire-gif" alt="🔥">
+                <span class="stat-value">5</span>
+                <span class="stat-label">Días Racha</span>
+            </div>
+            <div class="stat-pill">
+                <img src="../images/gifs/star.gif" class="star-gif" alt="⭐">
+                <span class="stat-value">2,450</span>
+                <span class="stat-label">XP</span>
+            </div>
+            <div class="stat-pill">
+                <img src="../images/gifs/coin.gif" class="money-gif" alt="🪙">
+                <span class="stat-value" id="user-balance-header">1,520</span>
+                <span class="stat-label">Monedas</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===== OVERLAY MOBILE ===== -->
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+    <!-- ===== SIDEBAR (idéntico al de historial) ===== -->
+    <aside class="sidebar-cards" id="sidebar">
+
+        <div class="user-profile">
+            <div class="user-avatar">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="user-name">Estudiante Pro</div>
+            <div class="user-level">Nivel 12</div>
+        </div>
+
+        <div class="nav-cards">
+            <a href="#" class="nav-card">
+                <div class="nav-card-icon gradient-perfil"><i class="fas fa-user"></i></div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Perfil</div>
+                    <div class="nav-card-desc">Tu información</div>
+                </div>
+            </a>
+            <a href="#" class="nav-card modo-estudio">
+                <div class="nav-card-icon gradient-estudio"><i class="fas fa-book-open"></i></div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Modo Estudio</div>
+                    <div class="nav-card-desc">Aprende a tu ritmo</div>
+                </div>
+            </a>
+            <a href="#" class="nav-card">
+                <div class="nav-card-icon gradient-profesor"><i class="fas fa-robot"></i></div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Mi Profesor</div>
+                    <div class="nav-card-desc">Asistente IA</div>
+                </div>
+            </a>
+            <a href="#" class="nav-card">
+                <div class="nav-card-icon gradient-duelo"><i class="fas fa-shield-alt"></i></div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Duelos</div>
+                    <div class="nav-card-desc">Reta a otros</div>
+                </div>
+            </a>
+            <a href="#" class="nav-card active">
+                <div class="nav-card-icon gradient-tienda"><i class="fas fa-shopping-bag"></i></div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Tienda</div>
+                    <div class="nav-card-desc">Personaliza tu perfil</div>
+                </div>
+            </a>
+            <a href="#" class="nav-card">
+                <div class="nav-card-icon gradient-favoritos"><i class="fas fa-heart"></i></div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Favoritos</div>
+                    <div class="nav-card-desc">Contenido guardado</div>
+                </div>
+            </a>
+            <a href="#" class="nav-card">
+                <div class="nav-card-icon gradient-historial"><i class="fas fa-clock-rotate-left"></i></div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Historial</div>
+                    <div class="nav-card-desc">Tu actividad reciente</div>
+                </div>
+            </a>
+            <a href="#" class="nav-card">
+                <div class="nav-card-icon gradient-ajustes"><i class="fas fa-cog"></i></div>
+                <div class="nav-card-content">
+                    <div class="nav-card-title">Ajustes</div>
+                    <div class="nav-card-desc">Configuración</div>
+                </div>
+            </a>
+        </div>
+    </aside>
+
+    <!-- ===== CONTENIDO TIENDA ===== -->
+    <main class="content">
+        <canvas id="galaxyCanvas"  class="content-canvas"></canvas>
+        <canvas id="forestCanvas"  class="content-canvas"></canvas>
+        <canvas id="volcanoCanvas" class="content-canvas"></canvas>
+        <canvas id="oceanCanvas"   class="content-canvas"></canvas>
+        <canvas id="skyCanvas"     class="content-canvas"></canvas>
+        <canvas id="rainCanvas"    class="content-canvas"></canvas>
+        <canvas id="auroraCanvas"  class="content-canvas"></canvas>
+
+        <div class="content-header">
+            <div class="title-container">
+                <h2 class="title-default">Tienda</h2>
+                <img src="../images/titulos/titulo-forest.png"  alt="Tienda" class="title-image title-forest">
+                <img src="../images/titulos/"                   alt="Tienda" class="title-image title-galaxy">
+                <img src="../images/titulos/titulo-volcano.png" alt="Tienda" class="title-image title-volcano">
+                <img src="../images/titulos/titulo-ocean.png"   alt="Tienda" class="title-image title-ocean">
+                <img src="../images/titulos/"                   alt="Tienda" class="title-image title-aurora">
+                <img src="../images/titulos/titulo-sky.png"     alt="Tienda" class="title-image title-sky">
+                <img src="../images/titulos/titulo-rain.png"    alt="Tienda" class="title-image title-rain">
+            </div>
+        </div>
+
+        <div class="shop-layout">
+            <div class="customization-area">
+                <div class="category-section">
+                    <h3 class="category-title">Personaliza tu profesor</h3>
+                    <div class="avatar-grid">
+                        <div class="avatar-item" data-price="400" onclick="selectAvatar(this,400,'avatar-1')">
+                            <div class="avatar-preview">👨‍🏫</div>
+                            <div class="avatar-price">💰 400</div>
+                        </div>
+                        <div class="avatar-item" data-price="600" onclick="selectAvatar(this,600,'avatar-2')">
+                            <div class="avatar-preview">👨‍💼</div>
+                            <div class="avatar-price">💰 600</div>
+                        </div>
+                        <div class="avatar-item" data-price="700" onclick="selectAvatar(this,700,'avatar-3')">
+                            <div class="avatar-preview">👨‍🎓</div>
+                            <div class="avatar-price">💰 700</div>
+                        </div>
+                        <div class="avatar-item" data-price="800" onclick="selectAvatar(this,800,'avatar-4')">
+                            <div class="avatar-preview">👨‍💻</div>
+                            <div class="avatar-price">💰 800</div>
+                        </div>
+                        <div class="avatar-item" data-price="900" onclick="selectAvatar(this,900,'avatar-5')">
+                            <div class="avatar-preview">🧑‍🚀</div>
+                            <div class="avatar-price">💰 900</div>
+                        </div>
+                        <div class="avatar-item" data-price="1000" onclick="selectAvatar(this,1000,'avatar-6')">
+                            <div class="avatar-preview">🧙‍♂️</div>
+                            <div class="avatar-price">💰 1000</div>
+                        </div>
+                        <div class="avatar-item" data-price="1200" onclick="selectAvatar(this,1200,'avatar-7')">
+                            <div class="avatar-preview">👨‍🔬</div>
+                            <div class="avatar-price">💰 1200</div>
+                        </div>
+                        <div class="avatar-item" data-price="1500" onclick="selectAvatar(this,1500,'avatar-8')">
+                            <div class="avatar-preview">🦸‍♂️</div>
+                            <div class="avatar-price">💰 1500</div>
+                        </div>
+                    </div>
+                    <button class="buy-button" onclick="buySelectedAvatar()">Comprar Avatar</button>
+                </div>
+
+                <div class="category-section">
+                    <h3 class="category-title">Personaliza el fondo</h3>
+                    <div class="background-grid">
+                        <div class="background-item owned" data-price="0" data-id="bg-default" data-class="bg-default" onclick="selectBackground(this,0,'bg-default','bg-default')">
+                            <div class="background-preview" style="background:linear-gradient(135deg,#0a0e27 0%,#1a1f3a 100%);">
+                                <div class="owned-badge">✓ TUYO</div>
+                                <div class="equipped-badge">★ EQUIPADO</div>
+                            </div>
+                            <div class="background-name">🌙 Noche Oscura</div>
+                            <div class="background-price">💰 Gratis</div>
+                        </div>
+                        <div class="background-item" data-price="500" data-id="bg-galaxy" data-class="bg-galaxy" onclick="selectBackground(this,500,'bg-galaxy','bg-galaxy')">
+                            <div class="background-preview" style="background:radial-gradient(ellipse at top,#1B2735 0%,#090A0F 100%);"></div>
+                            <div class="background-name">🌌 Galaxia</div>
+                            <div class="background-price">💰 500</div>
+                        </div>
+                        <div class="background-item" data-price="600" data-id="bg-volcano" data-class="bg-volcano" onclick="selectBackground(this,600,'bg-volcano','bg-volcano')">
+                            <div class="background-preview" style="background:radial-gradient(ellipse at bottom,#ff6b00 0%,#1a0f0f 70%);"></div>
+                            <div class="background-name">🌋 Volcán</div>
+                            <div class="background-price">💰 600</div>
+                        </div>
+                        <div class="background-item" data-price="550" data-id="bg-ocean" data-class="bg-ocean" onclick="selectBackground(this,550,'bg-ocean','bg-ocean')">
+                            <div class="background-preview" style="background:linear-gradient(to bottom,#0a1f3a 0%,#051020 100%);"></div>
+                            <div class="background-name">🌊 Océano</div>
+                            <div class="background-price">💰 550</div>
+                        </div>
+                        <div class="background-item" data-price="650" data-id="bg-forest" data-class="bg-forest" onclick="selectBackground(this,650,'bg-forest','bg-forest')">
+                            <div class="background-preview" style="background:linear-gradient(to bottom,#152815 0%,#0a1a0a 100%);"></div>
+                            <div class="background-name">🌳 Amazonas</div>
+                            <div class="background-price">💰 650</div>
+                        </div>
+                        <div class="background-item" data-price="800" data-id="bg-aurora" data-class="bg-aurora" onclick="selectBackground(this,800,'bg-aurora','bg-aurora')">
+                            <div class="background-preview" style="background:radial-gradient(ellipse at top,#2a5a2a 0%,#0a1a0a 60%,#000 100%);"></div>
+                            <div class="background-name">✨ Aurora Boreal</div>
+                            <div class="background-price">💰 800</div>
+                        </div>
+                        <div class="background-item" data-price="700" data-id="bg-sky" data-class="bg-sky" onclick="selectBackground(this,700,'bg-sky','bg-sky')">
+                            <div class="background-preview" style="background:linear-gradient(to bottom,#0B1F2A 0%,#1a3344 100%);"></div>
+                            <div class="background-name">☁️ Cielo Nocturno</div>
+                            <div class="background-price">💰 700</div>
+                        </div>
+                        <div class="background-item" data-price="750" data-id="bg-rain" data-class="bg-rain" onclick="selectBackground(this,750,'bg-rain','bg-rain')">
+                            <div class="background-preview" style="background:linear-gradient(to bottom,#0a0a0a 0%,#0f1a1a 100%);"></div>
+                            <div class="background-name">🌧️ Lluvia Digital</div>
+                            <div class="background-price">💰 750</div>
+                        </div>
+                    </div>
+                    <button class="buy-button" onclick="buySelectedBackground()">Comprar Fondo</button>
+                </div>
+            </div>
+
+            <div class="products-sidebar">
+                <select class="product-filter">
+                    <option>Productos de Moneda</option>
+                    <option>Productos de XP</option>
+                    <option>Productos Premium</option>
+                </select>
+                <div class="product-card" data-price="500">
+                    <div class="product-header">
+                        <div class="product-icon">🧪</div>
+                        <div class="product-info"><h3>1,000 XP</h3><div class="product-price-box">💰 500</div></div>
+                    </div>
+                    <button class="product-buy-btn" onclick="buyProduct('1,000 XP',500)">Comprar</button>
+                </div>
+                <div class="product-card" data-price="300">
+                    <div class="product-header">
+                        <div class="product-icon">🛡️</div>
+                        <div class="product-info"><h3>Streak Protector</h3><div class="product-price-box">💰 300</div></div>
+                    </div>
+                    <button class="product-buy-btn" onclick="buyProduct('Streak Protector',300)">Comprar</button>
+                </div>
+                <div class="product-card" data-price="400">
+                    <div class="product-header">
+                        <div class="product-icon">📝</div>
+                        <div class="product-info"><h3>Resúmenes Avanzados</h3><div class="product-price-box">💰 400</div></div>
+                    </div>
+                    <button class="product-buy-btn" onclick="buyProduct('Resúmenes Avanzados',400)">Comprar</button>
+                </div>
+                <p class="products-title">Más productos</p>
+                <div class="product-card" data-price="600">
+                    <div class="product-header">
+                        <div class="product-icon">💎</div>
+                        <div class="product-info"><h3>Pack Premium</h3><div class="product-price-box">💰 600</div></div>
+                    </div>
+                    <button class="product-buy-btn" onclick="buyProduct('Pack Premium',600)">Comprar</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Fondos Insuficientes -->
+    <div class="modal" id="insufficientModal">
+        <div class="modal-content">
+            <div class="modal-icon">❌</div>
+            <h2 class="modal-title">Fondos Insuficientes</h2>
+            <p class="modal-message">No tienes suficientes monedas</p>
+            <div class="modal-details">
+                <p><strong>Precio:</strong> <span id="modal-price">0</span> 💰</p>
+                <p><strong>Tu saldo:</strong> <span id="modal-balance">0</span> 💰</p>
+                <p style="color:#f44336;"><strong>Te faltan:</strong> <span id="modal-needed">0</span> 💰</p>
+            </div>
+            <button class="modal-btn" onclick="closeModal()">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Modal Compra Exitosa -->
+    <div class="modal" id="purchaseModal">
+        <div class="modal-content">
+            <div class="modal-icon">🎉</div>
+            <h2 class="modal-title">¡Compra Exitosa!</h2>
+            <p class="modal-message" id="purchase-message">Has comprado un nuevo item</p>
+            <div class="modal-details">
+                <p><strong>Precio:</strong> <span id="purchase-price">0</span> 💰</p>
+                <p><strong>Saldo restante:</strong> <span id="purchase-balance">0</span> 💰</p>
+            </div>
+            <p style="color:var(--text-secondary);font-size:14px;margin-bottom:20px;">¿Quieres equiparlo ahora?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn" onclick="equipNow()">Equipar Ahora</button>
+                <button class="modal-btn modal-btn-secondary" onclick="equipLater()">Más Tarde</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('sidebarOverlay').classList.toggle('active');
+        }
+
+        let userBalance = 1520;
+        let selectedAvatarPrice = 0, selectedAvatarId = null;
+        let selectedBackgroundPrice = 0, selectedBackgroundId = null, selectedBackgroundClass = null;
+        let ownedBackgrounds = ['bg-default'];
+        let currentEquippedBackground = 'bg-default';
+        let lastPurchasedBackground = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateInsufficientItems();
+            initGalaxyCanvas(); initForestCanvas(); initVolcanoCanvas();
+            initOceanCanvas(); initSkyCanvas(); initRainCanvas(); initAuroraCanvas();
+        });
+
+        function initGalaxyCanvas() {
+            const canvas = document.getElementById('galaxyCanvas'), ctx = canvas.getContext('2d'), content = document.querySelector('.content');
+            function resize() { canvas.width = content.offsetWidth; canvas.height = content.offsetHeight; } resize();
+            const stars = Array.from({length:200}, () => ({ x:Math.random()*canvas.width, y:Math.random()*canvas.height, size:Math.random()*2+0.3, speedX:(Math.random()-0.5)*0.15, speedY:(Math.random()-0.5)*0.15, opacity:Math.random()*0.4+0.1, opacityChange:(Math.random()-0.5)*0.015, color:['#fff','#fff','#ffe9c4','#d4f1ff','#ffccaa','#aaddff'][Math.floor(Math.random()*6)] }));
+            function draw() {
+                if (!content.classList.contains('bg-galaxy')) { requestAnimationFrame(draw); return; }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                stars.forEach(s => {
+                    s.x=(s.x+s.speedX+canvas.width)%canvas.width; s.y=(s.y+s.speedY+canvas.height)%canvas.height;
+                    s.opacity+=s.opacityChange; if(s.opacity<=0.2||s.opacity>=1) s.opacityChange*=-1;
+                    ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI*2); ctx.fillStyle=s.color; ctx.globalAlpha=s.opacity; ctx.fill();
+                    if(s.size>1.5){ctx.beginPath();ctx.arc(s.x,s.y,s.size*2,0,Math.PI*2);ctx.globalAlpha=s.opacity*0.3;ctx.fill();}
+                }); ctx.globalAlpha=1; requestAnimationFrame(draw);
+            } draw(); window.addEventListener('resize', resize);
+        }
+
+        function initForestCanvas() {
+            const canvas = document.getElementById('forestCanvas'), ctx = canvas.getContext('2d'), content = document.querySelector('.content');
+            const leafImg = new Image(); leafImg.src = '../images/backgrounds/leaf.png';
+            function resize() { canvas.width = content.offsetWidth; canvas.height = content.offsetHeight; } resize();
+            const mkLeaf = () => ({ x:Math.random()*canvas.width, y:-100, scale:Math.random()*0.15+0.08, speedY:Math.random()*1.5+0.8, speedX:(Math.random()-0.5), rotation:Math.random()*Math.PI*2, rotSpeed:(Math.random()-0.5)*0.03, opacity:Math.random()*0.5+0.5, wobble:Math.random()*Math.PI*2, wobbleSpeed:Math.random()*0.05+0.02 });
+            const leaves = Array.from({length:15}, () => { const l=mkLeaf(); l.y=Math.random()*canvas.height; return l; });
+            function draw() {
+                if (!content.classList.contains('bg-forest')) { requestAnimationFrame(draw); return; }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                if(leafImg.complete && leafImg.naturalWidth>0) leaves.forEach((l,i) => {
+                    l.wobble+=l.wobbleSpeed; l.y+=l.speedY; l.x+=l.speedX+Math.sin(l.wobble)*2; l.rotation+=l.rotSpeed;
+                    if(l.y>canvas.height+100) leaves[i]=mkLeaf();
+                    ctx.save(); ctx.globalAlpha=l.opacity; ctx.translate(l.x,l.y); ctx.rotate(l.rotation); ctx.scale(l.scale,l.scale);
+                    ctx.drawImage(leafImg,-leafImg.width/2,-leafImg.height/2); ctx.restore();
+                }); requestAnimationFrame(draw);
+            } draw(); window.addEventListener('resize', resize);
+        }
+
+        function initVolcanoCanvas() {
+            const canvas = document.getElementById('volcanoCanvas'), ctx = canvas.getContext('2d'), content = document.querySelector('.content');
+            function resize() { canvas.width = content.offsetWidth; canvas.height = content.offsetHeight; } resize();
+            const cols = ['#ff4500','#ff6b00','#ffd700','#ff2200'];
+            const mkEmber = () => ({ x:canvas.width/2+(Math.random()-0.5)*canvas.width*0.5, y:canvas.height+20, size:Math.random()*3+1, speedX:(Math.random()-0.5)*2, speedY:-(Math.random()*2+1), opacity:Math.random()*0.8+0.2, opacityDec:Math.random()*0.005+0.002, color:cols[Math.floor(Math.random()*4)] });
+            const embers = Array.from({length:80}, () => { const e=mkEmber(); e.y=canvas.height+Math.random()*200; return e; });
+            function draw() {
+                if (!content.classList.contains('bg-volcano')) { requestAnimationFrame(draw); return; }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                embers.forEach((e,i) => {
+                    e.y+=e.speedY; e.x+=e.speedX; e.opacity-=e.opacityDec;
+                    if(e.opacity<=0||e.y<-50) embers[i]=mkEmber();
+                    ctx.beginPath(); ctx.arc(e.x,e.y,e.size,0,Math.PI*2); ctx.fillStyle=e.color; ctx.globalAlpha=e.opacity; ctx.fill();
+                }); ctx.globalAlpha=1; requestAnimationFrame(draw);
+            } draw(); window.addEventListener('resize', resize);
+        }
+
+        function initOceanCanvas() {
+            const canvas = document.getElementById('oceanCanvas'), ctx = canvas.getContext('2d'), content = document.querySelector('.content');
+            function resize() { canvas.width = content.offsetWidth; canvas.height = content.offsetHeight; } resize();
+            const mkBubble = () => ({ x:Math.random()*canvas.width, y:canvas.height+20, size:Math.random()*6+2, speed:Math.random()*1+0.3, opacity:Math.random()*0.4+0.1, wobble:Math.random()*Math.PI*2, wobbleSpeed:Math.random()*0.03+0.01 });
+            const bubbles = Array.from({length:50}, () => { const b=mkBubble(); b.y=canvas.height+Math.random()*200; return b; });
+            function draw() {
+                if (!content.classList.contains('bg-ocean')) { requestAnimationFrame(draw); return; }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                bubbles.forEach((b,i) => {
+                    b.y-=b.speed; b.wobble+=b.wobbleSpeed; b.x+=Math.sin(b.wobble)*0.5;
+                    if(b.y<-20) bubbles[i]=mkBubble();
+                    ctx.beginPath(); ctx.arc(b.x,b.y,b.size,0,Math.PI*2);
+                    ctx.strokeStyle=`rgba(125,211,252,${b.opacity})`; ctx.lineWidth=1; ctx.stroke();
+                    ctx.fillStyle=`rgba(125,211,252,${b.opacity*0.2})`; ctx.fill();
+                }); requestAnimationFrame(draw);
+            } draw(); window.addEventListener('resize', resize);
+        }
+
+        function initSkyCanvas() {
+            const canvas = document.getElementById('skyCanvas'), ctx = canvas.getContext('2d'), content = document.querySelector('.content');
+            function resize() { canvas.width = content.offsetWidth; canvas.height = content.offsetHeight; } resize();
+            const stars = Array.from({length:100}, () => ({ x:Math.random()*canvas.width, y:Math.random()*canvas.height*0.7, size:Math.random()*1.5+0.3, opacity:Math.random()*0.6+0.2, opacityChange:(Math.random()-0.5)*0.01 }));
+            function draw() {
+                if (!content.classList.contains('bg-sky')) { requestAnimationFrame(draw); return; }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                stars.forEach(s => { s.opacity+=s.opacityChange; if(s.opacity<0.1||s.opacity>0.8) s.opacityChange*=-1; ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI*2); ctx.fillStyle=`rgba(255,255,255,${s.opacity})`; ctx.fill(); });
+                requestAnimationFrame(draw);
+            } draw(); window.addEventListener('resize', resize);
+        }
+
+        function initRainCanvas() {
+            const canvas = document.getElementById('rainCanvas'), ctx = canvas.getContext('2d'), content = document.querySelector('.content');
+            function resize() { canvas.width = content.offsetWidth; canvas.height = content.offsetHeight; } resize();
+            const drops = Array.from({length:120}, () => ({ x:Math.random()*canvas.width, y:Math.random()*canvas.height, length:Math.random()*20+10, speed:Math.random()*5+3, opacity:Math.random()*0.5+0.1, isCyan:Math.random()>0.97 }));
+            function draw() {
+                if (!content.classList.contains('bg-rain')) { requestAnimationFrame(draw); return; }
+                ctx.clearRect(0,0,canvas.width,canvas.height);
+                drops.forEach(d => {
+                    d.y+=d.speed; if(d.y>canvas.height){d.y=-d.length;d.x=Math.random()*canvas.width;}
+                    ctx.beginPath(); ctx.moveTo(d.x,d.y); ctx.lineTo(d.x-d.length*0.1,d.y+d.length);
+                    ctx.strokeStyle=d.isCyan?`rgba(45,212,191,${d.opacity})`:`rgba(125,211,252,${d.opacity})`;
+                    ctx.lineWidth=d.isCyan?1.5:0.8; ctx.stroke();
+                }); requestAnimationFrame(draw);
+            } draw(); window.addEventListener('resize', resize);
+        }
+
+        function initAuroraCanvas() {
+            const canvas = document.getElementById('auroraCanvas'), ctx = canvas.getContext('2d'), content = document.querySelector('.content');
+            function resize() { canvas.width = content.offsetWidth; canvas.height = content.offsetHeight; } resize();
+            let time = 0;
+            function draw() {
+                if (!content.classList.contains('bg-aurora')) { requestAnimationFrame(draw); return; }
+                ctx.clearRect(0,0,canvas.width,canvas.height); time+=0.02;
+                const breathe = Math.sin(time*0.3)*0.03+0.12;
+                const g = ctx.createRadialGradient(canvas.width*.5,canvas.height*.2,0,canvas.width*.5,canvas.height*.2,canvas.width*.6);
+                g.addColorStop(0,`rgba(80,255,120,${breathe})`); g.addColorStop(0.5,`rgba(50,200,100,${breathe*0.5})`); g.addColorStop(1,'transparent');
+                ctx.fillStyle=g; ctx.fillRect(0,0,canvas.width,canvas.height);
+                ctx.save(); ctx.globalAlpha=0.15;
+                for(let w=0;w<5;w++){
+                    ctx.beginPath(); const baseY=canvas.height*.3+w*60, amp=40+w*10, freq=0.003+w*.001;
+                    ctx.moveTo(0,baseY);
+                    for(let x=0;x<=canvas.width;x+=5){ctx.lineTo(x,baseY+Math.sin(x*freq+time*.5+w*.5)*amp+Math.sin(x*freq*2+time*.3)*(amp*.3));}
+                    const wg=ctx.createLinearGradient(0,baseY-amp,0,baseY+amp);
+                    wg.addColorStop(0,'transparent');wg.addColorStop(.5,'rgba(50,255,100,0.6)');wg.addColorStop(1,'transparent');
+                    ctx.strokeStyle=wg; ctx.lineWidth=20+w*5; ctx.lineCap='round'; ctx.filter='blur(8px)'; ctx.stroke();
+                } ctx.filter='none'; ctx.restore(); requestAnimationFrame(draw);
+            } draw(); window.addEventListener('resize', resize);
+        }
+
+        function updateInsufficientItems() {
+            document.querySelectorAll('.avatar-item').forEach(item => item.classList.toggle('insufficient', parseInt(item.dataset.price) > userBalance));
+            document.querySelectorAll('.background-item').forEach(item => item.classList.toggle('insufficient', parseInt(item.dataset.price) > userBalance && !ownedBackgrounds.includes(item.dataset.id)));
+            document.querySelectorAll('.product-card').forEach(card => {
+                const price = parseInt(card.dataset.price), btn = card.querySelector('.product-buy-btn');
+                card.classList.toggle('insufficient', price > userBalance); btn.disabled = price > userBalance;
+            });
+        }
+
+        function updateBalance(nb) {
+            userBalance = nb;
+            document.getElementById('user-balance-header').textContent = nb.toLocaleString();
+            updateInsufficientItems();
+        }
+
+        function showInsufficientModal(price) {
+            document.getElementById('modal-price').textContent = price;
+            document.getElementById('modal-balance').textContent = userBalance;
+            document.getElementById('modal-needed').textContent = price - userBalance;
+            document.getElementById('insufficientModal').classList.add('show');
+        }
+        function closeModal() { document.getElementById('insufficientModal').classList.remove('show'); }
+
+        function showPurchaseModal(name, price, nb) {
+            document.getElementById('purchase-message').textContent = 'Has comprado: ' + name;
+            document.getElementById('purchase-price').textContent = price;
+            document.getElementById('purchase-balance').textContent = nb;
+            document.getElementById('purchaseModal').classList.add('show');
+        }
+        function closePurchaseModal() { document.getElementById('purchaseModal').classList.remove('show'); }
+
+        function equipBackground(bgClass) {
+            const c = document.querySelector('.content');
+            c.classList.remove('bg-galaxy','bg-volcano','bg-ocean','bg-forest','bg-aurora','bg-sky','bg-rain','bg-default');
+            if (bgClass !== 'bg-default') c.classList.add(bgClass);
+            document.querySelectorAll('.background-item').forEach(item => { const b = item.querySelector('.equipped-badge'); if(b) b.remove(); });
+            const item = document.querySelector(`[data-class="${bgClass}"]`);
+            if (item) { const badge = document.createElement('div'); badge.className='equipped-badge'; badge.textContent='★ EQUIPADO'; item.querySelector('.background-preview').appendChild(badge); }
+            currentEquippedBackground = bgClass;
+        }
+
+        function equipNow() { if(lastPurchasedBackground){equipBackground(lastPurchasedBackground);lastPurchasedBackground=null;} closePurchaseModal(); }
+        function equipLater() { lastPurchasedBackground=null; closePurchaseModal(); }
+
+        function selectAvatar(el, price, id) {
+            if(el.classList.contains('insufficient')){showInsufficientModal(price);return;}
+            document.querySelectorAll('.avatar-item').forEach(i=>i.classList.remove('selected'));
+            el.classList.add('selected'); selectedAvatarPrice=price; selectedAvatarId=id;
+        }
+
+        function selectBackground(el, price, id, bgClass) {
+            if(el.classList.contains('insufficient')){showInsufficientModal(price);return;}
+            if(ownedBackgrounds.includes(id)){equipBackground(bgClass);return;}
+            document.querySelectorAll('.background-item').forEach(i=>i.classList.remove('selected'));
+            el.classList.add('selected'); selectedBackgroundPrice=price; selectedBackgroundId=id; selectedBackgroundClass=bgClass;
+        }
+
+        function buySelectedAvatar() {
+            if(!selectedAvatarPrice){alert('Selecciona un avatar primero');return;}
+            if(userBalance>=selectedAvatarPrice){
+                const nb=userBalance-selectedAvatarPrice; updateBalance(nb); showPurchaseModal('Avatar',selectedAvatarPrice,nb);
+                selectedAvatarPrice=0; document.querySelectorAll('.avatar-item').forEach(i=>i.classList.remove('selected'));
+            } else showInsufficientModal(selectedAvatarPrice);
+        }
+
+        function buySelectedBackground() {
+            if(!selectedBackgroundPrice){alert('Selecciona un fondo primero');return;}
+            if(userBalance>=selectedBackgroundPrice){
+                const nb=userBalance-selectedBackgroundPrice; updateBalance(nb); ownedBackgrounds.push(selectedBackgroundId);
+                const bgItem=document.querySelector(`[data-id="${selectedBackgroundId}"]`);
+                bgItem.classList.add('owned');
+                const ob=document.createElement('div'); ob.className='owned-badge'; ob.textContent='✓ TUYO'; bgItem.querySelector('.background-preview').appendChild(ob);
+                bgItem.querySelector('.background-price').textContent='✓ Comprado';
+                lastPurchasedBackground=selectedBackgroundClass; showPurchaseModal('Fondo',selectedBackgroundPrice,nb);
+                selectedBackgroundPrice=0; selectedBackgroundId=null; selectedBackgroundClass=null;
+                document.querySelectorAll('.background-item').forEach(i=>i.classList.remove('selected'));
+            } else showInsufficientModal(selectedBackgroundPrice);
+        }
+
+        function buyProduct(name, price) {
+            if(userBalance>=price){const nb=userBalance-price;updateBalance(nb);showPurchaseModal(name,price,nb);}
+            else showInsufficientModal(price);
+        }
+
+        document.getElementById('insufficientModal').addEventListener('click', e=>{if(e.target===document.getElementById('insufficientModal'))closeModal();});
+        document.getElementById('purchaseModal').addEventListener('click', e=>{if(e.target===document.getElementById('purchaseModal'))equipLater();});
+    </script>
+</body>
+</html>

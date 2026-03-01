@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Quiz</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+    <style>
+        @font-face {
+            font-family: 'Coolvetica';
+            src: url('Coolvetica Rg.otf') format('opentype');
+            font-weight: normal; font-style: normal;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary-bg: #0f0f23;
+            --secondary-bg: #1a1a35;
+            --card-bg: #252547;
+            --accent-cyan: #2dd4bf;
+            --accent-purple: #8b5cf6;
+            --accent-pink: #ec4899;
+            --accent-orange: #f97316;
+            --accent-blue: #3b82f6;
+            --accent-green: #22c55e;
+            --accent-yellow: #fbbf24;
+            --accent-red: #ef4444;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0c0;
+            --border-color: #2a2a4a;
+        }
+
+        body {
+            font-family: 'Coolvetica', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(ellipse at 20% 30%, rgba(88, 28, 135, 0.25) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 70%, rgba(30, 64, 175, 0.15) 0%, transparent 50%),
+                        var(--primary-bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* ===== STARS CANVAS ===== */
+        #starsCanvas {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; z-index: 0;
+        }
+
+        /* ===== EXAM WRAPPER ===== */
+        .exam-wrapper {
+            position: relative; z-index: 1;
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+        }
+
+        /* ===== TOP BAR ===== */
+        .exam-topbar {
+            background: var(--secondary-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex; align-items: center;
+            justify-content: space-between;
+            gap: 1rem; flex-wrap: wrap;
+        }
+
+        .exam-topbar-left { display: flex; align-items: center; gap: 1rem; }
+
+        .btn-salir {
+            background: none; border: 1px solid var(--border-color);
+            color: var(--text-secondary); padding: 0.5rem 1rem;
+            border-radius: 10px; cursor: pointer;
+            font-family: inherit; font-size: 0.9rem;
+            transition: all 0.3s ease;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .btn-salir:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+        .exam-title-bar {
+            font-size: 1.15rem; font-weight: normal;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .exam-title-bar i { color: var(--accent-cyan); }
+
+        .mode-badge-top {
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            padding: 0.25rem 0.75rem; border-radius: 20px;
+            font-size: 0.75rem;
+            background: rgba(45, 212, 191, 0.15); color: var(--accent-cyan);
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        .exam-topbar-right { display: flex; align-items: center; gap: 1.25rem; }
+
+        .score-display { display: flex; align-items: center; gap: 1rem; font-size: 0.9rem; }
+        .score-correct { color: var(--accent-green); display: flex; align-items: center; gap: 0.3rem; }
+        .score-incorrect { color: var(--accent-red); display: flex; align-items: center; gap: 0.3rem; }
+
+        .streak-display {
+            display: flex; align-items: center; gap: 0.4rem;
+            background: var(--card-bg); padding: 0.4rem 0.85rem;
+            border-radius: 20px; border: 1px solid var(--border-color);
+            font-size: 0.9rem; color: var(--accent-yellow);
+        }
+
+        .question-counter { color: var(--text-secondary); font-size: 0.95rem; }
+        .question-counter span { color: var(--text-primary); }
+
+        .timer {
+            display: flex; align-items: center; gap: 0.5rem;
+            background: var(--card-bg); padding: 0.5rem 1rem;
+            border-radius: 25px; border: 1px solid var(--border-color);
+            font-size: 1rem; transition: all 0.3s ease;
+        }
+        .timer i { color: var(--accent-cyan); }
+        .timer.timer-hidden { display: none; }
+        .timer.warning { border-color: var(--accent-orange); background: rgba(249,115,22,0.1); animation: timerPulse 1s ease-in-out infinite; }
+        .timer.warning i, .timer.warning .timer-value { color: var(--accent-orange); }
+        .timer.danger { border-color: var(--accent-red); background: rgba(239,68,68,0.15); animation: timerPulse 0.5s ease-in-out infinite; }
+        .timer.danger i, .timer.danger .timer-value { color: var(--accent-red); }
+        @keyframes timerPulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.03);} }
+
+        /* ===== PROGRESS BAR ===== */
+        .progress-container {
+            padding: 0 2rem 0.75rem;
+            background: var(--secondary-bg);
+        }
+        .progress-bar-track {
+            width: 100%; height: 6px;
+            background: var(--border-color);
+            border-radius: 3px; overflow: visible; position: relative;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+            border-radius: 3px; transition: width 0.5s ease; position: relative;
+        }
+        .progress-bar-fill::after {
+            content: ''; position: absolute;
+            right: 0; top: -2px; width: 10px; height: 10px;
+            background: var(--accent-cyan); border-radius: 50%;
+            box-shadow: 0 0 10px rgba(45,212,191,0.6);
+        }
+
+        /* ===== QUESTION AREA ===== */
+        .question-area {
+            flex: 1; display: flex;
+            align-items: center; justify-content: center;
+            padding: 2rem;
+        }
+
+        .question-card {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px; padding: 2.5rem;
+            max-width: 700px; width: 100%;
+            position: relative; animation: slideIn 0.4s ease;
+        }
+
+        @keyframes slideIn { from{opacity:0;transform:translateX(40px);} to{opacity:1;transform:translateX(0);} }
+        @keyframes slideOut { from{opacity:1;transform:translateX(0);} to{opacity:0;transform:translateX(-40px);} }
+        .question-card.exit { animation: slideOut 0.3s ease forwards; }
+
+        .question-number { text-align: center; color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem; }
+        .question-text { text-align: center; font-size: 1.35rem; line-height: 1.5; margin-bottom: 2rem; padding: 0 1rem; }
+
+        /* ===== OPTIONS ===== */
+        .options-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+        .option-btn {
+            display: flex; align-items: center; gap: 1rem;
+            padding: 1rem 1.25rem;
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 14px; cursor: pointer;
+            transition: all 0.25s ease; color: var(--text-primary);
+            font-family: inherit; font-size: 1rem;
+            text-align: left; width: 100%;
+        }
+        .option-btn:hover:not([disabled]) {
+            border-color: var(--accent-cyan);
+            background: rgba(45,212,191,0.05);
+            transform: translateX(4px);
+        }
+        .option-btn.selected {
+            border-color: var(--accent-cyan);
+            background: rgba(45,212,191,0.1);
+        }
+        /* ===== FEEDBACK COLORES (verde/rojo al responder) ===== */
+        .option-btn.correct {
+            border-color: var(--accent-green) !important;
+            background: rgba(34,197,94,0.15) !important;
+            pointer-events: none;
+        }
+        .option-btn.correct .option-letter {
+            background: var(--accent-green) !important;
+            color: #0f0f23 !important;
+            border-color: var(--accent-green) !important;
+        }
+        .option-btn.incorrect {
+            border-color: var(--accent-red) !important;
+            background: rgba(239,68,68,0.1) !important;
+            pointer-events: none;
+        }
+        .option-btn.incorrect .option-letter {
+            background: var(--accent-red) !important;
+            color: white !important;
+            border-color: var(--accent-red) !important;
+        }
+        .option-btn.disabled-opt { opacity: 0.4; pointer-events: none; }
+        .option-feedback { font-size: 1.1rem; flex-shrink: 0; }
+
+        .option-letter {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: var(--primary-bg); border: 1px solid var(--border-color);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.9rem; flex-shrink: 0; transition: all 0.25s ease;
+        }
+        .option-btn.selected .option-letter {
+            background: var(--accent-cyan); color: #0f0f23; border-color: var(--accent-cyan);
+        }
+        .option-text { flex: 1; }
+
+        /* ===== EXPLANATION BOX ===== */
+        .explanation-box {
+            margin-top: 1.25rem; padding: 1rem 1.25rem; border-radius: 12px;
+            background: rgba(45,212,191,0.08); border: 1px solid rgba(45,212,191,0.2);
+            display: none; animation: fadeInUp 0.3s ease;
+        }
+        .explanation-box.show { display: block; }
+        .explanation-box .exp-header {
+            display: flex; align-items: center; gap: 0.5rem;
+            font-size: 0.9rem; color: var(--accent-cyan); margin-bottom: 0.5rem;
+        }
+        .explanation-box .exp-text { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6; }
+
+        /* ===== NAVIGATION ===== */
+        .nav-buttons {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-top: 2rem; padding-top: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .btn-nav {
+            padding: 0.75rem 1.75rem; border-radius: 12px; border: none;
+            cursor: pointer; font-family: inherit; font-size: 0.95rem;
+            transition: all 0.3s ease;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .btn-siguiente {
+            background: linear-gradient(135deg, var(--accent-cyan), #14b8a6);
+            color: #0f0f23;
+        }
+        .btn-siguiente:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(45,212,191,0.4); }
+        .btn-siguiente.waiting { opacity: 0.3; pointer-events: none; }
+        .btn-entregar { background: linear-gradient(135deg, var(--accent-green), #16a34a); color: white; }
+        .btn-entregar:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(34,197,94,0.4); }
+
+        /* Question dots */
+        .question-dots { display: flex; justify-content: center; gap: 0.5rem; }
+        .q-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--border-color); transition: all 0.3s ease;
+        }
+        .q-dot.current { background: var(--accent-cyan); box-shadow: 0 0 8px rgba(45,212,191,0.6); transform: scale(1.3); }
+        .q-dot.dot-correct { background: var(--accent-green) !important; box-shadow: none !important; transform: none !important; }
+        .q-dot.dot-incorrect { background: var(--accent-red) !important; box-shadow: none !important; transform: none !important; }
+
+        /* ===== EXAM/RESULTS TOGGLE ===== */
+        .exam-screen { display: flex; flex-direction: column; flex: 1; }
+        .exam-screen.hidden { display: none; }
+
+        /* ===== RESULTS SCREEN ===== */
+        .results-screen {
+            display: none; flex-direction: column;
+            align-items: center; padding: 2rem;
+            animation: fadeInUp 0.6s ease;
+        }
+        .results-screen.active { display: flex; }
+
+        @keyframes fadeInUp { from{opacity:0;transform:translateY(30px);} to{opacity:1;transform:translateY(0);} }
+
+        /* ===== RESULTS CARD (igual a flashcards) ===== */
+        .results-card {
+            background: rgba(20,20,50,0.75);
+            border: 1px solid rgba(45,212,191,0.25);
+            border-radius: 28px; padding: 2rem 3rem;
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            box-shadow: 0 0 40px rgba(45,212,191,0.08), inset 0 1px 0 rgba(255,255,255,0.05), 0 20px 60px rgba(0,0,0,0.35);
+            width: 100%; max-width: 680px;
+            display: flex; flex-direction: column;
+            align-items: center; text-align: center;
+            position: relative; overflow: hidden;
+        }
+
+        /* ===== RESULTS EMOJI (igual a flashcards) ===== */
+        .results-emoji {
+            width: 80px; height: 80px; object-fit: contain;
+            margin-bottom: 0.6rem; animation: bounceIn 0.8s ease;
+        }
+        @keyframes bounceIn { 0%{transform:scale(0);} 50%{transform:scale(1.2);} 70%{transform:scale(0.9);} 100%{transform:scale(1);} }
+
+        .results-main-title { font-size: 1.75rem; font-weight: normal; margin-bottom: 0.25rem; }
+        .results-main-subtitle { font-size: 1rem; color: var(--text-secondary); margin-bottom: 1.25rem; }
+
+        /* ===== GRADE CIRCLE (igual a flashcards score ring) ===== */
+        .grade-circle-wrapper { position: relative; margin-bottom: 1.25rem; }
+
+        .grade-circle {
+            width: 150px; height: 150px;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            position: relative;
+        }
+        .grade-circle svg {
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%;
+            transform: rotate(-90deg);
+        }
+        .grade-circle .track { fill: none; stroke: rgba(255,255,255,0.06); stroke-width: 10; }
+        .grade-circle .fill-circle {
+            fill: none; stroke-width: 10; stroke-linecap: round;
+            stroke-dasharray: 471.24; stroke-dashoffset: 471.24;
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1);
+        }
+        .grade-number {
+            font-size: 2.5rem; font-weight: normal; line-height: 1;
+            position: relative; z-index: 2;
+        }
+        .grade-label { font-size: 0.85rem; color: var(--text-secondary); position: relative; z-index: 2; margin-top: 0.25rem; }
+
+        /* ===== GRADE MESSAGE ===== */
+        .grade-message { font-size: 1.1rem; margin-bottom: 1.25rem; }
+
+        /* ===== STAT CARDS (igual a flashcards fc-stat-box) ===== */
+        .results-stats {
+            display: grid; grid-template-columns: repeat(4,1fr);
+            gap: 0.85rem; margin-bottom: 1.25rem; width: 100%;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px; padding: 1rem; text-align: center;
+            transition: all 0.3s ease;
+        }
+        .stat-card:hover { border-color: rgba(255,255,255,0.15); transform: translateY(-2px); }
+        .stat-card-icon {
+            width: 38px; height: 38px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 0.6rem; font-size: 1rem;
+        }
+        .stat-card-value { font-size: 1.5rem; font-weight: normal; margin-bottom: 0.2rem; }
+        .stat-card-label { font-size: 0.78rem; color: var(--text-secondary); }
+
+        /* ===== REVIEW LIST (igual a flashcards fc-answers-detail) ===== */
+        .results-review { width: 100%; margin-bottom: 1.25rem; text-align: left; }
+
+        .review-title {
+            font-size: 1.05rem; color: var(--text-secondary);
+            margin-bottom: 0.85rem;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .review-title i { color: var(--accent-cyan); }
+
+        .review-list {
+            display: flex; flex-direction: column; gap: 0.6rem;
+            max-height: 280px; overflow-y: auto; padding-right: 0.4rem;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(45,212,191,0.35) rgba(45,212,191,0.06);
+        }
+        .review-list::-webkit-scrollbar { width: 6px; }
+        .review-list::-webkit-scrollbar-track { background: rgba(45,212,191,0.06); border-radius: 10px; }
+        .review-list::-webkit-scrollbar-thumb { background: linear-gradient(180deg,rgba(45,212,191,0.4),rgba(20,184,166,0.3)); border-radius: 10px; }
+        .review-list::-webkit-scrollbar-thumb:hover { background: linear-gradient(180deg,rgba(45,212,191,0.7),rgba(20,184,166,0.5)); }
+
+        /* Review item (igual a flashcards fc-answer-item) */
+        .review-item {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 14px; padding: 0.9rem 1.1rem;
+            display: flex; align-items: flex-start; gap: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        .review-item:hover { background: rgba(255,255,255,0.05); }
+        .review-item.correct  { border-left: 3px solid var(--accent-green); }
+        .review-item.incorrect { border-left: 3px solid var(--accent-red); }
+        .review-item.unanswered { border-left: 3px solid rgba(160,160,192,0.5); }
+
+        .review-item .review-icon {
+            width: 28px; height: 28px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.78rem; flex-shrink: 0; margin-top: 0.1rem;
+        }
+        .review-item.correct  .review-icon { background: rgba(34,197,94,0.2);    color: var(--accent-green); }
+        .review-item.incorrect .review-icon { background: rgba(239,68,68,0.2);    color: var(--accent-red); }
+        .review-item.unanswered .review-icon { background: rgba(160,160,192,0.15); color: var(--text-secondary); }
+
+        .review-item .review-q { flex: 1; }
+        .review-q-text { font-size: 0.92rem; color: var(--text-primary); margin-bottom: 0.3rem; }
+        .review-a-text { font-size: 0.82rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+        .review-a-text .arrow { opacity: 0.45; }
+
+        /* ===== RESULT BUTTONS (igual a flashcards fc-action-btn) ===== */
+        .results-actions { display: flex; gap: 1rem; width: 100%; }
+        .btn-result {
+            flex: 1; padding: 1.1rem 1.5rem; border-radius: 16px;
+            font-family: inherit; font-size: 1rem; cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+        }
+        .btn-retry {
+            background: linear-gradient(135deg,rgba(45,212,191,0.2) 0%,rgba(20,184,166,0.25) 100%);
+            border: 1px solid rgba(45,212,191,0.4); color: var(--accent-cyan);
+        }
+        .btn-retry:hover {
+            background: linear-gradient(135deg,rgba(45,212,191,0.3) 0%,rgba(20,184,166,0.35) 100%);
+            border-color: var(--accent-cyan); box-shadow: 0 0 25px rgba(45,212,191,0.2); transform: translateY(-3px);
+        }
+        .btn-exit {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary);
+        }
+        .btn-exit:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: var(--text-primary); transform: translateY(-3px); }
+
+        /* ===== XP TOAST (igual a flashcards) ===== */
+        .exam-xp-toast {
+            position: fixed; top: 2rem; right: 2rem;
+            background: rgba(20,20,50,0.92);
+            border: 1px solid rgba(45,212,191,0.3);
+            border-radius: 16px; padding: 1rem 1.5rem;
+            display: flex; align-items: center; gap: 0.75rem;
+            backdrop-filter: blur(20px); z-index: 200;
+            transform: translateX(140%);
+            transition: transform 0.4s cubic-bezier(0.4,0,0.2,1);
+        }
+        .exam-xp-toast.show { transform: translateX(0); }
+        .exam-xp-toast img { width: 22px; height: 22px; }
+        .exam-xp-toast .xp-text { color: var(--accent-cyan); font-size: 1rem; }
+        .exam-xp-toast .xp-amount { color: var(--accent-yellow); font-size: 1.15rem; }
+
+        /* ===== CONFETTI ===== */
+        .confetti-container {
+            position: fixed; inset: 0;
+            pointer-events: none; z-index: 50; overflow: hidden;
+        }
+        .confetti-piece {
+            position: absolute; top: -10px;
+            animation: confettiFall linear forwards;
+        }
+        @keyframes confettiFall { 0%{transform:translateY(0) rotate(0deg);opacity:1;} 100%{transform:translateY(100vh) rotate(720deg);opacity:0;} }
+
+        /* ===== TIMER ALERT ===== */
+        .timer-alert {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1100; opacity: 0; visibility: hidden; transition: all 0.3s ease;
+        }
+        .timer-alert.show { opacity: 1; visibility: visible; }
+        .timer-alert-box {
+            background: var(--card-bg); border: 1px solid var(--accent-orange);
+            border-radius: 20px; padding: 2.5rem; text-align: center;
+            max-width: 380px; width: 90%;
+            transform: scale(0.9); transition: transform 0.3s ease;
+        }
+        .timer-alert.show .timer-alert-box { transform: scale(1); }
+        .timer-alert-icon {
+            width: 70px; height: 70px; background: rgba(249,115,22,0.2);
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 1.25rem; font-size: 2rem; color: var(--accent-orange);
+            animation: alertShake 0.5s ease;
+        }
+        @keyframes alertShake { 0%,100%{transform:rotate(0);} 25%{transform:rotate(-10deg);} 75%{transform:rotate(10deg);} }
+        .timer-alert-box h3 { font-size: 1.3rem; margin-bottom: 0.5rem; color: var(--accent-orange); }
+        .timer-alert-box p { color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5; }
+        .btn-alert-ok {
+            padding: 0.75rem 2.5rem; border-radius: 12px; border: none;
+            background: var(--accent-orange); color: white; cursor: pointer;
+            font-family: inherit; font-size: 1rem; transition: all 0.3s ease;
+        }
+        .btn-alert-ok:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(249,115,22,0.4); }
+
+        /* ===== MODAL ===== */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.7);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 1100; opacity: 0; visibility: hidden; transition: all 0.3s ease;
+        }
+        .modal-overlay.show { opacity: 1; visibility: visible; }
+        .modal {
+            background: var(--card-bg); border-radius: 20px; padding: 2rem;
+            max-width: 420px; width: 90%; text-align: center;
+            transform: scale(0.9); transition: transform 0.3s ease;
+            border: 1px solid var(--border-color);
+        }
+        .modal-overlay.show .modal { transform: scale(1); }
+        .modal-icon {
+            width: 70px; height: 70px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 1.5rem; font-size: 2rem;
+        }
+        .modal-icon.exit { background: rgba(239,68,68,0.2); color: var(--accent-red); }
+        .modal h3 { font-size: 1.3rem; margin-bottom: 0.75rem; }
+        .modal p { color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5; }
+        .modal-actions { display: flex; gap: 1rem; }
+        .modal-btn {
+            flex: 1; padding: 0.85rem; border-radius: 12px; border: none;
+            cursor: pointer; font-family: inherit; font-size: 0.95rem; transition: all 0.3s ease;
+        }
+        .modal-btn.cancel { background: var(--secondary-bg); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .modal-btn.cancel:hover { border-color: var(--accent-cyan); }
+        .modal-btn.confirm-red { background: var(--accent-red); color: white; }
+        .modal-btn.confirm-red:hover { background: #dc2626; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .exam-topbar { padding: 0.75rem 1rem; }
+            .question-area { padding: 1.5rem 1rem; }
+            .question-card { padding: 1.75rem 1.25rem; }
+            .question-text { font-size: 1.15rem; }
+            .results-card { padding: 1.5rem 1.25rem; border-radius: 20px; }
+            .results-stats { grid-template-columns: repeat(2,1fr); }
+            .results-actions { flex-direction: column; }
+            .results-emoji { width: 65px; height: 65px; }
+            .results-main-title { font-size: 1.4rem; }
+        }
+        @media (max-width: 480px) {
+            .exam-topbar-left .exam-title-bar { display: none; }
+            .question-text { font-size: 1.05rem; }
+            .option-btn { padding: 0.85rem 1rem; }
+            .results-card { padding: 1.25rem 1rem; }
+            .results-emoji { width: 55px; height: 55px; }
+            .grade-circle { width: 130px; height: 130px; }
+            .grade-number { font-size: 2rem; }
+            .results-actions { flex-direction: column; }
+            .btn-result { padding: 1rem; }
+        }
+    </style>
+</head>
+<body data-page="modo-estudio">
+
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <canvas id="starsCanvas"></canvas>
+
+    <!-- Confetti & XP Toast -->
+    <div class="confetti-container" id="confettiContainer"></div>
+    <div class="exam-xp-toast" id="xpToast">
+        <img src="glowing-star_1f31f.gif" alt="star">
+        <span class="xp-text">+</span>
+        <span class="xp-amount" id="xpToastAmount">50 XP</span>
+    </div>
+
+    <main class="content" style="padding: 0; overflow-x: hidden;">
+    <div class="exam-wrapper">
+
+        <!-- ===== EXAM SCREEN ===== -->
+        <div class="exam-screen" id="examScreen">
+            <div class="exam-topbar">
+                <div class="exam-topbar-left">
+                    <button class="btn-salir" onclick="showExitModal()"><i class="fas fa-arrow-left"></i> Salir</button>
+                    <div class="exam-title-bar"><i class="fas fa-brain"></i> <span id="examTitleBar">Quiz</span></div>
+                    <div class="mode-badge-top"><i class="fas fa-seedling"></i> Quiz</div>
+                </div>
+                <div class="exam-topbar-right">
+                    <div class="score-display">
+                        <div class="score-correct"><i class="fas fa-check"></i> <span id="scoreCorrect">0</span></div>
+                        <div class="score-incorrect"><i class="fas fa-times"></i> <span id="scoreIncorrect">0</span></div>
+                    </div>
+                    <div class="streak-display"><i class="fas fa-fire"></i> <span id="streakCount">0</span></div>
+                    <div class="question-counter"><span id="currentQ">1</span> / <span id="totalQ">10</span></div>
+                    <div class="timer timer-hidden" id="timer"><i class="fas fa-clock"></i> <span class="timer-value" id="timerValue">10:00</span></div>
+                </div>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:10%"></div></div>
+            </div>
+
+            <div class="question-area">
+                <div class="question-card" id="questionCard">
+                    <div class="question-number" id="questionNumber"></div>
+                    <div class="question-text" id="questionText"></div>
+                    <div class="options-list" id="optionsList"></div>
+                    <div class="explanation-box" id="explanationBox">
+                        <div class="exp-header"><i class="fas fa-lightbulb"></i> Explicación</div>
+                        <div class="exp-text" id="explanationText"></div>
+                    </div>
+                    <div class="nav-buttons">
+                        <div></div>
+                        <div class="question-dots" id="questionDots"></div>
+                        <button class="btn-nav btn-siguiente waiting" id="btnSiguiente" onclick="nextQuestion()">Siguiente <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== RESULTS SCREEN ===== -->
+        <div class="results-screen" id="resultsScreen">
+            <div class="results-card">
+                <img class="results-emoji" id="resultsEmoji" src="giphy.gif" alt="emoji">
+                <div class="results-main-title" id="resultsMainTitle">¡Bien hecho!</div>
+                <div class="results-main-subtitle" id="resultsMainSubtitle">Sigue practicando</div>
+
+                <!-- Grade circle (igual a flashcards score ring) -->
+                <div class="grade-circle-wrapper">
+                    <div class="grade-circle">
+                        <svg viewBox="0 0 180 180">
+                            <circle class="track" cx="90" cy="90" r="75"/>
+                            <circle class="fill-circle" id="gradeFill" cx="90" cy="90" r="75"/>
+                        </svg>
+                        <span class="grade-number" id="gradeNumber">0</span>
+                        <span class="grade-label">Nota Final</span>
+                    </div>
+                </div>
+
+                <div class="grade-message" id="gradeMessage"></div>
+                <div class="results-stats" id="resultsStats"></div>
+
+                <div class="results-review" id="resultsReview">
+                    <div class="review-title"><i class="fas fa-list-check"></i> Repaso de respuestas</div>
+                    <div class="review-list" id="reviewList"></div>
+                </div>
+
+                <div class="results-actions">
+                    <button class="btn-result btn-retry" onclick="retryExam()"><i class="fas fa-redo"></i> Intentar de nuevo</button>
+                    <button class="btn-result btn-exit" onclick="exitExam()"><i class="fas fa-home"></i> Volver al inicio</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    </main>
+
+    <!-- Timer Alert -->
+    <div class="timer-alert" id="timerAlert">
+        <div class="timer-alert-box">
+            <div class="timer-alert-icon"><i class="fas fa-hourglass-half"></i></div>
+            <h3 id="alertTitle"></h3><p id="alertMessage"></p>
+            <button class="btn-alert-ok" onclick="closeTimerAlert()">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Exit Modal -->
+    <div class="modal-overlay" id="exitModal">
+        <div class="modal">
+            <div class="modal-icon exit"><i class="fas fa-door-open"></i></div>
+            <h3>¿Salir del quiz?</h3>
+            <p>Puedes volver a intentarlo cuando quieras. No pierdes nada.</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeExitModal()">Seguir practicando</button>
+                <button class="modal-btn confirm-red" onclick="exitExam()">Salir</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/components.js"></script>
+    <script>
+        // ===== STARS CANVAS (igual a flashcards) =====
+        function initStars() {
+            const canvas = document.getElementById('starsCanvas');
+            const ctx = canvas.getContext('2d');
+            function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+            resize();
+            window.addEventListener('resize', resize);
+            const stars = [];
+            for (let i = 0; i < 150; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 0.3,
+                    speedX: (Math.random() - 0.5) * 0.1, speedY: (Math.random() - 0.5) * 0.1,
+                    opacity: Math.random() * 0.4 + 0.1, opacityChange: (Math.random() - 0.5) * 0.012,
+                    color: ['#ffffff','#ffffff','#ffe9c4','#d4f1ff','#c4b5fd','#aaddff'][Math.floor(Math.random()*6)]
+                });
+            }
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                stars.forEach(s => {
+                    s.x += s.speedX; s.y += s.speedY;
+                    s.opacity += s.opacityChange;
+                    if (s.opacity <= 0.05 || s.opacity >= 0.6) s.opacityChange *= -1;
+                    if (s.x < 0) s.x = canvas.width; if (s.x > canvas.width) s.x = 0;
+                    if (s.y < 0) s.y = canvas.height; if (s.y > canvas.height) s.y = 0;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                    ctx.fillStyle = s.color;
+                    ctx.globalAlpha = s.opacity;
+                    ctx.fill();
+                    ctx.globalAlpha = 1;
+                });
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        // ===== EXAM DATA =====
+        const examData = {
+            title: 'Quiz - Química General',
+            hasTimer: false,
+            timeMinutes: 10,
+            questions: [
+                { question: '¿Cuál es la fórmula química del agua?', options: ['H2O', 'CO2', 'CH4', 'H2O2'], correct: 0, explanation: 'El agua está formada por dos átomos de hidrógeno y uno de oxígeno, formando la molécula H2O.' },
+                { question: '¿Qué partícula subatómica tiene carga positiva?', options: ['Electrón', 'Protón', 'Neutrón', 'Fotón'], correct: 1, explanation: 'El protón se encuentra en el núcleo del átomo y tiene carga eléctrica positiva (+1).' },
+                { question: '¿Cuál es el elemento más abundante en la corteza terrestre?', options: ['Hierro', 'Silicio', 'Oxígeno', 'Aluminio'], correct: 2, explanation: 'El oxígeno constituye aproximadamente el 46% de la masa de la corteza terrestre.' },
+                { question: '¿Qué tipo de enlace se forma entre átomos que comparten electrones?', options: ['Iónico', 'Metálico', 'Covalente', 'Van der Waals'], correct: 2, explanation: 'En el enlace covalente, los átomos comparten uno o más pares de electrones para alcanzar estabilidad.' },
+                { question: '¿Cuál es el número atómico del carbono?', options: ['4', '6', '8', '12'], correct: 1, explanation: 'El carbono tiene 6 protones en su núcleo, por lo tanto su número atómico es 6.' },
+                { question: '¿Qué ley establece que la materia no se crea ni se destruye?', options: ['Ley de Dalton', 'Ley de Avogadro', 'Ley de Lavoisier', 'Ley de Boyle'], correct: 2, explanation: 'La Ley de Conservación de la Masa de Lavoisier establece que en una reacción química la masa total se conserva.' },
+                { question: '¿Cuál es el pH de una solución neutra?', options: ['0', '7', '14', '1'], correct: 1, explanation: 'Un pH de 7 indica neutralidad. Valores menores son ácidos y mayores son básicos.' },
+                { question: '¿Qué gas es necesario para la combustión?', options: ['Nitrógeno', 'Hidrógeno', 'Oxígeno', 'Dióxido de carbono'], correct: 2, explanation: 'El oxígeno es el comburente necesario para que ocurra una reacción de combustión.' },
+                { question: '¿Cuántos electrones tiene un átomo de helio?', options: ['1', '2', '4', '8'], correct: 1, explanation: 'El helio tiene número atómico 2, por lo que posee 2 protones y 2 electrones en estado neutro.' },
+                { question: '¿Qué elemento químico tiene el símbolo Fe?', options: ['Flúor', 'Fósforo', 'Francio', 'Hierro'], correct: 3, explanation: 'Fe viene del latín "Ferrum". El hierro es un metal de transición muy abundante en la Tierra.' }
+            ]
+        };
+
+        // ===== STATE =====
+        let currentQuestion = 0;
+        let answers = new Array(examData.questions.length).fill(null);
+        let questionLocked = new Array(examData.questions.length).fill(false);
+        let questionResults = new Array(examData.questions.length).fill(null);
+        let totalSeconds = examData.timeMinutes * 60;
+        let timerInterval = null;
+        let alertShownAt2min = false, alertShownAt1min = false, examFinished = false;
+        let correctCount = 0, incorrectCount = 0, streak = 0, bestStreak = 0;
+        const letters = ['A','B','C','D'];
+
+        function initExam() {
+            initStars();
+            document.getElementById('examTitleBar').textContent = examData.title;
+            document.getElementById('totalQ').textContent = examData.questions.length;
+            if (examData.hasTimer) { document.getElementById('timer').classList.remove('timer-hidden'); startTimer(); }
+            renderQuestion(); renderDots();
+        }
+
+        function renderQuestion() {
+            const q = examData.questions[currentQuestion];
+            const locked = questionLocked[currentQuestion];
+            document.getElementById('currentQ').textContent = currentQuestion + 1;
+            document.getElementById('questionNumber').textContent = `Pregunta ${currentQuestion + 1} de ${examData.questions.length}`;
+            document.getElementById('questionText').textContent = q.question;
+            document.getElementById('progressFill').style.width = ((currentQuestion+1)/examData.questions.length*100)+'%';
+
+            const list = document.getElementById('optionsList');
+            list.innerHTML = q.options.map((opt, i) => {
+                let cls = 'option-btn', fb = '';
+                if (locked) {
+                    if (i === q.correct) { cls += ' correct'; fb = '<span class="option-feedback"><i class="fas fa-check-circle" style="color:var(--accent-green)"></i></span>'; }
+                    else if (i === answers[currentQuestion]) { cls += ' incorrect'; fb = '<span class="option-feedback"><i class="fas fa-times-circle" style="color:var(--accent-red)"></i></span>'; }
+                    else { cls += ' disabled-opt'; }
+                } else if (answers[currentQuestion] === i) { cls += ' selected'; }
+                return `<button class="${cls}" ${locked ? '' : `onclick="selectOption(${i})"`}><span class="option-letter">${letters[i]}</span><span class="option-text">${opt}</span>${fb}</button>`;
+            }).join('');
+
+            const expBox = document.getElementById('explanationBox');
+            if (locked && q.explanation) { document.getElementById('explanationText').textContent = q.explanation; expBox.classList.add('show'); }
+            else { expBox.classList.remove('show'); }
+
+            const btn = document.getElementById('btnSiguiente');
+            if (currentQuestion === examData.questions.length - 1 && locked) {
+                btn.innerHTML = '<i class="fas fa-chart-bar"></i> Ver resultados';
+                btn.className = 'btn-nav btn-entregar';
+                btn.onclick = function(){ finishExam(); };
+            } else {
+                btn.innerHTML = 'Siguiente <i class="fas fa-chevron-right"></i>';
+                btn.className = `btn-nav btn-siguiente ${locked ? '' : 'waiting'}`;
+                btn.onclick = nextQuestion;
+            }
+            updateDots();
+        }
+
+        function selectOption(index) {
+            if (questionLocked[currentQuestion]) return;
+            answers[currentQuestion] = index;
+            questionLocked[currentQuestion] = true;
+            const q = examData.questions[currentQuestion];
+            if (index === q.correct) { correctCount++; streak++; if (streak > bestStreak) bestStreak = streak; questionResults[currentQuestion] = 'correct'; }
+            else { incorrectCount++; streak = 0; questionResults[currentQuestion] = 'incorrect'; }
+            document.getElementById('scoreCorrect').textContent = correctCount;
+            document.getElementById('scoreIncorrect').textContent = incorrectCount;
+            document.getElementById('streakCount').textContent = streak;
+            renderQuestion();
+        }
+
+        function renderDots() {
+            document.getElementById('questionDots').innerHTML = examData.questions.map((_,i) => `<div class="q-dot" data-index="${i}"></div>`).join('');
+        }
+
+        function updateDots() {
+            document.querySelectorAll('.q-dot').forEach((dot, i) => {
+                dot.className = 'q-dot';
+                if (i === currentQuestion) { dot.classList.add('current'); }
+                else if (questionResults[i] === 'correct') { dot.classList.add('dot-correct'); }
+                else if (questionResults[i] === 'incorrect') { dot.classList.add('dot-incorrect'); }
+            });
+        }
+
+        function nextQuestion() {
+            if (!questionLocked[currentQuestion]) return;
+            if (currentQuestion < examData.questions.length - 1) {
+                const card = document.getElementById('questionCard');
+                card.classList.add('exit');
+                setTimeout(() => { currentQuestion++; renderQuestion(); card.classList.remove('exit'); }, 300);
+            }
+        }
+
+        // Timer
+        function startTimer() { updateTimerDisplay(); timerInterval = setInterval(() => { totalSeconds--; if(totalSeconds<=0){totalSeconds=0;clearInterval(timerInterval);timeUp();} updateTimerDisplay();updateTimerState(); },1000); }
+        function updateTimerDisplay() { const m=Math.floor(totalSeconds/60),s=totalSeconds%60; document.getElementById('timerValue').textContent=`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
+        function updateTimerState() { const t=document.getElementById('timer');t.classList.remove('warning','danger'); if(totalSeconds<=60){t.classList.add('danger');if(!alertShownAt1min){alertShownAt1min=true;showTimerAlert('Último minuto','Te queda menos de 1 minuto.');}} else if(totalSeconds<=120){t.classList.add('warning');if(!alertShownAt2min){alertShownAt2min=true;showTimerAlert('Queda poco tiempo','Te quedan menos de 2 minutos.');}} }
+        function timeUp(){showTimerAlert('Se acabó el tiempo','Vamos a ver tus resultados.');const b=document.querySelector('.btn-alert-ok');b.textContent='Ver resultados';b.onclick=function(){closeTimerAlert();finishExam();};}
+        function showTimerAlert(t,m){document.getElementById('alertTitle').textContent=t;document.getElementById('alertMessage').textContent=m;document.getElementById('timerAlert').classList.add('show');}
+        function closeTimerAlert(){document.getElementById('timerAlert').classList.remove('show');}
+
+        function showExitModal(){document.getElementById('exitModal').classList.add('show');}
+        function closeExitModal(){document.getElementById('exitModal').classList.remove('show');}
+        function exitExam(){clearInterval(timerInterval);closeExitModal();window.history.back();}
+
+        // ===== FINISH EXAM =====
+        function finishExam() {
+            if (examFinished) return;
+            examFinished = true;
+            clearInterval(timerInterval);
+
+            const unanswered = answers.filter(a => a === null).length;
+            const total = examData.questions.length;
+            const grade = Math.round((correctCount / total) * 100);
+
+            document.getElementById('examScreen').classList.add('hidden');
+            document.getElementById('resultsScreen').classList.add('active');
+
+            // Emoji + title + subtitle (igual a flashcards)
+            const emoji = document.getElementById('resultsEmoji');
+            const title = document.getElementById('resultsMainTitle');
+            const subtitle = document.getElementById('resultsMainSubtitle');
+            if (grade >= 90)      { emoji.src='giphy.gif';               title.textContent='¡Increíble, eres un crack!'; subtitle.textContent='Dominas este tema a la perfección'; }
+            else if (grade >= 70) { emoji.src='giphy.gif';               title.textContent='¡Muy bien hecho!';            subtitle.textContent='Tienes un buen dominio del tema'; }
+            else if (grade >= 50) { emoji.src='flexed-biceps_1f4aa.gif'; title.textContent='¡Buen intento!';              subtitle.textContent='Sigue practicando para mejorar'; }
+            else                  { emoji.src='WZ6R8rSOyG.gif';          title.textContent='A seguir estudiando';          subtitle.textContent='Repasa el material e inténtalo de nuevo'; }
+
+            // Grade circle animation (igual a flashcards)
+            animateGrade(grade);
+
+            // Grade message
+            const msgEl = document.getElementById('gradeMessage');
+            if (grade >= 90)      msgEl.innerHTML = '<i class="fas fa-trophy" style="color:var(--accent-green);margin-right:8px"></i><span style="color:var(--accent-green)">Excelente</span> — Dominas este tema';
+            else if (grade >= 70) msgEl.innerHTML = '<i class="fas fa-thumbs-up" style="color:var(--accent-cyan);margin-right:8px"></i><span style="color:var(--accent-cyan)">Buen trabajo</span> — Sigue así';
+            else if (grade >= 50) msgEl.innerHTML = '<i class="fas fa-book-open" style="color:var(--accent-yellow);margin-right:8px"></i><span style="color:var(--accent-yellow)">Puedes mejorar</span> — Repasa e intenta de nuevo';
+            else                  msgEl.innerHTML = '<i class="fas fa-rotate-right" style="color:var(--accent-red);margin-right:8px"></i><span style="color:var(--accent-red)">A seguir practicando</span> — No te desanimes';
+
+            // Stats (igual a flashcards fc-stat-box)
+            document.getElementById('resultsStats').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-card-icon" style="background:rgba(34,197,94,0.15);color:var(--accent-green)"><i class="fas fa-check-circle"></i></div>
+                    <div class="stat-card-value" style="color:var(--accent-green)">${correctCount}</div>
+                    <div class="stat-card-label">Correctas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon" style="background:rgba(239,68,68,0.15);color:var(--accent-red)"><i class="fas fa-times-circle"></i></div>
+                    <div class="stat-card-value" style="color:var(--accent-red)">${incorrectCount}</div>
+                    <div class="stat-card-label">Incorrectas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon" style="background:rgba(160,160,192,0.15);color:var(--text-secondary)"><i class="fas fa-minus-circle"></i></div>
+                    <div class="stat-card-value">${unanswered}</div>
+                    <div class="stat-card-label">Sin responder</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-icon" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow)"><i class="fas fa-fire"></i></div>
+                    <div class="stat-card-value" style="color:var(--accent-yellow)">${bestStreak}</div>
+                    <div class="stat-card-label">Mejor racha</div>
+                </div>`;
+
+            // Review list (igual a flashcards fc-answer-item)
+            const reviewList = document.getElementById('reviewList');
+            reviewList.innerHTML = examData.questions.map((q, i) => {
+                let st, ic;
+                if (answers[i] === null) { st = 'unanswered'; ic = 'fas fa-minus'; }
+                else if (answers[i] === q.correct) { st = 'correct'; ic = 'fas fa-check'; }
+                else { st = 'incorrect'; ic = 'fas fa-times'; }
+                const ca = q.options[q.correct];
+                const ua = answers[i] !== null ? q.options[answers[i]] : null;
+                let answerRow = '';
+                if (st === 'correct') {
+                    answerRow = `<div class="review-a-text"><span class="arrow">→</span><span style="color:var(--accent-green)">${ca}</span></div>`;
+                } else if (st === 'incorrect') {
+                    answerRow = `<div class="review-a-text"><span style="color:var(--accent-red)">${ua}</span><span class="arrow" style="margin:0 0.3rem">→</span><span style="color:var(--accent-green)">${ca}</span></div>`;
+                } else {
+                    answerRow = `<div class="review-a-text"><span class="arrow">→</span><span style="color:var(--accent-green)">${ca}</span></div>`;
+                }
+                return `<div class="review-item ${st}">
+                    <div class="review-icon"><i class="${ic}"></i></div>
+                    <div class="review-q">
+                        <div class="review-q-text"><span style="color:var(--text-secondary);margin-right:0.25rem">${i+1}.</span>${q.question}</div>
+                        ${answerRow}
+                    </div>
+                </div>`;
+            }).join('');
+
+            // Confetti + XP toast (igual a flashcards)
+            if (grade >= 70) launchConfetti();
+            const xpEarned = correctCount * 10;
+            setTimeout(() => showXpToast(xpEarned), 1500);
+        }
+
+        function animateGrade(target) {
+            const fillEl = document.getElementById('gradeFill');
+            const numEl = document.getElementById('gradeNumber');
+            const circumference = 471.24; // 2 * PI * 75
+            let color;
+            if (target >= 80) color = '#22c55e';
+            else if (target >= 60) color = '#2dd4bf';
+            else if (target >= 40) color = '#fbbf24';
+            else color = '#ef4444';
+            fillEl.style.stroke = color;
+            numEl.style.color = color;
+            const offset = circumference - (target / 100) * circumference;
+            setTimeout(() => { fillEl.style.strokeDashoffset = offset; }, 300);
+            // Animate number
+            let cur = 0;
+            const step = Math.max(1, Math.floor(target / 40));
+            const iv = setInterval(() => { cur += step; if (cur >= target) { cur = target; clearInterval(iv); } numEl.textContent = cur + '%'; }, 30);
+        }
+
+        function launchConfetti() {
+            const container = document.getElementById('confettiContainer');
+            const colors = ['#2dd4bf','#8b5cf6','#ec4899','#fbbf24','#22c55e','#3b82f6','#f97316'];
+            let html = '';
+            for (let i = 0; i < 60; i++) {
+                const color = colors[Math.floor(Math.random()*colors.length)];
+                const left = Math.random()*100, size = 6+Math.random()*8;
+                const dur = 1.5+Math.random()*2, delay = Math.random()*0.8;
+                const shape = Math.random()>0.5?'50%':'2px';
+                html += `<div class="confetti-piece" style="left:${left}%;width:${size}px;height:${size*(Math.random()>0.5?1:1.5)}px;background:${color};border-radius:${shape};animation-duration:${dur}s;animation-delay:${delay}s"></div>`;
+            }
+            container.innerHTML = html;
+            setTimeout(() => container.innerHTML = '', 4000);
+        }
+
+        function showXpToast(amount) {
+            const toast = document.getElementById('xpToast');
+            document.getElementById('xpToastAmount').textContent = `${amount} XP`;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        function retryExam() {
+            currentQuestion = 0;
+            answers = new Array(examData.questions.length).fill(null);
+            questionLocked = new Array(examData.questions.length).fill(false);
+            questionResults = new Array(examData.questions.length).fill(null);
+            totalSeconds = examData.timeMinutes * 60;
+            alertShownAt2min = false; alertShownAt1min = false; examFinished = false;
+            correctCount = 0; incorrectCount = 0; streak = 0; bestStreak = 0;
+            document.getElementById('scoreCorrect').textContent = '0';
+            document.getElementById('scoreIncorrect').textContent = '0';
+            document.getElementById('streakCount').textContent = '0';
+            document.getElementById('gradeFill').style.strokeDashoffset = '471.24';
+            document.getElementById('gradeNumber').textContent = '0%';
+            document.getElementById('resultsScreen').classList.remove('active');
+            document.getElementById('examScreen').classList.remove('hidden');
+            renderQuestion(); renderDots();
+            if (examData.hasTimer) startTimer();
+        }
+
+        // Keyboard
+        document.getElementById('exitModal').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('show'); });
+        document.addEventListener('keydown', function(e) {
+            if (examFinished) return;
+            if (e.key === 'Escape') { closeExitModal(); closeTimerAlert(); }
+            if (e.key === 'ArrowRight') nextQuestion();
+            const km = {'a':0,'b':1,'c':2,'d':3};
+            if (km[e.key.toLowerCase()] !== undefined && !questionLocked[currentQuestion]) {
+                const idx = km[e.key.toLowerCase()];
+                if (idx < examData.questions[currentQuestion].options.length) selectOption(idx);
+            }
+        });
+
+        initExam();
+    </script>
+</body>
+</html>
