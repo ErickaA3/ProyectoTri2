@@ -17,7 +17,7 @@
 
         <!-- Topbar con breadcrumb -->
         <div class="config-topbar">
-            <button class="btn-volver" onclick="history.back()">
+            <button class="btn-volver" onclick="goBack()">
                 <i class="fas fa-arrow-left"></i> Volver
             </button>
             <div class="breadcrumb">
@@ -135,28 +135,79 @@
     <script>
         let selectedMode = null;
 
+        // ================================================================
+        // FLOW MANAGER
+        // ================================================================
+        function getFlow()      { return JSON.parse(sessionStorage.getItem('modoEstudioFlow') || 'null'); }
+        function saveFlow(flow) { sessionStorage.setItem('modoEstudioFlow', JSON.stringify(flow)); }
+
+        function getNextPage(flow) {
+            const CONFIG_PAGES = {
+                esquemas: '../pages/seleccion-esquema.html',
+                examenes: '../pages/config-examen.html'
+            };
+            const next = flow.currentConfigIndex + 1;
+            if (next < flow.configQueue.length) return CONFIG_PAGES[flow.configQueue[next]];
+            return '../pages/sesion-estudio.html';
+        }
+
+        // ================================================================
+        // VOLVER — retrocede en el flujo correctamente
+        // ================================================================
+        function goBack() {
+            const flow = getFlow();
+            if (!flow) { window.location.href = '../pages/modo-estudio.html'; return; }
+            // Si hay una config anterior en la cola, ir a ella
+            if (flow.currentConfigIndex > 0) {
+                flow.currentConfigIndex--;
+                saveFlow(flow);
+                const CONFIG_PAGES = { esquemas: '../pages/seleccion-esquema.html', examenes: '../pages/config-examen.html' };
+                const prev = flow.configQueue[flow.currentConfigIndex];
+                if (prev && CONFIG_PAGES[prev]) { window.location.href = CONFIG_PAGES[prev]; return; }
+            }
+            window.location.href = '../pages/modo-estudio.html';
+        }
+
+        // ================================================================
+        // INIT — verificar flujo y mostrar indicador de paso
+        // ================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const flow = getFlow();
+            if (!flow) { window.location.href = '../pages/modo-estudio.html'; return; }
+
+            // Mostrar indicador "Paso X de Y" en el breadcrumb
+            const idx   = flow.configQueue.indexOf('examenes');
+            const total = flow.configQueue.length;
+            if (idx >= 0) {
+                const breadcrumb = document.querySelector('.breadcrumb span');
+                if (breadcrumb) breadcrumb.textContent = `Evaluación (Paso ${idx + 1} de ${total})`;
+            }
+        });
+
+        // ================================================================
+        // SELECCIÓN DE MODO (sin cambios de UI)
+        // ================================================================
         function selectMode(mode) {
             selectedMode = mode;
 
-            // Toggle selected
             document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
             document.querySelector(`.mode-card.${mode}`).classList.add('selected');
 
-            // Show config
             const configEl = document.getElementById('configOptions');
             configEl.classList.add('visible');
 
-            // Update button
             const btn = document.getElementById('btnContinuar');
             btn.classList.add('active');
             btn.className = `btn-continuar active ${mode === 'quiz' ? 'quiz-theme' : 'experto-theme'}`;
 
-            // Render options
             renderOptions(mode);
         }
 
+        // ================================================================
+        // RENDER OPTIONS (sin cambios de UI)
+        // ================================================================
         function renderOptions(mode) {
-            const grid = document.getElementById('optionsGrid');
+            const grid  = document.getElementById('optionsGrid');
             const title = document.getElementById('optionsTitle');
 
             if (mode === 'quiz') {
@@ -175,7 +226,6 @@
                             <option value="20">20</option>
                         </select>
                     </div>
-
                     <div class="option-card">
                         <div class="option-icon purple"><i class="fas fa-clock"></i></div>
                         <div class="option-info">
@@ -187,8 +237,7 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
-
-                    <div class="option-card" id="timerDurationCard" style="opacity:0.4; pointer-events:none;">
+                    <div class="option-card" id="timerDurationCard" style="opacity:0.4;pointer-events:none;">
                         <div class="option-icon purple"><i class="fas fa-hourglass-half"></i></div>
                         <div class="option-info">
                             <div class="option-label">Duración del temporizador</div>
@@ -201,7 +250,6 @@
                             <option value="20">20 min</option>
                         </select>
                     </div>
-
                     <div class="option-card">
                         <div class="option-icon green"><i class="fas fa-lightbulb"></i></div>
                         <div class="option-info">
@@ -209,13 +257,13 @@
                             <div class="option-hint">Explica por qué es correcta</div>
                         </div>
                         <label class="toggle-switch">
-                            <input type="checkbox" checked>
+                            <input type="checkbox" id="optExplanations" checked>
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
                 `;
             } else {
-                title.textContent = 'Configura tu Examen';
+                title.textContent = 'Configura tu Examen Experto';
                 grid.innerHTML = `
                     <div class="option-card">
                         <div class="option-icon orange"><i class="fas fa-list-ol"></i></div>
@@ -230,8 +278,7 @@
                             <option value="30">30</option>
                         </select>
                     </div>
-
-                    <div class="option-card" style="position:relative;">
+                    <div class="option-card">
                         <div class="option-icon orange"><i class="fas fa-clock"></i></div>
                         <div class="option-info">
                             <div class="option-label">Temporizador</div>
@@ -242,7 +289,6 @@
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
-
                     <div class="option-card">
                         <div class="option-icon orange"><i class="fas fa-hourglass-half"></i></div>
                         <div class="option-info">
@@ -257,7 +303,6 @@
                             <option value="45">45 min</option>
                         </select>
                     </div>
-
                     <div class="option-card">
                         <div class="option-icon green"><i class="fas fa-bolt"></i></div>
                         <div class="option-info">
@@ -265,7 +310,7 @@
                             <div class="option-hint">Pierdes XP si sales antes</div>
                         </div>
                         <label class="toggle-switch">
-                            <input type="checkbox" checked>
+                            <input type="checkbox" id="optPenalty" checked>
                             <span class="toggle-slider"></span>
                         </label>
                     </div>
@@ -275,37 +320,55 @@
 
         function toggleTimerSelect() {
             const checked = document.getElementById('optTimer').checked;
-            const card = document.getElementById('timerDurationCard');
+            const card    = document.getElementById('timerDurationCard');
             if (card) {
-                card.style.opacity = checked ? '1' : '0.4';
+                card.style.opacity       = checked ? '1'    : '0.4';
                 card.style.pointerEvents = checked ? 'auto' : 'none';
             }
         }
 
+        // ================================================================
+        // CONTINUAR — guarda config en el flujo y avanza
+        // ================================================================
         function startExam() {
             if (!selectedMode) return;
 
-            const questions = document.getElementById('optQuestions')?.value || 10;
-            const timerDuration = document.getElementById('optTimerDuration')?.value || 15;
-            let hasTimer = true;
+            const flow = getFlow();
+            if (!flow) { window.location.href = '../pages/modo-estudio.html'; return; }
 
+            // Leer los valores seleccionados
+            const numPreguntas   = parseInt(document.getElementById('optQuestions')?.value  || 10);
+            const timerMinutos   = parseInt(document.getElementById('optTimerDuration')?.value || 15);
+            const showExplain    = document.getElementById('optExplanations')?.checked ?? true;
+            const penalty        = document.getElementById('optPenalty')?.checked ?? true;
+            let   hasTimer       = true;
             if (selectedMode === 'quiz') {
-                const timerCheckbox = document.getElementById('optTimer');
-                hasTimer = timerCheckbox ? timerCheckbox.checked : false;
+                hasTimer = document.getElementById('optTimer')?.checked ?? false;
             }
 
-            const config = {
-                mode: selectedMode,
-                questions: parseInt(questions),
-                timer: hasTimer,
-                timerMinutes: parseInt(timerDuration)
+            // Guardar config de examenes en el flujo
+            flow.configs.examenes = {
+                tipo:          selectedMode === 'quiz' ? 'quiz' : 'expert_exam',
+                numPreguntas,
+                hasTimer,
+                timerMinutos:  hasTimer ? timerMinutos : null,
+                showExplain:   selectedMode === 'quiz' ? showExplain : false,
+                penalty:       selectedMode === 'experto' ? penalty : false
             };
+            flow.currentConfigIndex++;
+            saveFlow(flow);
 
-            console.log('Iniciando examen con config:', config);
+            // Cambiar botón a loading
+            const btn = document.getElementById('btnContinuar');
+            btn.innerHTML = '<div style="width:18px;height:18px;border:3px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px"></div> Guardando...';
+            btn.disabled = true;
 
-            // Aquí redirigirías a examen.html pasando la config
-            // window.location.href = `examen.html?mode=${config.mode}&q=${config.questions}&timer=${config.timer}&time=${config.timerMinutes}`;
+            setTimeout(() => window.location.href = getNextPage(flow), 500);
         }
     </script>
+
+    <style>
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </body>
 </html>
