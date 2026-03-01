@@ -212,7 +212,8 @@ async function doLogin(){
   try {
     const res=await fetch(`${API_BASE}/api/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
     const data=await res.json();
-    if(data.success){ showSuccess('¡Bienvenido de vuelta!'); setTimeout(()=>window.location.href='/pages/dashboard.html',1000); }
+    if(data.success){ showSuccess('¡Bienvenido de vuelta!'); setTimeout(()=>window.location.href='pages/profil.html',1000);}
+
     else showError(data.message||'Credenciales incorrectas.');
   } catch(e){ showError('Error de conexión. Intenta de nuevo.'); }
   finally{ setLoading('login',false); }
@@ -231,12 +232,15 @@ async function doRegister(){
   if(!/[A-Za-z]/.test(password)||!/[0-9]/.test(password)){ showError('La contraseña debe tener letras y números.'); return; }
   setLoading('register',true);
   try {
-    const res=await fetch(`${API_BASE}/api/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,email,password,fullName})});
-    const data=await res.json();
-    if(data.success){ showSuccess('¡Cuenta creada! Redirigiendo...'); setTimeout(()=>window.location.href='/pages/dashboard.html',1200); }
+    const res = await fetch(`${API_BASE}/api/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,email,password,fullName})});
+    const text = await res.text();
+    console.log('RESPUESTA:', text);
+    const data = JSON.parse(text);
+    if(data.success){ showSuccess('¡Cuenta creada! Redirigiendo...'); setTimeout(()=>window.location.href='pages/profil.html',1200);}
+
     else showError(data.message||'No se pudo crear la cuenta.');
-  } catch(e){ showError('Error de conexión. Intenta de nuevo.'); }
-  finally{ setLoading('register',false); }
+} catch(e){ showError('Error: ' + e.message); }
+finally{ setLoading('register',false); }
 }
 
 document.addEventListener('keydown',e=>{
