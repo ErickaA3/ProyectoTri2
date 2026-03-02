@@ -34,7 +34,7 @@ public class LoginServlet extends HttpServlet {
             throws ServletException, IOException {
 
         setCorsHeaders(response);
-        String body     = request.getReader().lines().collect(Collectors.joining());
+        String body = request.getReader().lines().collect(Collectors.joining());
         String email    = extractJsonField(body, "email");
         String password = extractJsonField(body, "password");
 
@@ -79,14 +79,13 @@ public class LoginServlet extends HttpServlet {
         res.setStatus(HttpServletResponse.SC_OK);
     }
 
-    // BUG CORREGIDO: se eliminó la variable 'origin' que se leía pero nunca se usaba.
     private void setCorsHeaders(HttpServletResponse response) {
-        response.setHeader("Access-Control-Allow-Origin", "*");
-        response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-        response.setHeader("Access-Control-Allow-Credentials", "false");
-    }
-
+    String origin = response.getHeader("Origin");
+    response.setHeader("Access-Control-Allow-Origin", "*");
+    response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    response.setHeader("Access-Control-Allow-Credentials", "false");
+}
     private String extractJsonField(String json, String field) {
         if (json == null) return null;
         String key = "\"" + field + "\"";

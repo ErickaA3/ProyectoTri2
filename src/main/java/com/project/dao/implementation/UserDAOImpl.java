@@ -15,13 +15,17 @@ import com.project.database.DatabaseConnection;
 import com.project.model.users.Statistics;
 import com.project.model.users.User;
 
+/**
+ * Implementación real de IUserDAO.
+ * Todas las operaciones SQL contra Supabase (PostgreSQL) viven aquí.
+ */
 public class UserDAOImpl implements IUserDAO {
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private Connection conn() throws SQLException {
-        return DatabaseConnection.getConnection();
-    }
+    return DatabaseConnection.getConnection();
+}
 
     /** Mapea un ResultSet → User (sin exponer password_hash al exterior). */
     private User mapUser(ResultSet rs) throws SQLException {
@@ -29,10 +33,8 @@ public class UserDAOImpl implements IUserDAO {
         u.setId(UUID.fromString(rs.getString("id")));
         u.setUsername(rs.getString("username"));
         u.setEmail(rs.getString("email"));
-        u.setPasswordHash(rs.getString("password_hash")); // solo para login interno
+        u.setPasswordHash(rs.getString("password_hash"));     // solo para login interno
         u.setFullName(rs.getString("full_name"));
-
-        // language y country pueden ser null en Supabase; se leen de forma segura
         u.setLanguage(rs.getString("language"));
         u.setCountry(rs.getString("country"));
 
@@ -42,27 +44,6 @@ public class UserDAOImpl implements IUserDAO {
         Timestamp ca = rs.getTimestamp("created_at");
         if (ca != null) u.setCreatedAt(ca.toLocalDateTime());
 
-        return u;
-    }
-
-    /**
-     * Mapea un ResultSet parcial proveniente de un RETURNING que no incluye
-     * todas las columnas de users (p.ej. el INSERT de register).
-     * Solo lee las columnas que sí están presentes.
-     */
-    private User mapUserFromInsert(ResultSet rs) throws SQLException {
-        User u = new User();
-        u.setId(UUID.fromString(rs.getString("id")));
-        u.setUsername(rs.getString("username"));
-        u.setEmail(rs.getString("email"));
-        u.setPasswordHash(rs.getString("password_hash"));
-        u.setFullName(rs.getString("full_name"));
-        u.setLanguage(rs.getString("language")); // incluida en el RETURNING del INSERT
-
-        Timestamp ca = rs.getTimestamp("created_at");
-        if (ca != null) u.setCreatedAt(ca.toLocalDateTime());
-
-        // country y birthdate no se insertan en el registro inicial; quedan null
         return u;
     }
 
@@ -87,51 +68,33 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public User register(User user) throws SQLException {
-        // BUG CORREGIDO #1: se agregó 'language' como 5ta columna en el INSERT y en el RETURNING.
-        // Antes: INSERT INTO users (username, email, password_hash, full_name) — solo 4 columnas
-        // pero se llamaba ps.setString(5, language) → "column index out of range: 5, number of columns: 4"
+        // 1. Insertar en users y recuperar el UUID generado
+       String sqlUser = """
+        INSERT INTO users (username, email, password_hash, full_name)
+        VALUES (?, ?, ?, ?)
+        RETURNING id, username, email, password_hash, full_name, created_at
+        """;
 
-        // BUG CORREGIDO #2: ambos INSERTs ahora comparten la misma conexión y corren dentro
-        // de una transacción explícita. Antes, conn() se llamaba dos veces (dos conexiones
-        // distintas), el primer INSERT hacía auto-commit, y si el segundo fallaba el usuario
-        // quedaba creado en BD pero el servlet devolvía Error 500 al cliente.
-        String sqlUser = """
-                INSERT INTO users (username, email, password_hash, full_name, language)
-                VALUES (?, ?, ?, ?, ?)
-                RETURNING id, username, email, password_hash, full_name, language, created_at
-                """;
-        String sqlStats = "INSERT INTO user_stats (user_id) VALUES (?)";
+        try (PreparedStatement ps = conn().prepareStatement(sqlUser)) {
+            ps.setString(1, user.getUsername());
+            ps.setString(2, user.getEmail());
+            ps.setString(3, user.getPasswordHash());
+            ps.setString(4, user.getFullName());
+            ps.setString(5, user.getLanguage() != null ? user.getLanguage() : "es");
 
-        Connection c = conn();
-        try {
-            c.setAutoCommit(false); // inicio de transacción
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) throw new SQLException("No se pudo insertar el usuario.");
 
-            User created;
-            try (PreparedStatement ps = c.prepareStatement(sqlUser)) {
-                ps.setString(1, user.getUsername());
-                ps.setString(2, user.getEmail());
-                ps.setString(3, user.getPasswordHash());
-                ps.setString(4, user.getFullName());
-                ps.setString(5, user.getLanguage() != null ? user.getLanguage() : "es");
+            User created = mapUser(rs);
 
-                ResultSet rs = ps.executeQuery();
-                if (!rs.next()) throw new SQLException("No se pudo insertar el usuario.");
-                created = mapUserFromInsert(rs);
-            }
-
-            try (PreparedStatement ps2 = c.prepareStatement(sqlStats)) {
+            // 2. Crear fila inicial en user_stats
+            String sqlStats = "INSERT INTO user_stats (user_id) VALUES (?)";
+            try (PreparedStatement ps2 = conn().prepareStatement(sqlStats)) {
                 ps2.setObject(1, created.getId());
                 ps2.executeUpdate();
             }
 
-            c.commit(); // ambos INSERTs exitosos → confirmar
             return created;
-
-        } catch (SQLException e) {
-            c.rollback(); // algo falló → revertir todo (el usuario NO queda huérfano en BD)
-            throw e;      // propagar para que RegisterServlet devuelva 500 con el mensaje real
-        } finally {
-            c.setAutoCommit(true);
         }
     }
 
