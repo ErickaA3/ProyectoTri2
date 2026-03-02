@@ -11,114 +11,10 @@
 
 </head>
 
-<body>
+<body data-page="tienda">
 
-    <!-- ===== NAVBAR (idéntico al de historial) ===== -->
-    <nav class="main-navbar">
-        <div class="navbar-left">
-            <button class="menu-toggle" onclick="toggleSidebar()">
-                <i class="fas fa-bars"></i>
-            </button>
-            <a href="#" class="logo">
-                <div class="logo-icon">
-                    <i class="fas fa-robot"></i>
-                </div>
-                <span class="logo-text">Mi ProfesorIA</span>
-            </a>
-        </div>
-
-        <div class="navbar-stats">
-            <div class="stat-pill">
-                <img src="../images/gifs/fire.gif" class="fire-gif" alt="🔥">
-                <span class="stat-value">5</span>
-                <span class="stat-label">Días Racha</span>
-            </div>
-            <div class="stat-pill">
-                <img src="../images/gifs/star.gif" class="star-gif" alt="⭐">
-                <span class="stat-value">2,450</span>
-                <span class="stat-label">XP</span>
-            </div>
-            <div class="stat-pill">
-                <img src="../images/gifs/coin.gif" class="money-gif" alt="🪙">
-                <span class="stat-value" id="user-balance-header">1,520</span>
-                <span class="stat-label">Monedas</span>
-            </div>
-        </div>
-    </nav>
-
-    <!-- ===== OVERLAY MOBILE ===== -->
-    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
-
-    <!-- ===== SIDEBAR (idéntico al de historial) ===== -->
-    <aside class="sidebar-cards" id="sidebar">
-
-        <div class="user-profile">
-            <div class="user-avatar">
-                <i class="fas fa-user"></i>
-            </div>
-            <div class="user-name">Estudiante Pro</div>
-            <div class="user-level">Nivel 12</div>
-        </div>
-
-        <div class="nav-cards">
-            <a href="#" class="nav-card">
-                <div class="nav-card-icon gradient-perfil"><i class="fas fa-user"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Perfil</div>
-                    <div class="nav-card-desc">Tu información</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card modo-estudio">
-                <div class="nav-card-icon gradient-estudio"><i class="fas fa-book-open"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Modo Estudio</div>
-                    <div class="nav-card-desc">Aprende a tu ritmo</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card">
-                <div class="nav-card-icon gradient-profesor"><i class="fas fa-robot"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Mi Profesor</div>
-                    <div class="nav-card-desc">Asistente IA</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card">
-                <div class="nav-card-icon gradient-duelo"><i class="fas fa-shield-alt"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Duelos</div>
-                    <div class="nav-card-desc">Reta a otros</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card active">
-                <div class="nav-card-icon gradient-tienda"><i class="fas fa-shopping-bag"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Tienda</div>
-                    <div class="nav-card-desc">Personaliza tu perfil</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card">
-                <div class="nav-card-icon gradient-favoritos"><i class="fas fa-heart"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Favoritos</div>
-                    <div class="nav-card-desc">Contenido guardado</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card">
-                <div class="nav-card-icon gradient-historial"><i class="fas fa-clock-rotate-left"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Historial</div>
-                    <div class="nav-card-desc">Tu actividad reciente</div>
-                </div>
-            </a>
-            <a href="#" class="nav-card">
-                <div class="nav-card-icon gradient-ajustes"><i class="fas fa-cog"></i></div>
-                <div class="nav-card-content">
-                    <div class="nav-card-title">Ajustes</div>
-                    <div class="nav-card-desc">Configuración</div>
-                </div>
-            </a>
-        </div>
-    </aside>
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
 
     <!-- ===== CONTENIDO TIENDA ===== -->
     <main class="content">
@@ -308,11 +204,6 @@
     </div>
 
     <script>
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('active');
-            document.getElementById('sidebarOverlay').classList.toggle('active');
-        }
-
         let userBalance = 1520;
         let selectedAvatarPrice = 0, selectedAvatarId = null;
         let selectedBackgroundPrice = 0, selectedBackgroundId = null, selectedBackgroundClass = null;
@@ -533,5 +424,6 @@
         document.getElementById('insufficientModal').addEventListener('click', e=>{if(e.target===document.getElementById('insufficientModal'))closeModal();});
         document.getElementById('purchaseModal').addEventListener('click', e=>{if(e.target===document.getElementById('purchaseModal'))equipLater();});
     </script>
+    <script src="../js/components.js"></script>
 </body>
 </html>

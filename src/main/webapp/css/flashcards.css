@@ -1,15 +1,6 @@
 /* ===== FLASHCARDS - Mi ProfesorIA ===== */
 @import url('styles-shared.css');
 
-/* ===== CUSTOM CURSOR ===== */
-html, html *, html *::before, html *::after {
-    cursor: url('../images/flashcards/cursor-star-cyan.png') 16 16, auto !important;
-}
-
-html *:active {
-    cursor: url('../images/flashcards/cursor-star-silver.png') 16 16, auto !important;
-}
-
 /* ===== CONTENT AREA ===== */
 .content {
     overflow-y: auto;
