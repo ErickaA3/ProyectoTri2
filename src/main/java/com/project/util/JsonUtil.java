@@ -15,19 +15,7 @@ public class JsonUtil {
 
     public static void sendSuccess(HttpServletResponse response, String jsonData) throws IOException {
         setJsonHeaders(response);
-        response.setStatus(HttpServletResponse.SC_OK); // 200
-        response.getWriter().write("{\"success\":true,\"data\":" + jsonData + "}");
-    }
-
-    /**
-     * NUEVO: Envía una respuesta 201 Created con datos JSON.
-     * Se debe usar en RegisterServlet para devolver el código HTTP correcto.
-     * Antes se llamaba response.setStatus(201) seguido de sendSuccess() que
-     * sobreescribía el status a 200 — ahora el status 201 se preserva correctamente.
-     */
-    public static void sendCreated(HttpServletResponse response, String jsonData) throws IOException {
-        setJsonHeaders(response);
-        response.setStatus(HttpServletResponse.SC_CREATED); // 201
+        response.setStatus(HttpServletResponse.SC_OK);
         response.getWriter().write("{\"success\":true,\"data\":" + jsonData + "}");
     }
 
