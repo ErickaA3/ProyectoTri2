@@ -39,16 +39,16 @@ public class RegisterServlet extends HttpServlet {
         String password = extractJsonField(body, "password");
         String fullName = extractJsonField(body, "fullName");
 
-        if (username == null || username.isBlank()) { JsonUtil.sendError(response, 400, "El nombre de usuario es obligatorio."); return; }
-        if (email == null || email.isBlank()) { JsonUtil.sendError(response, 400, "El email es obligatorio."); return; }
-        if (!email.contains("@")) { JsonUtil.sendError(response, 400, "El email no tiene un formato válido."); return; }
-        if (password == null || password.isBlank()) { JsonUtil.sendError(response, 400, "La contraseña es obligatoria."); return; }
-        if (!PasswordUtil.isStrong(password)) { JsonUtil.sendError(response, 400, "La contraseña debe tener al menos 8 caracteres, una letra y un número."); return; }
+        if (username == null || username.isBlank())  { JsonUtil.sendError(response, 400, "El nombre de usuario es obligatorio."); return; }
+        if (email == null || email.isBlank())         { JsonUtil.sendError(response, 400, "El email es obligatorio."); return; }
+        if (!email.contains("@"))                     { JsonUtil.sendError(response, 400, "El email no tiene un formato válido."); return; }
+        if (password == null || password.isBlank())   { JsonUtil.sendError(response, 400, "La contraseña es obligatoria."); return; }
+        if (!PasswordUtil.isStrong(password))         { JsonUtil.sendError(response, 400, "La contraseña debe tener al menos 8 caracteres, una letra y un número."); return; }
         if (username.length() < 3 || username.length() > 50) { JsonUtil.sendError(response, 400, "El usuario debe tener entre 3 y 50 caracteres."); return; }
 
         try {
-            if (userDAO.emailExists(email.trim().toLowerCase())) { JsonUtil.sendError(response, 409, "El email ya está registrado."); return; }
-            if (userDAO.usernameExists(username.trim())) { JsonUtil.sendError(response, 409, "El nombre de usuario ya está en uso."); return; }
+            if (userDAO.emailExists(email.trim().toLowerCase()))  { JsonUtil.sendError(response, 409, "El email ya está registrado."); return; }
+            if (userDAO.usernameExists(username.trim()))          { JsonUtil.sendError(response, 409, "El nombre de usuario ya está en uso."); return; }
 
             User newUser = new User();
             newUser.setUsername(username.trim());
@@ -65,13 +65,14 @@ public class RegisterServlet extends HttpServlet {
             session.setAttribute("username", created.getUsername());
             session.setMaxInactiveInterval(60 * 60 * 8);
 
-            response.setStatus(HttpServletResponse.SC_CREATED);
-            JsonUtil.sendSuccess(response, JsonUtil.buildUserJson(created, stats));
+            // BUG CORREGIDO: antes se llamaba response.setStatus(201) y luego
+            // JsonUtil.sendSuccess() sobreescribía el status a 200.
+            // Ahora se usa sendCreated() que aplica el 201 correctamente.
+            JsonUtil.sendCreated(response, JsonUtil.buildUserJson(created, stats));
 
         } catch (SQLException e) {
             e.printStackTrace();
             JsonUtil.sendError(response, 500, e.getMessage());
-            
         }
     }
 
@@ -80,14 +81,14 @@ public class RegisterServlet extends HttpServlet {
         setCorsHeaders(res);
         res.setStatus(HttpServletResponse.SC_OK);
     }
-private void setCorsHeaders(HttpServletResponse response) {
-    String origin = response.getHeader("Origin");
-    response.setHeader("Access-Control-Allow-Origin", "*");
-    response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    response.setHeader("Access-Control-Allow-Credentials", "false");
-}
-    
+
+    // BUG CORREGIDO: se eliminó la variable 'origin' que se leía pero nunca se usaba.
+    private void setCorsHeaders(HttpServletResponse response) {
+        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+        response.setHeader("Access-Control-Allow-Credentials", "false");
+    }
 
     private String extractJsonField(String json, String field) {
         if (json == null) return null;
