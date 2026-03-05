@@ -246,13 +246,19 @@
                 showToast('Agrega texto o adjunta un archivo primero'); return;
             }
 
-            // Verificar sesión → si no hay cuenta redirigir a index
-            const userId = sessionStorage.getItem('userId');
+            // Verificar sesión — Hans guarda el user como objeto JSON bajo la clave 'user'
+            const userRaw = localStorage.getItem('user');
+            let userId = null;
+            if (userRaw) {
+                try { userId = JSON.parse(userRaw).id; } catch(e) {}
+            }
             if (!userId) {
                 showToast('Debes iniciar sesión primero');
                 setTimeout(() => window.location.href = '../index.html', 1200);
                 return;
             }
+            // Sincronizar para que el resto del flujo también lo encuentre
+            sessionStorage.setItem('userId', userId);
 
             // Construir el objeto de flujo y guardarlo
             const configQueue = selectedOptions.filter(o => CONFIG_REQUIRED[o]);
@@ -262,17 +268,33 @@
                 dataType:           selectedDataType || 'text',
                 text:               selectedDataType === 'text' ? userText : null,
                 fileName:           uploadedFile ? uploadedFile.name : null,
+                fileType:           uploadedFile ? uploadedFile.type : null,
+                fileBase64:         null,
                 configs:            {},
                 configQueue,
                 currentConfigIndex: 0
             };
-            sessionStorage.setItem('modoEstudioFlow', JSON.stringify(flow));
 
-            // Ir a la primera config, o directo a generar si no hay configs
-            if (configQueue.length > 0) {
-                window.location.href = CONFIG_REQUIRED[configQueue[0]].page;
+            const navigate = () => {
+                sessionStorage.setItem('modoEstudioFlow', JSON.stringify(flow));
+                if (configQueue.length > 0) {
+                    window.location.href = CONFIG_REQUIRED[configQueue[0]].page;
+                } else {
+                    window.location.href = '../pages/sesion-estudio.html';
+                }
+            };
+
+            if (uploadedFile && selectedDataType === 'file') {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Guardar base64 dentro del flow (persiste entre páginas)
+                    flow.fileBase64 = e.target.result; // incluye prefijo data:type;base64,...
+                    navigate();
+                };
+                reader.onerror = () => showToast('Error leyendo el archivo.');
+                reader.readAsDataURL(uploadedFile);
             } else {
-                window.location.href = '../pages/sesion-estudio.html';
+                navigate();
             }
         }
 

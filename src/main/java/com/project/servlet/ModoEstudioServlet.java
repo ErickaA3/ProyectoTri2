@@ -10,39 +10,36 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
+
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.Loader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+
+
 /**
  * Servlet principal del Modo Estudio.
- * Recibe texto + tipos seleccionados y genera contenido con IA para cada uno.
+ * URL: /modo-estudio/generar  — POST
  *
- * URL: /modo-estudio/generar
- * Método: POST
- * Body (JSON):
+ * Body JSON:
  * {
- *   "userId": "uuid-del-usuario",
- *   "options": ["flashcards", "esquemas", "resumenes", "quizzes"],
- *   "dataType": "text",
- *   "text": "Texto a estudiar..."
- * }
- *
- * Respuesta:
- * {
- *   "success": true,
- *   "sessionId": "uuid-de-la-sesion",
- *   "results": {
- *     "flashcards": { "id": "uuid", "title": "...", "cards": [...] },
- *     "esquemas":   { "id": "uuid", "title": "...", "rootNode": {...} },
- *     "resumenes":  { "id": "uuid", "title": "...", "summaryText": "..." },
- *     "quizzes":    { "id": "uuid", "title": "...", "questions": [...] }
+ *   "userId":   "uuid",
+ *   "options":  ["esquemas","flashcards","examenes","resumenes"],
+ *   "dataType": "text" | "file",
+ *   "text":     "...",          // si dataType = text
+ *   "configs":  {               // configuraciones de cada módulo
+ *     "examenes": { "tipo": "quiz" | "expert_exam", "numPreguntas": 10, "dificultad": "medio" }
+ *     "esquemas": { "tipo": "jerarquico" | ... }
  *   }
  * }
  */
 @WebServlet("/modo-estudio/generar")
-@MultipartConfig(maxFileSize = 10_485_760) // 10 MB máximo
+@MultipartConfig(maxFileSize = 10_485_760) // 10 MB
 public class ModoEstudioServlet extends HttpServlet {
 
     private final IContentDAO contentDAO = new ContentDAOImpl();
@@ -56,55 +53,78 @@ public class ModoEstudioServlet extends HttpServlet {
         res.setCharacterEncoding("UTF-8");
 
         try {
-            // 1. Leer y parsear el body
-            String body = req.getReader().lines().collect(Collectors.joining());
-            JsonObject data = JsonParser.parseString(body).getAsJsonObject();
+            String dataType = req.getContentType() != null && req.getContentType().contains("multipart")
+                ? "file" : "json";
 
-            // userId es UUID — viene como String del frontend (sessionStorage)
-            String userId = data.get("userId").getAsString();
-            String dataType = data.get("dataType").getAsString();
+            String userId;
+            List<String> options;
+            String textoBase;
+            JsonObject configs = new JsonObject();
 
-            // Extraer los tipos de contenido seleccionados
-            List<String> options = gson.fromJson(
-                data.getAsJsonArray("options"),
-                new com.google.gson.reflect.TypeToken<List<String>>(){}.getType()
-            );
+            if ("file".equals(dataType)) {
+                // ── Multipart: viene con archivo PDF ──────────────────────
+                userId  = req.getParameter("userId");
+                String optionsParam = req.getParameter("options");
+                options = gson.fromJson(optionsParam,
+                    new com.google.gson.reflect.TypeToken<List<String>>(){}.getType());
 
-            // 2. Obtener el texto a estudiar
-            String textoBase = extractText(data, dataType);
+                String configsParam = req.getParameter("configs");
+                if (configsParam != null && !configsParam.isBlank()) {
+                    configs = JsonParser.parseString(configsParam).getAsJsonObject();
+                }
 
+                Part filePart = req.getPart("file");
+                textoBase = extractTextFromPDF(filePart.getInputStream());
+
+            } else {
+                // ── JSON puro: viene con texto ────────────────────────────
+                String body = req.getReader().lines().collect(Collectors.joining());
+                JsonObject data = JsonParser.parseString(body).getAsJsonObject();
+
+                userId  = data.get("userId").getAsString();
+                options = gson.fromJson(data.getAsJsonArray("options"),
+                    new com.google.gson.reflect.TypeToken<List<String>>(){}.getType());
+                textoBase = (data.has("text") && !data.get("text").isJsonNull()) ? data.get("text").getAsString() : null;
+
+                if (data.has("configs") && data.get("configs").isJsonObject()) {
+                    configs = data.getAsJsonObject("configs");
+                }
+            }
+
+            // ── Validaciones básicas ──────────────────────────────────────
             if (textoBase == null || textoBase.isBlank()) {
-                sendError(res, 400, "No se recibió texto para procesar.");
-                return;
+                sendError(res, 400, "No se recibió texto o el PDF estaba vacío."); return;
             }
-
             if (options == null || options.isEmpty()) {
-                sendError(res, 400, "Selecciona al menos un tipo de contenido.");
-                return;
+                sendError(res, 400, "Selecciona al menos un tipo de contenido."); return;
             }
 
-            // 3. Generar un sessionId único para agrupar todo lo de esta sesión
+            // ── Generar sessionId ─────────────────────────────────────────
             String sessionId = UUID.randomUUID().toString();
 
-            // 4. Generar contenido para cada tipo seleccionado
+            // ── Generar contenido para cada opción seleccionada ───────────
             JsonObject results = new JsonObject();
-
             for (String option : options) {
                 String contentType = mapOptionToType(option);
                 if (contentType == null) continue;
 
+                // Obtener la config específica de este módulo (si tiene)
+                JsonObject moduleConfig = configs.has(option)
+                    ? configs.getAsJsonObject(option) : new JsonObject();
+
                 try {
-                    JsonObject generated = generateAndSave(userId, contentType, textoBase, sessionId);
+                    JsonObject generated = generateAndSave(
+                        userId, contentType, option, textoBase, sessionId, moduleConfig
+                    );
                     results.add(option, generated);
                 } catch (Exception e) {
-                    // Si un tipo falla, seguimos con los demás y reportamos el error puntual
                     JsonObject error = new JsonObject();
                     error.addProperty("error", "Error generando " + option + ": " + e.getMessage());
                     results.add(option, error);
                 }
             }
 
-            // 5. Responder con todos los resultados y el sessionId
+            // ── Respuesta ─────────────────────────────────────────────────
             JsonObject response = new JsonObject();
             response.addProperty("success", true);
             response.addProperty("sessionId", sessionId);
@@ -116,70 +136,68 @@ public class ModoEstudioServlet extends HttpServlet {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // GENERAR Y GUARDAR — llama a la IA y persiste en BD
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
+    // GENERAR Y GUARDAR
+    // ─────────────────────────────────────────────────────────────────────────
 
-    private JsonObject generateAndSave(String userId, String type, String textoBase, String sessionId)
-            throws Exception {
+    private JsonObject generateAndSave(String userId, String contentType, String option,
+                                        String textoBase, String sessionId,
+                                        JsonObject moduleConfig) throws Exception {
 
-        // Llamar a la IA con el prompt del tipo correspondiente
-        String aiResponseJson = AIService.generate(type, textoBase);
-
-        // Parsear la respuesta de la IA
+        String aiResponseJson = AIService.generate(contentType, textoBase, moduleConfig);
         JsonObject aiData = JsonParser.parseString(aiResponseJson).getAsJsonObject();
         String title = aiData.has("title") ? aiData.get("title").getAsString() : "Sin título";
 
-        // Crear el objeto de contenido con userId (UUID String) y sessionId
-        EducationalContent content = buildContentObject(userId, type, title, sessionId);
-
-        // Guardar en study_content — pasamos el JSON de la IA y el texto original
+        EducationalContent content = buildContentObject(userId, contentType, title, sessionId);
         String savedId = contentDAO.save(content, aiResponseJson, textoBase);
 
-        // Agregar el UUID del registro guardado al resultado
         aiData.addProperty("id", savedId);
-        aiData.addProperty("type", type);
+        aiData.addProperty("type", contentType);
         aiData.addProperty("sessionId", sessionId);
 
         return aiData;
     }
 
-    // -----------------------------------------------------------------------
-    // MÉTODOS AUXILIARES
-    // -----------------------------------------------------------------------
+    // ─────────────────────────────────────────────────────────────────────────
+    // EXTRACCIÓN DE TEXTO DEL PDF
+    // El PDF se descarta — solo guardamos el resultado JSON de la IA
+    // ─────────────────────────────────────────────────────────────────────────
 
-    private String extractText(JsonObject data, String dataType) {
-        if ("text".equals(dataType)) {
-            return data.has("text") ? data.get("text").getAsString() : null;
+        private String extractTextFromPDF(InputStream pdfStream) throws Exception {
+        try (PDDocument doc = Loader.loadPDF(pdfStream.readAllBytes())) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            String text = stripper.getText(doc);
+            if (text == null || text.isBlank()) {
+                throw new Exception("No se pudo extraer texto del PDF.");
+            }
+            return text;
         }
-        // TODO: Soporte para archivos (PDF parsing — siguiente iteración)
-        return null;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // HELPERS
+    // ─────────────────────────────────────────────────────────────────────────
+
     /**
-     * Mapea el nombre del frontend al tipo interno de la BD.
-     * frontend: "flashcards" → BD check constraint: "flashcard"
+     * Mapea la opción del frontend al tipo interno de la BD.
+     * frontend → BD (check constraint)
      */
     private String mapOptionToType(String option) {
         return switch (option) {
             case "flashcards" -> "flashcard";
             case "esquemas"   -> "schema";
             case "resumenes"  -> "summary";
-            case "quizzes"    -> "quiz";
+            case "examenes"   -> "quiz";   // ← antes era "quizzes", ahora es "examenes"
             default           -> null;
         };
     }
 
-    /**
-     * Instancia el modelo correcto según el tipo.
-     * Nota: para quiz usamos Summary como base temporal
-     * hasta que Ericka defina Quiz.java con su estructura.
-     */
-    private EducationalContent buildContentObject(String userId, String type, String title, String sessionId) {
+    private EducationalContent buildContentObject(String userId, String type,
+                                                   String title, String sessionId) {
         return switch (type) {
             case "flashcard" -> new Flashcard(userId, title, sessionId, null);
             case "schema"    -> new Diagram(userId, title, sessionId, null);
-            default          -> new Summary(userId, title, sessionId, null); // summary y quiz
+            default          -> new Summary(userId, title, sessionId, null);
         };
     }
 
