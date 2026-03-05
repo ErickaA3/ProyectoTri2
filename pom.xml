@@ -28,6 +28,14 @@
             <version>42.7.3</version>
         </dependency>
 
+
+        <!-- PDF BOX -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.1</version>
+        </dependency>
+
         <!-- Servlets -->
         <dependency>
             <groupId>jakarta.servlet</groupId>
