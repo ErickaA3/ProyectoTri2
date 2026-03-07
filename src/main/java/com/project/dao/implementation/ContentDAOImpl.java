@@ -163,4 +163,35 @@ public class ContentDAOImpl implements IContentDAO {
         item.setFavorite(rs.getBoolean("is_favorite"));
         return item;
     }
+
+    @Override
+    public String getContentJson(String contentId, String userId) throws Exception {
+        String sql = """
+            SELECT type, title, content::text, is_favorite
+            FROM study_content
+            WHERE id = ?::uuid AND user_id = ?::uuid
+            """;
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, contentId);
+            stmt.setString(2, userId);
+
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                // Construir un JSON con type, title, y el content JSONB completo
+                String type    = rs.getString("type");
+                String title   = rs.getString("title");
+                String content = rs.getString("content");
+                boolean isFav  = rs.getBoolean("is_favorite");
+
+                return "{\"type\":\"" + type + "\","
+                     + "\"title\":\"" + title.replace("\"", "\\\"") + "\","
+                     + "\"isFavorite\":" + isFav + ","
+                     + "\"content\":" + content + "}";
+            }
+            return null;
+        }
+    }
 }

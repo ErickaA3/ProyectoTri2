@@ -1,59 +1,88 @@
 package com.project.servlet;
 
 import com.google.gson.Gson;
-import com.project.dao.implementation.FavoriteDAOImpl;
-import com.project.dao.interfaces.IFavoriteDAO;
-import com.project.model.favorites.Favorite;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.project.dao.implementation.ContentDAOImpl;
+import com.project.dao.interfaces.IContentDAO;
+import com.project.model.content.EducationalContent;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import java.io.IOException;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * GET  /favorites?userId=xxx               → todos los favoritos del usuario
- * GET  /favorites?userId=xxx&type=flashcard → filtrado por tipo
- * PUT  /favorites  { "contentId": "uuid", "userId": "uuid", "isFavorite": true/false }
+ * Servlet de Favoritos — mismo patrón que HistorialServlet.
+ * Usa ContentDAOImpl (el mismo DAO que historial).
+ *
+ * GET  /api/favoritos                → lista todos los favoritos
+ * GET  /api/favoritos?type=flashcard → filtrado por tipo
+ * GET  /api/favoritos/{id}           → contenido completo de un ítem (para "Ver")
+ * PUT  /api/favoritos                → toggle favorito
+ *
+ * Auth: HttpSession → fallback header X-User-Id
  */
-@WebServlet("/favorites")
+@WebServlet("/api/favoritos/*")
 public class FavoritesServlet extends HttpServlet {
 
-    private final IFavoriteDAO favoriteDAO = new FavoriteDAOImpl();
+    private final IContentDAO contentDAO = new ContentDAOImpl();
     private final Gson gson = new Gson();
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
 
-        setJsonResponse(res);
+        res.setContentType("application/json");
+        res.setCharacterEncoding("UTF-8");
+
+        String userId = getUserId(req);
+        if (userId == null) { sendError(res, 401, "Sesión no válida."); return; }
+
+        // Detectar si viene un ID en el path: /api/favoritos/{id}
+        String pathInfo = req.getPathInfo();
+        String contentId = extractId(pathInfo);
 
         try {
-            String userIdParam = req.getParameter("userId");
-            String type = req.getParameter("type");  // opcional
+            if (contentId != null) {
+                // ── GET /api/favoritos/{id} — contenido completo ──
+                String json = contentDAO.getContentJson(contentId, userId);
+                if (json == null) {
+                    sendError(res, 404, "Contenido no encontrado.");
+                    return;
+                }
+                res.getWriter().write(json);
 
-            if (userIdParam == null || userIdParam.isBlank()) {
-                sendError(res, 400, "Falta el parámetro userId.");
-                return;
-            }
-
-            UUID userId = UUID.fromString(userIdParam);
-            List<Favorite> favorites;
-
-            if (type != null && !type.isBlank()) {
-                favorites = favoriteDAO.getFavoritesByType(userId, type);
             } else {
-                favorites = favoriteDAO.getFavoritesByUser(userId);
+                // ── GET /api/favoritos — lista de favoritos ──
+                String type = req.getParameter("type");
+                List<EducationalContent> favorites = contentDAO.getFavorites(userId);
+
+                if (type != null && !type.isBlank()) {
+                    favorites = favorites.stream()
+                            .filter(f -> type.equals(f.getType()))
+                            .collect(Collectors.toList());
+                }
+
+                JsonArray arr = new JsonArray();
+                for (EducationalContent item : favorites) {
+                    JsonObject obj = new JsonObject();
+                    obj.addProperty("id", item.getId());
+                    obj.addProperty("type", item.getType());
+                    obj.addProperty("title", item.getTitle());
+                    obj.addProperty("isFavorite", item.isFavorite());
+                    arr.add(obj);
+                }
+
+                res.getWriter().write(gson.toJson(arr));
             }
 
-            res.getWriter().write(gson.toJson(favorites));
-
-        } catch (IllegalArgumentException e) {
-            sendError(res, 400, "userId inválido.");
         } catch (Exception e) {
             System.err.println("[FavoritesServlet] Error en doGet: " + e.getMessage());
             sendError(res, 500, "Error interno del servidor.");
@@ -64,25 +93,30 @@ public class FavoritesServlet extends HttpServlet {
     protected void doPut(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
 
-        setJsonResponse(res);
+        res.setContentType("application/json");
+        res.setCharacterEncoding("UTF-8");
+
+        String userId = getUserId(req);
+        if (userId == null) { sendError(res, 401, "Sesión no válida."); return; }
 
         try {
             String body = req.getReader().lines().collect(Collectors.joining());
-            FavoriteRequest data = gson.fromJson(body, FavoriteRequest.class);
+            JsonObject data = JsonParser.parseString(body).getAsJsonObject();
 
-            if (data == null || data.contentId == null || data.userId == null) {
-                sendError(res, 400, "Se requieren contentId y userId.");
-                return;
+            String contentId = data.has("contentId") ? data.get("contentId").getAsString() : null;
+            if (contentId == null || contentId.isBlank()) {
+                sendError(res, 400, "Se requiere contentId."); return;
             }
 
-            UUID contentId = UUID.fromString(data.contentId);
-            UUID userId    = UUID.fromString(data.userId);
+            boolean isFavorite = data.has("isFavorite") && data.get("isFavorite").getAsBoolean();
 
-            boolean success = favoriteDAO.setFavorite(contentId, userId, data.isFavorite);
+            boolean success = contentDAO.toggleFavorite(contentId, userId, isFavorite);
 
             if (success) {
-                String action = data.isFavorite ? "marcado" : "desmarcado";
-                res.getWriter().write("{\"success\": true, \"message\": \"Contenido " + action + " como favorito.\"}");
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.addProperty("isFavorite", isFavorite);
+                res.getWriter().write(gson.toJson(response));
             } else {
                 sendError(res, 404, "Contenido no encontrado o no te pertenece.");
             }
@@ -93,19 +127,33 @@ public class FavoritesServlet extends HttpServlet {
         }
     }
 
-    private void setJsonResponse(HttpServletResponse res) {
-        res.setContentType("application/json");
-        res.setCharacterEncoding("UTF-8");
+    // -----------------------------------------------------------------------
+    // HELPERS
+    // -----------------------------------------------------------------------
+
+    private String extractId(String pathInfo) {
+        if (pathInfo == null || pathInfo.equals("/")) return null;
+        String cleaned = pathInfo.replaceFirst("^/", "");
+        int slash = cleaned.indexOf('/');
+        String id = (slash == -1) ? cleaned : cleaned.substring(0, slash);
+        return id.isBlank() ? null : id;
+    }
+
+    private String getUserId(HttpServletRequest req) {
+        HttpSession session = req.getSession(false);
+        if (session != null) {
+            Object uid = session.getAttribute("userId");
+            if (uid != null) return uid.toString();
+        }
+        String header = req.getHeader("X-User-Id");
+        return (header != null && !header.isBlank()) ? header : null;
     }
 
     private void sendError(HttpServletResponse res, int status, String message) throws IOException {
         res.setStatus(status);
-        res.getWriter().write("{\"success\": false, \"error\": \"" + message + "\"}");
-    }
-
-    private static class FavoriteRequest {
-        String  contentId;
-        String  userId;
-        boolean isFavorite;
+        JsonObject error = new JsonObject();
+        error.addProperty("success", false);
+        error.addProperty("error", message);
+        res.getWriter().write(gson.toJson(error));
     }
 }
