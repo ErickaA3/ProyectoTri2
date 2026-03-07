@@ -15,7 +15,6 @@
   <div id="navbar-container"></div>
   <div id="sidebar-container"></div>
 
-  <!-- ══ CONTENT: ocupa el espacio restante (margin-left: 300px ya en styles-shared) ══ -->
   <main class="content">
 
     <!-- ══ CHAT SIDEBAR (búho + historial) ══ -->
@@ -87,76 +86,7 @@
       <!-- Chats recientes -->
       <div class="recents">
         <div class="section-label">Chats recientes</div>
-
-        <div class="chat-item active" onclick="selectChat(this)">
-          <div class="chat-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div class="chat-item-meta">
-            <div class="chat-item-label">¿Cómo funciona el universo?</div>
-            <div class="chat-item-date">Hoy · 11:35</div>
-          </div>
-        </div>
-
-        <div class="chat-item" onclick="selectChat(this)">
-          <div class="chat-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div class="chat-item-meta">
-            <div class="chat-item-label">Explícame el ADN</div>
-            <div class="chat-item-date">Hoy · 10:12</div>
-          </div>
-        </div>
-
-        <div class="chat-item" onclick="selectChat(this)">
-          <div class="chat-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div class="chat-item-meta">
-            <div class="chat-item-label">Ayúdame con álgebra</div>
-            <div class="chat-item-date">Ayer · 18:44</div>
-          </div>
-        </div>
-
-        <div class="chat-item" onclick="selectChat(this)">
-          <div class="chat-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div class="chat-item-meta">
-            <div class="chat-item-label">Historia de Roma</div>
-            <div class="chat-item-date">Ayer · 15:20</div>
-          </div>
-        </div>
-
-        <div class="chat-item" onclick="selectChat(this)">
-          <div class="chat-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div class="chat-item-meta">
-            <div class="chat-item-label">Física cuántica básica</div>
-            <div class="chat-item-date">Lun · 09:05</div>
-          </div>
-        </div>
-
-        <div class="chat-item" onclick="selectChat(this)">
-          <div class="chat-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div class="chat-item-meta">
-            <div class="chat-item-label">Datos curiosos de animales</div>
-            <div class="chat-item-date">Dom · 20:31</div>
-          </div>
-        </div>
-
-        <div class="chat-item" onclick="selectChat(this)">
-          <div class="chat-item-icon">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          </div>
-          <div class="chat-item-meta">
-            <div class="chat-item-label">Química orgánica</div>
-            <div class="chat-item-date">Sáb · 14:18</div>
-          </div>
-        </div>
+        <!-- Los items se cargan dinámicamente desde chat.js -->
       </div>
 
       <!-- Perfil del chat sidebar -->
@@ -234,124 +164,7 @@
     </div><!-- /chat-main -->
   </main>
 
-  <!-- Componentes -->
   <script src="../js/components.js"></script>
-
-  <script>
-    document.getElementById('initTime').textContent = fmt(new Date());
-
-    // Cargar datos del usuario en perfil del chat sidebar
-    (function() {
-      try {
-        const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const initials = (user.username || 'U').substring(0, 2).toUpperCase();
-        document.getElementById('chatAvatar').textContent = initials;
-        document.getElementById('chatProfileName').textContent = user.fullName || user.username || 'Usuario';
-      } catch(e) {}
-    })();
-
-    let history = [];
-    let busy = false;
-
-    const BOT_AV = `<div class="msg-av bot-av"><svg width="20" height="20" viewBox="0 0 100 100" fill="none"><polygon points="50,5 33,36 67,36" fill="#8b5cf6"/><ellipse cx="50" cy="36" rx="17" ry="5" fill="#6d28d9"/><ellipse cx="50" cy="67" rx="24" ry="27" fill="#6d28d9"/><ellipse cx="50" cy="70" rx="14" ry="18" fill="#8b5cf6" opacity="0.6"/><circle cx="36" cy="55" r="9" fill="#1a1a35"/><circle cx="64" cy="55" r="9" fill="#1a1a35"/><circle cx="36" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/><circle cx="64" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/><circle cx="36" cy="55" r="4" fill="#0f0f23"/><circle cx="64" cy="55" r="4" fill="#0f0f23"/><polygon points="50,62 44,68 56,68" fill="#f97316"/></svg></div>`;
-
-    function fmt(d) {
-      return d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function autoResize(el) {
-      el.style.height = 'auto';
-      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
-    }
-
-    function handleKey(e) {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-    }
-
-    function selectChat(el) {
-      document.querySelectorAll('.chat-item').forEach(c => c.classList.remove('active'));
-      el.classList.add('active');
-    }
-
-    function newChat() {
-      history = [];
-      const area = document.getElementById('msgsArea');
-      const typing = document.getElementById('typingRow');
-      [...area.children].forEach(c => { if (c !== typing) c.remove(); });
-      addBotMsg('¡Nuevo chat iniciado! ¿En qué tema te puedo ayudar?');
-      document.querySelectorAll('.chat-item').forEach(c => c.classList.remove('active'));
-    }
-
-    async function send() {
-      const inp = document.getElementById('userInput');
-      const txt = inp.value.trim();
-      if (!txt || busy) return;
-      addMsg('user', txt);
-      inp.value = ''; inp.style.height = 'auto';
-      history.push({ role: 'user', content: txt });
-      setTyping(true);
-      try {
-        const reply = await demo(txt);
-        setTyping(false);
-        addBotMsg(reply);
-        history.push({ role: 'assistant', content: reply });
-      } catch(e) {
-        setTyping(false);
-        addBotMsg('Hubo un error. Intenta de nuevo.');
-      }
-    }
-
-    async function demo(txt) {
-      await new Promise(r => setTimeout(r, 900 + Math.random() * 700));
-      const l = txt.toLowerCase();
-      if (l.includes('universo') || l.includes('espacio') || l.includes('astronom'))
-        return 'El universo tiene <strong>13.8 mil millones de años</strong> y se expande constantemente desde el Big Bang. Contiene más de 2 billones de galaxias, cada una con millones de estrellas. ¿Quieres profundizar en algún aspecto?';
-      if (l.includes('adn') || l.includes('gen') || l.includes('biolog'))
-        return 'El ADN es la molécula de la vida. Es una doble hélice con 4 bases: <strong>A, T, G y C</strong>. Si extendieras el ADN de una célula, ¡mediría casi 2 metros! ¿Te explico cómo funciona la replicación?';
-      if (l.includes('matemát') || l.includes('álgebra') || l.includes('cálculo'))
-        return 'Puedo ayudarte con <strong>álgebra, cálculo, geometría, trigonometría o estadística</strong>. Cuéntame qué problema específico necesitas resolver y te guío paso a paso.';
-      if (l.includes('histori') || l.includes('roma') || l.includes('guerra'))
-        return 'La historia es fascinante. Desde las primeras civilizaciones de <strong>Mesopotamia y Egipto</strong>, pasando por Grecia y Roma, hasta el mundo contemporáneo. ¿Qué período te interesa?';
-      if (l.includes('física') || l.includes('cuántica') || l.includes('átomo'))
-        return 'La física cuántica describe el comportamiento de la materia a escala subatómica. Las partículas pueden estar en <strong>superposición</strong> hasta que se miden. ¿Quieres que profundice?';
-      return `Buena pregunta sobre "<strong>${txt.slice(0,40)}${txt.length>40?'...':''}</strong>". ¿Puedes darme más detalles sobre qué aspecto específico te interesa explorar?`;
-    }
-
-    function addBotMsg(txt) { addMsg('bot', txt); }
-
-    function addMsg(role, txt) {
-      const area = document.getElementById('msgsArea');
-      const typing = document.getElementById('typingRow');
-      const div = document.createElement('div');
-      div.className = `msg ${role}`;
-      const initials = document.getElementById('chatAvatar').textContent || 'U';
-      if (role === 'bot') {
-        div.innerHTML = `${BOT_AV}<div class="msg-body"><div class="msg-who">Búho ProfesorIA</div><div class="bubble">${txt}</div><div class="msg-time">${fmt(new Date())}</div></div>`;
-      } else {
-        div.innerHTML = `<div class="msg-av user-av">${initials}</div><div class="msg-body"><div class="msg-who" style="text-align:right">Tú</div><div class="bubble">${esc(txt)}</div><div class="msg-time">${fmt(new Date())}</div></div>`;
-      }
-      area.insertBefore(div, typing);
-      scroll();
-    }
-
-    function esc(t) {
-      return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-    }
-
-    function setTyping(on) {
-      busy = on;
-      const owl = document.getElementById('owlSvg');
-      const tr = document.getElementById('typingRow');
-      document.getElementById('sendBtn').disabled = on;
-      if (on) { owl.classList.add('talking'); tr.classList.add('show'); }
-      else     { owl.classList.remove('talking'); tr.classList.remove('show'); }
-      scroll();
-    }
-
-    function scroll() {
-      const a = document.getElementById('msgsArea');
-      setTimeout(() => a.scrollTop = a.scrollHeight, 60);
-    }
-  </script>
+  <script src="../js/chat.js"></script>
 </body>
 </html>

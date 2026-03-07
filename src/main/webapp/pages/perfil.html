@@ -29,20 +29,16 @@
                 <i class="fas fa-user"></i>
             </div>
             <div class="profile-info">
-                <h2 class="profile-name">Juan Pérez</h2>
-                <p class="profile-email"><a href="mailto:juan@example.com">juan@example.com</a></p>
+                <h2 class="profile-name" id="profile-username">—</h2>
+                <p class="profile-email" id="profile-email">—</p>
                 <div class="profile-badges">
-                    <span class="badge badge-premium">
-                        <i class="fas fa-crown"></i>
-                        Premium
-                    </span>
                     <span class="badge badge-level">
                         <i class="fas fa-chart-line"></i>
-                        Nivel 15
+                        Nivel <span id="profile-level">—</span>
                     </span>
                 </div>
             </div>
-            <button class="btn-edit">
+            <button class="btn-edit" id="btn-edit-profile">
                 <i class="fas fa-pen"></i>
                 Editar Perfil
             </button>
@@ -54,33 +50,33 @@
                 <div class="stat-icon">
                     <i class="fas fa-fire"></i>
                 </div>
-                <div class="stat-value">28</div>
+                <div class="stat-value" id="stat-streak">—</div>
                 <div class="stat-label">Días de racha</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">
                     <i class="fas fa-star"></i>
                 </div>
-                <div class="stat-value">3,450</div>
+                <div class="stat-value" id="stat-xp">—</div>
                 <div class="stat-label">Puntos XP</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">
                     <i class="fas fa-coins"></i>
                 </div>
-                <div class="stat-value">1,250</div>
+                <div class="stat-value" id="stat-coins">—</div>
                 <div class="stat-label">Monedas</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon">
-                    <i class="fas fa-bullseye"></i>
+                    <i class="fas fa-trophy"></i>
                 </div>
-                <div class="stat-value">87%</div>
-                <div class="stat-label">Completado</div>
+                <div class="stat-value" id="stat-streak-record">—</div>
+                <div class="stat-label">Mejor racha</div>
             </div>
         </section>
 
-        <!-- Objetivos Semanales -->
+        <!-- Objetivos y Misiones -->
         <section class="objectives-grid">
 
             <!-- Objetivos Semanales -->
@@ -91,64 +87,12 @@
                     </div>
                     <div>
                         <h3 class="section-title">Objetivos Semanales</h3>
-                        <p class="section-subtitle">Reinicia en 3 días</p>
+                        <p class="section-subtitle" id="weekly-reset-label">—</p>
                     </div>
                 </div>
-
-                <div class="objective-item completed">
-                    <div class="objective-checkbox">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div class="objective-content">
-                        <div class="objective-title">Completar 10 flashcards</div>
-                        <div class="objective-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill purple" style="width: 100%"></div>
-                            </div>
-                            <span class="progress-text">10/10</span>
-                        </div>
-                    </div>
-                    <div class="objective-reward">
-                        <i class="fas fa-coins"></i>
-                        100
-                    </div>
-                </div>
-
-                <div class="objective-item">
-                    <div class="objective-checkbox">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div class="objective-content">
-                        <div class="objective-title">Estudiar 5 horas</div>
-                        <div class="objective-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill purple" style="width: 60%"></div>
-                            </div>
-                            <span class="progress-text">3/5 hrs</span>
-                        </div>
-                    </div>
-                    <div class="objective-reward">
-                        <i class="fas fa-coins"></i>
-                        150
-                    </div>
-                </div>
-
-                <div class="objective-item">
-                    <div class="objective-checkbox">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div class="objective-content">
-                        <div class="objective-title">Ganar 3 duelos</div>
-                        <div class="objective-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill purple" style="width: 33%"></div>
-                            </div>
-                            <span class="progress-text">1/3</span>
-                        </div>
-                    </div>
-                    <div class="objective-reward">
-                        <i class="fas fa-coins"></i>
-                        200
+                <div id="weekly-objectives-list">
+                    <div class="loading-placeholder">
+                        <i class="fas fa-spinner fa-spin"></i> Cargando...
                     </div>
                 </div>
             </div>
@@ -161,83 +105,12 @@
                     </div>
                     <div>
                         <h3 class="section-title">Misiones Diarias</h3>
-                        <p class="section-subtitle">Reinicia en 8 horas</p>
+                        <p class="section-subtitle" id="daily-reset-label">—</p>
                     </div>
                 </div>
-
-                <div class="objective-item completed">
-                    <div class="objective-checkbox">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div class="objective-content">
-                        <div class="objective-title">Iniciar sesión</div>
-                        <div class="objective-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill orange" style="width: 100%"></div>
-                            </div>
-                            <span class="progress-text">1/1</span>
-                        </div>
-                    </div>
-                    <div class="objective-reward">
-                        <i class="fas fa-coins"></i>
-                        10
-                    </div>
-                </div>
-
-                <div class="objective-item completed">
-                    <div class="objective-checkbox">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div class="objective-content">
-                        <div class="objective-title">Completar 2 quizzes</div>
-                        <div class="objective-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill orange" style="width: 100%"></div>
-                            </div>
-                            <span class="progress-text">2/2</span>
-                        </div>
-                    </div>
-                    <div class="objective-reward">
-                        <i class="fas fa-coins"></i>
-                        25
-                    </div>
-                </div>
-
-                <div class="objective-item">
-                    <div class="objective-checkbox">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div class="objective-content">
-                        <div class="objective-title">Crear 5 flashcards</div>
-                        <div class="objective-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill orange" style="width: 40%"></div>
-                            </div>
-                            <span class="progress-text">2/5</span>
-                        </div>
-                    </div>
-                    <div class="objective-reward">
-                        <i class="fas fa-coins"></i>
-                        30
-                    </div>
-                </div>
-
-                <div class="objective-item">
-                    <div class="objective-checkbox">
-                        <i class="fas fa-check"></i>
-                    </div>
-                    <div class="objective-content">
-                        <div class="objective-title">Usar el profesor IA</div>
-                        <div class="objective-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill orange" style="width: 0%"></div>
-                            </div>
-                            <span class="progress-text">0/1</span>
-                        </div>
-                    </div>
-                    <div class="objective-reward">
-                        <i class="fas fa-coins"></i>
-                        15
+                <div id="daily-missions-list">
+                    <div class="loading-placeholder">
+                        <i class="fas fa-spinner fa-spin"></i> Cargando...
                     </div>
                 </div>
             </div>
@@ -254,37 +127,71 @@
             <div class="info-grid-content">
                 <div class="info-row">
                     <span class="info-label">Nombre completo</span>
-                    <span class="info-value">Juan Pérez García</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Institución</span>
-                    <span class="info-value">Universidad TEC</span>
+                    <span class="info-value" id="info-fullname">—</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Fecha de nacimiento</span>
-                    <span class="info-value">15 de Marzo, 2005</span>
-                </div>
-                <div class="info-row">
-                    <span class="info-label">Carrera</span>
-                    <span class="info-value">Ingeniería en Computación</span>
+                    <span class="info-value" id="info-birthdate">—</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">País</span>
-                    <span class="info-value">Costa Rica 🇨🇷</span>
+                    <span class="info-value" id="info-country">—</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Idioma</span>
-                    <span class="info-value">Español</span>
+                    <span class="info-value" id="info-language">—</span>
                 </div>
                 <div class="info-row">
                     <span class="info-label">Fecha de registro</span>
-                    <span class="info-value">1 Enero, 2026</span>
+                    <span class="info-value" id="info-createdat">—</span>
                 </div>
             </div>
         </section>
     </main>
 
+    <!-- Modal Editar Perfil -->
+    <div class="modal-overlay" id="modal-edit" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fas fa-pen"></i> Editar Perfil</h3>
+                <button class="modal-close" id="btn-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre completo</label>
+                    <input type="text" id="edit-fullname" placeholder="Tu nombre completo">
+                </div>
+                <div class="form-group">
+                    <label>País</label>
+                    <input type="text" id="edit-country" placeholder="Tu país">
+                </div>
+                <div class="form-group">
+                    <label>Idioma</label>
+                    <select id="edit-language">
+                        <option value="es">Español</option>
+                        <option value="en">English</option>
+                        <option value="pt">Português</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fecha de nacimiento</label>
+                    <input type="date" id="edit-birthdate">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" id="btn-modal-cancel">Cancelar</button>
+                <button class="btn-save" id="btn-modal-save">
+                    <i class="fas fa-check"></i> Guardar
+                </button>
+            </div>
+            <p class="modal-error" id="modal-error-msg" style="display:none;"></p>
+        </div>
+    </div>
+
     <script src="../js/components.js"></script>
+    <script src="../js/perfil.js"></script>
 
 </body>
 </html>

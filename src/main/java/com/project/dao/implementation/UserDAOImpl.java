@@ -7,33 +7,32 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.project.dao.interfaces.IUserDAO;
 import com.project.database.DatabaseConnection;
+import com.project.model.users.DailyMission;
 import com.project.model.users.Statistics;
 import com.project.model.users.User;
+import com.project.model.users.WeeklyObjective;
 
-/**
- * Implementación real de IUserDAO.
- * Todas las operaciones SQL contra Supabase (PostgreSQL) viven aquí.
- */
 public class UserDAOImpl implements IUserDAO {
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private Connection conn() throws SQLException {
-    return DatabaseConnection.getConnection();
-}
+        return DatabaseConnection.getConnection();
+    }
 
-    /** Mapea un ResultSet → User (sin exponer password_hash al exterior). */
     private User mapUser(ResultSet rs) throws SQLException {
         User u = new User();
         u.setId(UUID.fromString(rs.getString("id")));
         u.setUsername(rs.getString("username"));
         u.setEmail(rs.getString("email"));
-        u.setPasswordHash(rs.getString("password_hash"));     // solo para login interno
+        u.setPasswordHash(rs.getString("password_hash"));
         u.setFullName(rs.getString("full_name"));
         u.setLanguage(rs.getString("language"));
         u.setCountry(rs.getString("country"));
@@ -47,7 +46,6 @@ public class UserDAOImpl implements IUserDAO {
         return u;
     }
 
-    /** Mapea un ResultSet → Statistics. */
     private Statistics mapStats(ResultSet rs) throws SQLException {
         Statistics s = new Statistics();
         s.setUserId(UUID.fromString(rs.getString("user_id")));
@@ -68,12 +66,11 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public User register(User user) throws SQLException {
-        // 1. Insertar en users y recuperar el UUID generado
-       String sqlUser = """
-        INSERT INTO users (username, email, password_hash, full_name)
-        VALUES (?, ?, ?, ?)
-        RETURNING id, username, email, password_hash, full_name, created_at
-        """;
+        String sqlUser = """
+                INSERT INTO users (username, email, password_hash, full_name, language)
+                VALUES (?, ?, ?, ?, ?)
+                RETURNING id, username, email, password_hash, full_name, language, country, birthdate, created_at
+                """;
 
         try (PreparedStatement ps = conn().prepareStatement(sqlUser)) {
             ps.setString(1, user.getUsername());
@@ -87,7 +84,6 @@ public class UserDAOImpl implements IUserDAO {
 
             User created = mapUser(rs);
 
-            // 2. Crear fila inicial en user_stats
             String sqlStats = "INSERT INTO user_stats (user_id) VALUES (?)";
             try (PreparedStatement ps2 = conn().prepareStatement(sqlStats)) {
                 ps2.setObject(1, created.getId());
@@ -172,5 +168,87 @@ public class UserDAOImpl implements IUserDAO {
             ps.setString(1, username);
             return ps.executeQuery().next();
         }
+    }
+
+    @Override
+    public void updateUser(User user) throws SQLException {
+        String sql = """
+                UPDATE users
+                   SET full_name = ?, country = ?, language = ?, birthdate = ?
+                 WHERE id = ?
+                """;
+        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+            ps.setString(1, user.getFullName());
+            ps.setString(2, user.getCountry());
+            ps.setString(3, user.getLanguage());
+            ps.setObject(4, user.getBirthdate() != null ? Date.valueOf(user.getBirthdate()) : null);
+            ps.setObject(5, user.getId());
+            ps.executeUpdate();
+        }
+    }
+
+    @Override
+    public List<WeeklyObjective> getWeeklyObjectives(UUID userId) throws SQLException {
+        LocalDate weekStart = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+        String sql = """
+                SELECT user_id, type, week_start, objective_description,
+                       required_count, progress, completed, xp_reward, coin_reward
+                  FROM user_weekly_objectives
+                 WHERE user_id = ? AND week_start = ?
+                 ORDER BY completed ASC
+                """;
+        List<WeeklyObjective> list = new ArrayList<>();
+        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+            ps.setObject(1, userId);
+            ps.setObject(2, weekStart);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                WeeklyObjective obj = new WeeklyObjective();
+                obj.setUserId(UUID.fromString(rs.getString("user_id")));
+                obj.setType(rs.getString("type"));
+                obj.setWeekStart(rs.getDate("week_start").toLocalDate());
+                obj.setObjectiveDescription(rs.getString("objective_description"));
+                obj.setRequiredCount(rs.getInt("required_count"));
+                obj.setProgress(rs.getInt("progress"));
+                obj.setCompleted(rs.getBoolean("completed"));
+                obj.setXpReward(rs.getInt("xp_reward"));
+                obj.setCoinReward(rs.getInt("coin_reward"));
+                list.add(obj);
+            }
+        }
+        return list;
+    }
+
+    @Override
+    public List<DailyMission> getDailyMissions(UUID userId) throws SQLException {
+        String sql = """
+                SELECT udm.user_id, udm.mission_id, udm.date, udm.progress, udm.completed,
+                       m.description, m.type, m.required_count, m.xp_reward, m.coin_reward
+                  FROM user_daily_missions udm
+                  JOIN missions m ON udm.mission_id = m.id
+                 WHERE udm.user_id = ? AND udm.date = ?
+                 ORDER BY udm.completed ASC
+                """;
+        List<DailyMission> list = new ArrayList<>();
+        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+            ps.setObject(1, userId);
+            ps.setObject(2, Date.valueOf(LocalDate.now()));
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                DailyMission dm = new DailyMission();
+                dm.setUserId(UUID.fromString(rs.getString("user_id")));
+                dm.setMissionId(rs.getInt("mission_id"));
+                dm.setDate(rs.getDate("date").toLocalDate());
+                dm.setProgress(rs.getInt("progress"));
+                dm.setCompleted(rs.getBoolean("completed"));
+                dm.setDescription(rs.getString("description"));
+                dm.setType(rs.getString("type"));
+                dm.setRequiredCount(rs.getInt("required_count"));
+                dm.setXpReward(rs.getInt("xp_reward"));
+                dm.setCoinReward(rs.getInt("coin_reward"));
+                list.add(dm);
+            }
+        }
+        return list;
     }
 }

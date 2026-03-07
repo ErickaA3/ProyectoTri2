@@ -82,11 +82,6 @@
     gap: 0.4rem;
 }
 
-.badge-premium {
-    background: linear-gradient(135deg, #ffc107 0%, #ffca28 100%);
-    color: #8B6914;
-}
-
 .badge-level {
     background: var(--accent-blue);
     color: white;
@@ -285,6 +280,20 @@
 
 .objective-reward i { font-size: 0.75rem; }
 
+.empty-msg {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 1.5rem 0;
+}
+
+.loading-placeholder {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 1.5rem 0;
+}
+
 /* ===== INFO CARD ===== */
 .info-card {
     background: var(--card-bg);
@@ -336,6 +345,144 @@
 .info-label { font-size: 0.9rem; color: var(--text-secondary); }
 .info-value { font-size: 0.9rem; display: flex; align-items: center; gap: 0.4rem; }
 
+/* ===== MODAL EDITAR PERFIL ===== */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 460px;
+    padding: 2rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+}
+
+.modal-header h3 {
+    font-size: 1.2rem;
+    font-weight: normal;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--accent-cyan);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    transition: color 0.2s;
+}
+
+.modal-close:hover { color: white; }
+
+.modal-body { display: flex; flex-direction: column; gap: 1rem; }
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.form-group input,
+.form-group select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    color: white;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: var(--accent-cyan);
+}
+
+.form-group select option {
+    background: #1a1a2e;
+    color: white;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.btn-cancel {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    padding: 0.7rem 1.5rem;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.btn-save {
+    background: linear-gradient(135deg, var(--accent-cyan), #14b8a6);
+    color: #0f0f23;
+    border: none;
+    padding: 0.7rem 1.5rem;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.btn-save:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(45, 212, 191, 0.4);
+}
+
+.modal-error {
+    margin-top: 0.75rem;
+    color: #f87171;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
     .content { padding: 1.5rem; }
@@ -349,6 +496,7 @@
     .page-title { font-size: 2rem; }
     .profile-card { flex-direction: column; text-align: center; }
     .profile-badges { justify-content: center; }
+    .modal-card { margin: 1rem; }
 }
 
 @media (max-width: 480px) {
