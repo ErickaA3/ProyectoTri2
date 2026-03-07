@@ -54,7 +54,8 @@ public class HistorialServlet extends HttpServlet {
     private final Gson gson = new Gson();
 
     // -----------------------------------------------------------------------
-    // GET /api/historial  — listar historial con filtros opcionales
+    // GET /api/historial        — lista historial con filtros opcionales
+    // GET /api/historial/{id}   — ítem único con contenido completo (para abrir desde historial)
     // -----------------------------------------------------------------------
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
@@ -66,18 +67,35 @@ public class HistorialServlet extends HttpServlet {
         String userId = getUserIdFromSession(req);
         if (userId == null) { sendError(res, 401, "Sesión no válida."); return; }
 
-        String typeFilter   = req.getParameter("type");    // "summary" | "flashcard" | etc.
-        String dateFilter   = req.getParameter("date");    // "YYYY-MM-DD"
-        String searchFilter = req.getParameter("search");  // texto libre
+        String pathInfo  = req.getPathInfo(); // null | "/" | "/{id}"
+        String contentId = extractId(pathInfo);
 
-        try {
-            JsonArray items = historialDAO.getHistory(userId, typeFilter, dateFilter, searchFilter);
-            JsonObject response = new JsonObject();
-            response.addProperty("success", true);
-            response.add("data", items);
-            res.getWriter().write(gson.toJson(response));
-        } catch (Exception e) {
-            sendError(res, 500, "Error al obtener el historial: " + e.getMessage());
+        if (contentId != null) {
+            // ── Ítem único con contenido completo ──────────────────────
+            try {
+                JsonObject item = historialDAO.getById(contentId, userId);
+                if (item == null) { sendError(res, 404, "Contenido no encontrado."); return; }
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.add("data", item);
+                res.getWriter().write(gson.toJson(response));
+            } catch (Exception e) {
+                sendError(res, 500, "Error al obtener el contenido: " + e.getMessage());
+            }
+        } else {
+            // ── Lista con filtros ───────────────────────────────────────
+            String typeFilter   = req.getParameter("type");
+            String dateFilter   = req.getParameter("date");
+            String searchFilter = req.getParameter("search");
+            try {
+                JsonArray items = historialDAO.getHistory(userId, typeFilter, dateFilter, searchFilter);
+                JsonObject response = new JsonObject();
+                response.addProperty("success", true);
+                response.add("data", items);
+                res.getWriter().write(gson.toJson(response));
+            } catch (Exception e) {
+                sendError(res, 500, "Error al obtener el historial: " + e.getMessage());
+            }
         }
     }
 

@@ -16,19 +16,20 @@ const API = '/project-1.0-SNAPSHOT/api/historial';
 // Claves = valores exactos que guarda la BD en la columna "type"
 // ─────────────────────────────────────────────────────────────────────────────
 const TYPE_CONFIG = {
-    flashcard:   { label: 'Flashcard',      icon: 'fas fa-layer-group',    page: '../pages/flashcards.html' },
-    schema:      { label: 'Esquema',        icon: 'fas fa-project-diagram', page: '../pages/esquema.html'    },
-    summary:     { label: 'Resumen',        icon: 'fas fa-file-alt',        page: '../pages/resumenes.html'  },
-    quiz:        { label: 'Quiz',           icon: 'fas fa-clipboard-list',  page: '../pages/quiz.html'       },
-    expert_exam: { label: 'Examen Experto', icon: 'fas fa-file-signature',  page: '../pages/quiz.html'       },
+    flashcard:   { label: 'Flashcard',      icon: 'fas fa-layer-group',     page: '../pages/flashcards.html'     },
+    schema:      { label: 'Esquema',        icon: 'fas fa-project-diagram', page: null                           }, // Isaac no tiene página aún
+    summary:     { label: 'Resumen',        icon: 'fas fa-file-alt',        page: '../pages/resumenes.html'      },
+    quiz:        { label: 'Quiz',           icon: 'fas fa-clipboard-list',  page: '../pages/examen-quiz.html'    },
+    expert_exam: { label: 'Examen Experto', icon: 'fas fa-file-signature',  page: '../pages/examen-experto.html' },
 };
 
 const PAGE_SIZE = 20;
 
-let allItems     = [];
-let visibleCount = PAGE_SIZE;
-let currentView  = 'recientes';
-let itemToDelete = null;
+let allItems        = [];
+let visibleCount    = PAGE_SIZE;
+let currentView     = 'recientes';
+let currentTypeFilter = null;   // null = grilla de tipos; string = tipo seleccionado
+let itemToDelete    = null;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH
@@ -159,17 +160,58 @@ function renderByDate(container, items) {
 }
 
 function renderByType(container, items) {
-    const groups = {}, order = [];
-    items.forEach(item => {
-        const label = TYPE_CONFIG[item.type]?.label || item.type;
-        if (!groups[label]) { groups[label] = []; order.push(label); }
-        groups[label].push(item);
+    if (currentTypeFilter === null) {
+        renderTypeGrid(container, items);
+    } else {
+        renderTypeItems(container, items, currentTypeFilter);
+    }
+}
+
+/** Grilla de tarjetas coloridas — una por cada tipo presente */
+function renderTypeGrid(container, items) {
+    const counts = {};
+    items.forEach(item => { counts[item.type] = (counts[item.type] || 0) + 1; });
+
+    const types = Object.keys(counts);
+    if (types.length === 0) { container.innerHTML = ''; return; }
+
+    const cards = types.map(type => {
+        const cfg = TYPE_CONFIG[type] || { label: type, icon: 'fas fa-file' };
+        const n   = counts[type];
+        return `
+            <div class="type-card ${type}" onclick="selectTypeFilter('${type}')">
+                <div class="type-card-icon"><i class="${cfg.icon}"></i></div>
+                <div class="type-card-label">${cfg.label}</div>
+                <div class="type-card-count">${n} ${n === 1 ? 'actividad' : 'actividades'}</div>
+            </div>`;
     });
-    container.innerHTML = order.map(label => `
-        <div class="date-group">
-            <div class="date-label">${label}</div>
-            <div class="history-list">${groups[label].map(renderItem).join('')}</div>
-        </div>`).join('');
+
+    container.innerHTML = `<div class="type-cards-grid">${cards.join('')}</div>`;
+}
+
+/** Items del tipo seleccionado, con breadcrumb para volver */
+function renderTypeItems(container, items, type) {
+    const cfg      = TYPE_CONFIG[type] || { label: type, icon: 'fas fa-file' };
+    const filtered = items.filter(i => i.type === type);
+
+    container.innerHTML = `
+        <div class="type-breadcrumb">
+            <button onclick="clearTypeFilter()">Todos los tipos</button>
+            <i class="fas fa-chevron-right"></i>
+            <span>${cfg.label}</span>
+        </div>
+        <div class="history-list">${filtered.map(renderItem).join('')}</div>`;
+}
+
+function selectTypeFilter(type) {
+    currentTypeFilter = type;
+    visibleCount      = PAGE_SIZE;
+    renderHistory();
+}
+
+function clearTypeFilter() {
+    currentTypeFilter = null;
+    renderHistory();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,13 +250,83 @@ function renderItem(item) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // NAVEGACIÓN
+//
+// Cada tipo tiene una estrategia distinta:
+//
+//  summary     → resumenes.js NO usa sessionStorage — lee ?id= y llama a SummaryServlet.
+//                Solo hay que navegar con el id en la URL.
+//
+//  flashcard   → flashcards.js lee sessionStorage.studyResults.flashcards
+//                Hay que hacer fetch del contenido, meterlo en sessionStorage, navegar.
+//
+//  quiz /      → pendiente de confirmar cómo lee examen-quiz.js (mismo patrón que flashcards
+//  expert_exam   probablemente). Por ahora usa fetch + sessionStorage.
+//
+//  schema      → página de Isaac no existe aún, mostrar mensaje.
 // ─────────────────────────────────────────────────────────────────────────────
-function openItem(id, type) {
+
+// Tipos que van directo por URL (la página hace su propio fetch con ?id=)
+const OPEN_BY_URL = new Set(['summary']);
+
+// Tipos que necesitan sessionStorage (la página lee studyResults.<sessionKey>)
+const TYPE_TO_SESSION_KEY = {
+    flashcard:   'flashcards',
+    quiz:        'examenes',
+    expert_exam: 'examenes',
+};
+
+async function openItem(id, type) {
     const cfg = TYPE_CONFIG[type];
-    if (cfg?.page) {
+
+    if (!cfg?.page) {
+        showToast('Vista no disponible aún para esquemas.', 'toast-danger', 'fas fa-circle-xmark');
+        return;
+    }
+
+    // ── Caso 1: summary → navegar directo con ?id= ─────────────────────────
+    if (OPEN_BY_URL.has(type)) {
         window.location.href = `${cfg.page}?id=${id}`;
-    } else {
+        return;
+    }
+
+    // ── Caso 2: flashcard / quiz → fetch del contenido + sessionStorage ────
+    const sessionKey = TYPE_TO_SESSION_KEY[type];
+    if (!sessionKey) {
         showToast('Vista no disponible para este tipo.', 'toast-danger', 'fas fa-circle-xmark');
+        return;
+    }
+
+    showToast('Cargando...', 'toast-success', 'fas fa-circle-notch fa-spin');
+
+    try {
+        const res  = await fetch(`${API}/${id}`, { headers: authHeaders() });
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); }
+        catch (_) { throw new Error(`Respuesta inválida del servidor (${res.status})`); }
+
+        if (!res.ok || !json.success) throw new Error(json.error || `Error ${res.status}`);
+
+        // El contenido JSONB ya tiene la estructura que espera la página
+        // (title, cards[], etc.) — solo hay que ponerlo bajo la clave correcta
+        const contentData = json.data;
+
+        // Leer studyResults existente y sobreescribir/agregar la clave de este tipo
+        let studyResults = {};
+        try {
+            const existing = sessionStorage.getItem('studyResults');
+            if (existing) studyResults = JSON.parse(existing);
+        } catch (_) {}
+
+        studyResults[sessionKey] = contentData;
+        sessionStorage.setItem('studyResults', JSON.stringify(studyResults));
+        sessionStorage.setItem('fromHistorial', 'true');
+
+        window.location.href = cfg.page;
+
+    } catch (err) {
+        showToast('Error al abrir: ' + err.message, 'toast-danger', 'fas fa-circle-xmark');
+        console.error('[openItem]', err);
     }
 }
 
@@ -222,8 +334,9 @@ function openItem(id, type) {
 // FILTROS
 // ─────────────────────────────────────────────────────────────────────────────
 function setFilter(view, el) {
-    currentView  = view;
-    visibleCount = PAGE_SIZE;
+    currentView       = view;
+    visibleCount      = PAGE_SIZE;
+    currentTypeFilter = null;
     document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
     el.classList.add('active');
     renderHistory();
