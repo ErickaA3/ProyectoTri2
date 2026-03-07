@@ -41,7 +41,7 @@ function getNavbarHTML(base) {
             <div class="stat-pill">
                 <img src="${base}images/gifs/fire.gif" alt="🔥" class="fire-gif" onerror="this.outerHTML='<i class=\\'fas fa-fire\\' style=\\'color:#ff6b6b\\'></i>'">
                 <span class="stat-value">${racha} Días</span>
-                <span class="stat-label">Racha</span>
+                <span class="stat-label">Ericka</span>
             </div>
             <div class="stat-pill">
                 <img src="${base}images/gifs/star.gif" alt="⭐" class="star-gif" onerror="this.outerHTML='<i class=\\'fas fa-star\\' style=\\'color:#ffd93d\\'></i>'">

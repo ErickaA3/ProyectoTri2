@@ -1,22 +1,28 @@
 package com.project.util;
 
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.Properties;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+/**
+ * Servicio para llamar a OpenAI.
+ * Lee la API key desde config/database.properties.
+ */
 public class AIService {
 
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String API_KEY = System.getenv("OPENAI_API_KEY");
     private static final String MODEL   = "gpt-3.5-turbo";
+    private static final String API_KEY = loadApiKey();
 
     private static final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(15))
@@ -24,18 +30,39 @@ public class AIService {
 
     private static final Gson gson = new Gson();
 
-    // ── Contenido educativo (flashcard, schema, summary, quiz) ────────────────
-    public static String generate(String type, String texto) throws Exception {
-        String prompt = buildPrompt(type, texto);
+    // ── Cargar API key desde properties ──────────────────────────────────────
+    private static String loadApiKey() {
+        try (InputStream in = AIService.class
+                .getClassLoader()
+                .getResourceAsStream("config/database.properties")) {
+            if (in == null) throw new RuntimeException("No se encontro config/database.properties");
+            Properties props = new Properties();
+            props.load(in);
+            String key = props.getProperty("OPENAI_API_KEY");
+            if (key == null || key.isBlank()) throw new RuntimeException("OPENAI_API_KEY no definida");
+            return key.trim();
+        } catch (Exception e) {
+            throw new RuntimeException("Error leyendo API key: " + e.getMessage());
+        }
+    }
+
+    // ── Contenido educativo con config de módulo ──────────────────────────────
+    public static String generate(String type, String texto, JsonObject moduleConfig) throws Exception {
+        String prompt = buildPrompt(type, texto, moduleConfig);
         return callAPISingle(prompt);
+    }
+
+    // Sobrecarga sin config (retrocompatibilidad)
+    public static String generate(String type, String texto) throws Exception {
+        return generate(type, texto, new JsonObject());
     }
 
     // ── Chat con historial ────────────────────────────────────────────────────
     /**
-     * @param historial Lista de mensajes previos [{role, content}, ...]
-     * @param nuevoMensaje El mensaje nuevo del usuario
+     * @param historial      Lista de mensajes previos [{role, content}, ...]
+     * @param nuevoMensaje   El mensaje nuevo del usuario
      * @param profesorNombre Nombre del profesor configurado
-     * @param personalidad Personalidad del profesor configurada
+     * @param personalidad   Personalidad del profesor configurada
      * @return Texto de respuesta del asistente
      */
     public static String chat(List<ChatMessage> historial, String nuevoMensaje,
@@ -49,7 +76,6 @@ public class AIService {
         String persona = (personalidad != null && !personalidad.isBlank())
             ? personalidad : "amigable y motivador";
 
-        // System prompt
         JsonObject systemMsg = new JsonObject();
         systemMsg.addProperty("role", "system");
         systemMsg.addProperty("content",
@@ -63,7 +89,7 @@ public class AIService {
         JsonArray messages = new JsonArray();
         messages.add(systemMsg);
 
-        // Agregar historial (últimos 10 mensajes para no exceder tokens)
+        // Últimos 10 mensajes para no exceder tokens
         int start = Math.max(0, historial.size() - 10);
         for (int i = start; i < historial.size(); i++) {
             ChatMessage m = historial.get(i);
@@ -73,7 +99,6 @@ public class AIService {
             messages.add(msg);
         }
 
-        // Agregar el mensaje nuevo
         JsonObject userMsg = new JsonObject();
         userMsg.addProperty("role", "user");
         userMsg.addProperty("content", nuevoMensaje);
@@ -96,7 +121,8 @@ public class AIService {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new Exception("Error en la API de IA. Status: " + response.statusCode());
+            throw new Exception("Error en la API de IA. Status: " + response.statusCode()
+                + " — " + response.body());
         }
 
         JsonObject responseJson = JsonParser.parseString(response.body()).getAsJsonObject();
@@ -119,73 +145,107 @@ public class AIService {
     }
 
     // ── Prompts para contenido educativo ──────────────────────────────────────
-    private static String buildPrompt(String type, String texto) {
-        return switch (type) {
+    private static String buildPrompt(String type, String texto, JsonObject config) {
+        switch (type) {
 
-            case "flashcard" -> """
-                Eres un tutor educativo. Analiza el siguiente texto y genera un set de flashcards.
-                Responde ÚNICAMENTE con un JSON válido, sin texto adicional, con este formato:
-                {
-                  "title": "Título descriptivo del tema",
-                  "cards": [
-                    { "front": "Concepto o pregunta", "back": "Definición o respuesta" }
-                  ]
+            case "flashcard":
+                return "Eres un tutor educativo. Analiza el siguiente texto y genera un set de flashcards.\n"
+                    + "Responde UNICAMENTE con un JSON valido, sin texto adicional, con este formato:\n"
+                    + "{\n"
+                    + "  \"title\": \"Titulo descriptivo del tema\",\n"
+                    + "  \"cards\": [\n"
+                    + "    { \"front\": \"Concepto o pregunta\", \"back\": \"Definicion o respuesta\" }\n"
+                    + "  ]\n"
+                    + "}\n"
+                    + "Genera entre 8 y 15 flashcards. Se conciso y claro.\n\n"
+                    + "TEXTO A ESTUDIAR:\n" + texto;
+
+            case "schema": {
+                String tipoEsquema = config.has("tipo") ? config.get("tipo").getAsString() : "jerarquico";
+                return "Eres un tutor educativo. Analiza el texto y genera un esquema de tipo: " + tipoEsquema + ".\n"
+                    + "Responde UNICAMENTE con un JSON valido, sin texto adicional:\n"
+                    + "{\n"
+                    + "  \"title\": \"Titulo del tema\",\n"
+                    + "  \"rootNode\": {\n"
+                    + "    \"label\": \"Tema principal\",\n"
+                    + "    \"children\": [\n"
+                    + "      { \"label\": \"Subtema 1\", \"children\": [\n"
+                    + "          { \"label\": \"Punto clave\", \"children\": [] }\n"
+                    + "      ]},\n"
+                    + "      { \"label\": \"Subtema 2\", \"children\": [] }\n"
+                    + "    ]\n"
+                    + "  }\n"
+                    + "}\n\n"
+                    + "TEXTO A ESTUDIAR:\n" + texto;
+            }
+
+            case "summary": {
+                String subject = config.has("subject") ? config.get("subject").getAsString() : "General";
+                return "Eres un tutor educativo. Genera un resumen claro y estructurado del texto.\n"
+                    + "Responde UNICAMENTE con un JSON valido, sin texto adicional, con este formato exacto:\n"
+                    + "{\n"
+                    + "  \"title\": \"Titulo descriptivo del tema\",\n"
+                    + "  \"subject\": \"" + subject + "\",\n"
+                    + "  \"sections\": [\n"
+                    + "    {\n"
+                    + "      \"number\": \"01\",\n"
+                    + "      \"heading\": \"Titulo de la seccion\",\n"
+                    + "      \"body\": \"Texto explicativo de la seccion, entre 3 y 6 oraciones.\",\n"
+                    + "      \"highlight\": \"Dato importante opcional, o null si no aplica\"\n"
+                    + "    }\n"
+                    + "  ],\n"
+                    + "  \"keywords\": [\"palabra1\", \"palabra2\", \"palabra3\"]\n"
+                    + "}\n"
+                    + "Genera entre 3 y 6 secciones. El campo highlight debe ser una oracion corta o null.\n"
+                    + "Genera entre 6 y 12 keywords relevantes del texto.\n\n"
+                    + "TEXTO A ESTUDIAR:\n" + texto;
+            }
+
+            case "quiz": {
+                int    numPreguntas = config.has("numPreguntas") ? config.get("numPreguntas").getAsInt()  : 10;
+                String dificultad   = config.has("dificultad")   ? config.get("dificultad").getAsString() : "medio";
+                String tipo         = config.has("tipo")          ? config.get("tipo").getAsString()       : "quiz";
+                boolean esExperto   = "expert_exam".equals(tipo);
+
+                String instrDificultad;
+                switch (dificultad) {
+                    case "facil":   instrDificultad = "Preguntas basicas de comprension directa."; break;
+                    case "dificil": instrDificultad = "Preguntas de analisis profundo y razonamiento complejo."; break;
+                    default:        instrDificultad = "Mezcla de preguntas de comprension y aplicacion."; break;
                 }
-                Genera entre 8 y 15 flashcards. Sé conciso y claro.
-                TEXTO A ESTUDIAR:
-                """ + texto;
 
-            case "schema" -> """
-                Eres un tutor educativo. Analiza el siguiente texto y genera un esquema jerárquico.
-                Responde ÚNICAMENTE con un JSON válido, sin texto adicional, con este formato:
-                {
-                  "title": "Título del tema",
-                  "rootNode": {
-                    "label": "Tema principal",
-                    "children": [
-                      { "label": "Subtema", "children": [{ "label": "Punto", "children": [] }] }
-                    ]
-                  }
-                }
-                TEXTO A ESTUDIAR:
-                """ + texto;
+                String instrTipo = esExperto
+                    ? "Modo EXPERTO: preguntas desafiantes, sin pistas. Deja explanation vacio."
+                    : "Modo QUIZ: incluye una explicacion breve de por que es correcta cada respuesta.";
 
-            case "summary" -> """
-                Eres un tutor educativo. Genera un resumen claro y estructurado del siguiente texto.
-                Responde ÚNICAMENTE con un JSON válido, sin texto adicional, con este formato:
-                {
-                  "title": "Título del tema",
-                  "summaryText": "Resumen completo en markdown"
-                }
-                TEXTO A ESTUDIAR:
-                """ + texto;
+                return "Eres un tutor educativo. Genera un examen de opcion multiple.\n"
+                    + instrTipo + "\n"
+                    + instrDificultad + "\n"
+                    + "Genera exactamente " + numPreguntas + " preguntas.\n"
+                    + "Responde UNICAMENTE con un JSON valido, sin texto adicional:\n"
+                    + "{\n"
+                    + "  \"title\": \"Titulo del tema\",\n"
+                    + "  \"questions\": [\n"
+                    + "    {\n"
+                    + "      \"question\": \"Pregunta aqui\",\n"
+                    + "      \"options\": [\"Opcion A\", \"Opcion B\", \"Opcion C\", \"Opcion D\"],\n"
+                    + "      \"correctIndex\": 0,\n"
+                    + "      \"explanation\": \"Por que es correcta\"\n"
+                    + "    }\n"
+                    + "  ]\n"
+                    + "}\n\n"
+                    + "TEXTO A ESTUDIAR:\n" + texto;
+            }
 
-            case "quiz" -> """
-                Eres un tutor educativo. Genera un quiz de opción múltiple sobre el siguiente texto.
-                Responde ÚNICAMENTE con un JSON válido, sin texto adicional, con este formato:
-                {
-                  "title": "Título del tema",
-                  "questions": [
-                    {
-                      "question": "Pregunta aquí",
-                      "options": ["A", "B", "C", "D"],
-                      "correctIndex": 0,
-                      "explanation": "Explicación"
-                    }
-                  ]
-                }
-                Genera entre 5 y 10 preguntas.
-                TEXTO A ESTUDIAR:
-                """ + texto;
-
-            default -> throw new IllegalArgumentException("Tipo no reconocido: " + type);
-        };
+            default:
+                throw new IllegalArgumentException("Tipo no reconocido: " + type);
+        }
     }
 
     // ── Llamada HTTP simple (para contenido educativo) ────────────────────────
     private static String callAPISingle(String prompt) throws Exception {
         if (API_KEY == null || API_KEY.isBlank()) {
-            throw new Exception("API Key no configurada. Revisa OPENAI_API_KEY.");
+            throw new Exception("API Key no configurada en database.properties.");
         }
 
         JsonObject message = new JsonObject();
@@ -205,23 +265,23 @@ public class AIService {
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer " + API_KEY)
             .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
-            .timeout(Duration.ofSeconds(30))
+            .timeout(Duration.ofSeconds(60))
             .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
         if (response.statusCode() != 200) {
-            throw new Exception("Error en la API. Status: " + response.statusCode());
+            throw new Exception("Error API OpenAI. Status: " + response.statusCode()
+                + " — " + response.body());
         }
 
         JsonObject responseJson = JsonParser.parseString(response.body()).getAsJsonObject();
         String aiText = responseJson
-            .getAsJsonArray("choices")
-            .get(0).getAsJsonObject()
-            .getAsJsonObject("message")
+            .getAsJsonArray("choices").get(0)
+            .getAsJsonObject().getAsJsonObject("message")
             .get("content").getAsString();
 
-        JsonParser.parseString(aiText);
+        JsonParser.parseString(aiText); // Valida que sea JSON
         return aiText;
     }
 }

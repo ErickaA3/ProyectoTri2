@@ -146,8 +146,9 @@
                 esquemas: '../pages/seleccion-esquema.html',
                 examenes: '../pages/config-examen.html'
             };
-            const next = flow.currentConfigIndex + 1;
-            if (next < flow.configQueue.length) return CONFIG_PAGES[flow.configQueue[next]];
+            // currentConfigIndex ya fue incrementado antes de llamar esta función
+            const current = flow.currentConfigIndex;
+            if (current < flow.configQueue.length) return CONFIG_PAGES[flow.configQueue[current]];
             return '../pages/sesion-estudio.html';
         }
 
