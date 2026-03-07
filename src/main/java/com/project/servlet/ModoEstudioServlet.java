@@ -148,8 +148,14 @@ public class ModoEstudioServlet extends HttpServlet {
         JsonObject aiData = JsonParser.parseString(aiResponseJson).getAsJsonObject();
         String title = aiData.has("title") ? aiData.get("title").getAsString() : "Sin título";
 
+        // Inyectar tipo de módulo en el JSONB para poder recuperarlo después
+        // (ej: esquema jerárquico vs timeline, quiz vs expert_exam)
+        if (moduleConfig.has("tipo")) {
+            aiData.addProperty("schemaType", moduleConfig.get("tipo").getAsString());
+        }
+
         EducationalContent content = buildContentObject(userId, contentType, title, sessionId);
-        String savedId = contentDAO.save(content, aiResponseJson, textoBase);
+        String savedId = contentDAO.save(content, gson.toJson(aiData), textoBase);
 
         aiData.addProperty("id", savedId);
         aiData.addProperty("type", contentType);

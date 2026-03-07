@@ -1,4 +1,4 @@
-        * { box-sizing:border-box; margin:0; padding:0; }
+* { box-sizing:border-box; margin:0; padding:0; }
 
         /* ——— LOADING SCREEN ——— */
         .loading-screen {
@@ -177,5 +177,47 @@
             .se-tab { padding:8px 14px; font-size:0.8rem; }
             .se-panel-stats { gap:10px; }
             .se-actions { flex-direction:column; }
-            .se-action-btn { width:100%; justify-content:center; }
+            .se-action-btn, .se-fav-btn { width:100%; justify-content:center; }
+        }
+
+        /* ——— HEART FAVORITE BUTTON ——— */
+        .se-fav-btn {
+            padding:11px 22px; border-radius:12px; border:1px solid rgba(255,255,255,0.15);
+            cursor:pointer; font-size:0.88rem; font-weight:600;
+            display:flex; align-items:center; gap:8px; transition:all 0.2s;
+            background:rgba(255,255,255,0.07); color:rgba(255,255,255,0.7);
+            position:relative; overflow:visible;
+        }
+        .se-fav-btn:hover { background:rgba(255,255,255,0.12); color:#fff; }
+        .se-fav-btn.active {
+            background:rgba(255,107,138,0.12); border-color:rgba(255,107,138,0.4); color:#ff6b8a;
+        }
+        .se-fav-btn.active:hover { background:rgba(255,107,138,0.2); }
+        .se-fav-btn.animating { animation:heartPop 0.5s ease; }
+
+        @keyframes heartPop {
+            0%   { transform:scale(1); }
+            20%  { transform:scale(1.15); }
+            40%  { transform:scale(0.9); }
+            60%  { transform:scale(1.05); }
+            80%  { transform:scale(0.97); }
+            100% { transform:scale(1); }
+        }
+
+        .se-fav-btn .sparkle-container {
+            position:absolute; top:50%; left:20px;
+            width:0; height:0; pointer-events:none; z-index:10;
+        }
+        .se-fav-btn .sparkle {
+            position:absolute; width:5px; height:5px;
+            border-radius:50%; animation:sparkleOut 0.6s ease-out forwards;
+        }
+        .se-fav-btn .sparkle:nth-child(odd)  { background:#ff6b8a; }
+        .se-fav-btn .sparkle:nth-child(even) { background:#ffd700; }
+        .se-fav-btn .sparkle:nth-child(3)    { background:#ff9ec5; }
+        .se-fav-btn .sparkle:nth-child(6)    { background:#ff9ec5; }
+
+        @keyframes sparkleOut {
+            0%   { transform:translate(0,0) scale(1); opacity:1; }
+            100% { opacity:0; transform:var(--sparkle-end) scale(0); }
         }

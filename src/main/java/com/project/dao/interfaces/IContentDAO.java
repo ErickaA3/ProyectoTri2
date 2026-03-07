@@ -44,4 +44,11 @@ public interface IContentDAO {
      * Verifica que pertenezca al usuario antes de borrar.
      */
     boolean delete(String contentId, String userId) throws Exception;
+
+    /**
+     * Obtiene el JSON completo de un contenido por ID.
+     * Devuelve el contenido JSONB junto con type y title.
+     * @return null si no existe o no pertenece al usuario
+     */
+    String getContentJson(String contentId, String userId) throws Exception;
 }

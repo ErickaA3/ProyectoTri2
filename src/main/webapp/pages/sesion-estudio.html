@@ -198,6 +198,20 @@
     document.addEventListener('DOMContentLoaded', async () => {
         flow = getFlow();
 
+        // Si viene desde favoritos/historial, mostrar directo sin generar
+        const fromHistorial = sessionStorage.getItem('fromHistorial');
+        if (fromHistorial === 'true') {
+            sessionStorage.removeItem('fromHistorial');
+            results = JSON.parse(sessionStorage.getItem('studyResults') || '{}');
+            if (!flow) flow = { userId: null, options: Object.keys(results), configs: {} };
+            // Ocultar loading y mostrar resultados directo
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            initResultStars();
+            buildUI(flow, results);
+            return;
+        }
+
         if (!flow || !flow.userId) {
             window.location.href = '../pages/modo-estudio.html';
             return;
@@ -433,8 +447,8 @@
                     <button class="se-action-btn primary" onclick="goStudy('flashcards')">
                         <i class="fas fa-play"></i> Estudiar flashcards
                     </button>
-                    <button class="se-action-btn secondary" onclick="toggleFavorite('flashcards')">
-                        <i class="fas fa-heart"></i> Guardar
+                    <button class="se-fav-btn" id="favBtn-flashcards" onclick="toggleFavorite('flashcards')">
+                        <i class="far fa-heart"></i> Guardar
                     </button>
                 </div>
             </div>
@@ -444,7 +458,7 @@
     // — Esquemas —
     function buildEsquemasPanel(data, config) {
         const tipoLabels = { jerarquico:'Jerárquico', conceptual:'Conceptual', timeline:'Línea del tiempo', 'causa-efecto':'Causa y efecto', ciclico:'Cíclico' };
-        const tipo = config?.tipo || 'jerarquico';
+        const tipo = config?.tipo || data?.schemaType || 'jerarquico';
         const root = data.rootNode;
 
         // ── Utilidades compartidas ──
@@ -850,8 +864,8 @@
                     <button class="se-action-btn primary" onclick="openFullscreen()">
                         <i class="fas fa-expand"></i> Ver pantalla completa
                     </button>
-                    <button class="se-action-btn secondary" onclick="toggleFavorite('esquemas')">
-                        <i class="fas fa-heart"></i> Guardar
+                    <button class="se-fav-btn" id="favBtn-esquemas" onclick="toggleFavorite('esquemas')">
+                        <i class="far fa-heart"></i> Guardar
                     </button>
                 </div>
             </div>
@@ -864,8 +878,8 @@
 
     // — Examen —
     function buildExamenesPanel(data, config) {
-        const tipo = config?.tipo === 'expert_exam' ? 'Examen Experto' : 'Quiz Rápido';
-        const icon = config?.tipo === 'expert_exam' ? 'fa-crown' : 'fa-bolt';
+        const tipo = (config?.tipo || data?.schemaType) === 'expert_exam' ? 'Examen Experto' : 'Quiz Rápido';
+        const icon = (config?.tipo || data?.schemaType) === 'expert_exam' ? 'fa-crown' : 'fa-bolt';
         const questions = data.questions || [];
         const diff = { facil:'Fácil', medio:'Medio', dificil:'Difícil' };
 
@@ -892,8 +906,8 @@
                     <button class="se-action-btn primary" onclick="goStudy('examenes')">
                         <i class="fas ${icon}"></i> Iniciar ${tipo}
                     </button>
-                    <button class="se-action-btn secondary" onclick="toggleFavorite('examenes')">
-                        <i class="fas fa-heart"></i> Guardar
+                    <button class="se-fav-btn" id="favBtn-examenes" onclick="toggleFavorite('examenes')">
+                        <i class="far fa-heart"></i> Guardar
                     </button>
                 </div>
             </div>
@@ -919,8 +933,8 @@
                 </div>
                 <div class="se-resumen-content">${html}</div>
                 <div class="se-actions">
-                    <button class="se-action-btn secondary" onclick="toggleFavorite('resumenes')">
-                        <i class="fas fa-heart"></i> Guardar resumen
+                    <button class="se-fav-btn" id="favBtn-resumenes" onclick="toggleFavorite('resumenes')">
+                        <i class="far fa-heart"></i> Guardar
                     </button>
                 </div>
             </div>
@@ -991,12 +1005,71 @@
         }
     });
 
-    function toggleFavorite(opt) {
+    // Estado de favoritos por opción
+    const favoriteState = {};
+
+    async function toggleFavorite(opt) {
         const contentId = results?.[opt]?.id;
         if (!contentId) { showToast('Contenido no disponible'); return; }
-        showToast('Guardado en favoritos');
-        // TODO: llamar al endpoint toggleFavorite cuando esté disponible
-        // fetch('/content/favorite', { method:'PUT', body: JSON.stringify({ contentId, userId: flow.userId, isFavorite: true }) })
+
+        const btn = document.getElementById('favBtn-' + opt);
+        const isCurrentlyFav = favoriteState[opt] || false;
+        const newState = !isCurrentlyFav;
+
+        try {
+            const response = await fetch('../api/favoritos', {
+                method:  'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-User-Id': flow.userId
+                },
+                body: JSON.stringify({
+                    contentId:  contentId,
+                    isFavorite: newState
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                favoriteState[opt] = newState;
+                if (btn) {
+                    if (newState) {
+                        btn.classList.add('active', 'animating');
+                        btn.innerHTML = '<i class="fas fa-heart"></i> Guardado';
+                        createHeartSparkles(btn);
+                        setTimeout(() => btn.classList.remove('animating'), 500);
+                    } else {
+                        btn.classList.remove('active');
+                        btn.innerHTML = '<i class="far fa-heart"></i> Guardar';
+                    }
+                }
+                showToast(newState ? 'Guardado en favoritos' : 'Eliminado de favoritos');
+            } else {
+                showToast('Error al actualizar favorito');
+                console.error('[Favorito]', data.error);
+            }
+        } catch (error) {
+            console.error('[Favorito] Error de conexión:', error);
+            showToast('Error de conexión');
+        }
+    }
+
+    function createHeartSparkles(btn) {
+        const container = document.createElement('div');
+        container.className = 'sparkle-container';
+        btn.appendChild(container);
+        const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+        angles.forEach(angle => {
+            const sparkle = document.createElement('div');
+            sparkle.className = 'sparkle';
+            const distance = 25 + Math.random() * 15;
+            const rad = (angle * Math.PI) / 180;
+            const x = Math.cos(rad) * distance;
+            const y = Math.sin(rad) * distance;
+            sparkle.style.setProperty('--sparkle-end', `translate(${x}px, ${y}px)`);
+            container.appendChild(sparkle);
+        });
+        setTimeout(() => container.remove(), 700);
     }
 
     // ================================================================

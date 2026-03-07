@@ -38,11 +38,11 @@
                 <i class="fas fa-layer-group"></i>
                 Flashcards
             </button>
-            <button class="filter-tab" onclick="setFilter('esquema', this)">
+            <button class="filter-tab" onclick="setFilter('schema', this)">
                 <i class="fas fa-project-diagram"></i>
                 Esquemas
             </button>
-            <button class="filter-tab" onclick="setFilter('resumen', this)">
+            <button class="filter-tab" onclick="setFilter('summary', this)">
                 <i class="fas fa-file-alt"></i>
                 Resúmenes
             </button>
@@ -82,181 +82,7 @@
         <span id="toastMessage">Eliminado de favoritos</span>
     </div>
 
-    <script>
-        let favorites = [
-            { id: 1, type: 'flashcard', title: 'Tema de Física Moderna', category: 'Flashcard', likes: 223, icon: 'fas fa-layer-group' },
-            { id: 2, type: 'esquema', title: 'Ciclo de Krebs - Biología', category: 'Esquema', likes: 160, icon: 'fas fa-project-diagram' },
-            { id: 3, type: 'quiz', title: 'Quizzes sobre literatura', category: 'Quiz', likes: 95, icon: 'fas fa-clipboard-list' },
-            { id: 4, type: 'resumen', title: 'Teoría de la Relatividad', category: 'Resumen', likes: 178, icon: 'fas fa-file-alt' },
-            { id: 5, type: 'flashcard', title: 'Vocabulario Francés A1', category: 'Flashcard', likes: 230, icon: 'fas fa-layer-group' },
-            { id: 6, type: 'resumen', title: 'Resúmenes de química', category: 'Resumen', likes: 127, icon: 'fas fa-file-alt' },
-            { id: 7, type: 'esquema', title: 'Estructura del átomo', category: 'Esquema', likes: 102, icon: 'fas fa-project-diagram' }
-        ];
-
-        let currentFilter = 'all';
-        let itemToRemove = null;
-
-        function generateStars() {
-            let starsHTML = '';
-            for (let i = 0; i < 20; i++) {
-                const size = 1 + Math.random() * 2;
-                const left = Math.random() * 100;
-                const top = Math.random() * 100;
-                const delay = Math.random() * 2;
-                starsHTML += `<div class="star" style="width:${size}px;height:${size}px;left:${left}%;top:${top}%;animation-delay:${delay}s"></div>`;
-            }
-            return starsHTML;
-        }
-
-        function renderFavorites() {
-            const grid = document.getElementById('favoritesGrid');
-            const emptyState = document.getElementById('emptyState');
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            
-            let filtered = favorites.filter(item => {
-                const matchesFilter = currentFilter === 'all' || item.type === currentFilter;
-                const matchesSearch = item.title.toLowerCase().includes(searchTerm);
-                return matchesFilter && matchesSearch;
-            });
-
-            if (filtered.length === 0) {
-                grid.style.display = 'none';
-                emptyState.style.display = 'block';
-            } else {
-                grid.style.display = 'grid';
-                emptyState.style.display = 'none';
-                
-                grid.innerHTML = filtered.map(item => `
-                    <div class="favorite-card ${item.type}" onclick="openItem(${item.id})">
-                        <div class="card-stars">${generateStars()}</div>
-                        <span class="card-type-badge ${item.type}">${item.type.toUpperCase()}</span>
-                        <i class="fas fa-star card-star"></i>
-                        <div class="card-preview ${item.type}">
-                            <i class="${item.icon} card-preview-icon"></i>
-                        </div>
-                        <div class="card-content">
-                            <h3 class="card-title">${item.title}</h3>
-                            <div class="card-category ${item.type}">
-                                <i class="${item.icon}"></i>
-                                ${item.category}
-                            </div>
-                            <div class="card-actions">
-                                <button class="card-btn-ver" onclick="event.stopPropagation(); openItem(${item.id})">
-                                    <i class="fas fa-play"></i> Ver
-                                </button>
-                                <button class="card-btn-heart active" onclick="event.stopPropagation(); toggleFavorite(${item.id}, this)">
-                                    <i class="fas fa-heart"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        }
-
-        function setFilter(filter, element) {
-            currentFilter = filter;
-            document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
-            element.classList.add('active');
-            renderFavorites();
-        }
-
-        function filterFavorites() { renderFavorites(); }
-        function openItem(id) { console.log('Abriendo item:', id); }
-
-        function toggleFavorite(id, btn) {
-            // Toggle la clase active con animación
-            if (btn.classList.contains('active')) {
-                btn.classList.remove('active');
-                btn.innerHTML = '<i class="far fa-heart"></i>';
-                
-                // Mostrar modal de confirmación para quitar de favoritos
-                const item = favorites.find(f => f.id === id);
-                if (item) {
-                    showRemoveModal(id, item.title);
-                }
-            } else {
-                btn.classList.add('active');
-                btn.classList.add('animating');
-                btn.innerHTML = '<i class="fas fa-heart"></i>';
-                
-                // Crear sparkles
-                createSparkles(btn);
-                
-                // Quitar clase animating después de la animación
-                setTimeout(() => btn.classList.remove('animating'), 500);
-            }
-        }
-
-        function createSparkles(btn) {
-            // Crear contenedor de sparkles
-            const container = document.createElement('div');
-            container.className = 'sparkle-container';
-            btn.appendChild(container);
-
-            // Crear 8 sparkles en diferentes direcciones
-            const angles = [0, 45, 90, 135, 180, 225, 270, 315];
-            angles.forEach((angle, i) => {
-                const sparkle = document.createElement('div');
-                sparkle.className = 'sparkle';
-                
-                // Calcular posición final basada en el ángulo
-                const distance = 25 + Math.random() * 15;
-                const rad = (angle * Math.PI) / 180;
-                const x = Math.cos(rad) * distance;
-                const y = Math.sin(rad) * distance;
-                
-                sparkle.style.setProperty('--sparkle-end', `translate(${x}px, ${y}px)`);
-                container.appendChild(sparkle);
-            });
-
-            // Remover contenedor después de la animación
-            setTimeout(() => container.remove(), 700);
-        }
-
-        function showRemoveModal(id, title) {
-            itemToRemove = id;
-            document.getElementById('modalItemName').textContent = `"${title}"`;
-            document.getElementById('removeModal').classList.add('show');
-        }
-
-        function closeRemoveModal() {
-            document.getElementById('removeModal').classList.remove('show');
-            itemToRemove = null;
-        }
-
-        function confirmRemove() {
-            if (itemToRemove) {
-                favorites = favorites.filter(f => f.id !== itemToRemove);
-                closeRemoveModal();
-                renderFavorites();
-                showToast('Eliminado de favoritos');
-            }
-        }
-
-        function showToast(message) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toastMessage').textContent = message;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
-
-
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && window.innerWidth <= 768) {
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar.classList.contains('active')) {
-                    toggleMenu();
-                }
-            }
-        });
-
-        document.getElementById('removeModal').addEventListener('click', function(e) {
-            if (e.target === this) closeRemoveModal();
-        });
-
-        renderFavorites();
-    </script>
+    <script src="../js/favoritos.js"></script>
     <script src="../js/components.js"></script>
 </body>
 </html>
