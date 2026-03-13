@@ -26,33 +26,37 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * Endpoints:
  *
- *   GET  /resumen?id=<UUID>&userId=<UUID>
- *   → Devuelve los datos del resumen si pertenece al userId.
+ *   GET  /api/summaries?id=<UUID>
+ *        Header: X-User-Id: <UUID>
+ *   → Devuelve el resumen si pertenece al userId.
  *   Respuesta:
  *   {
  *     "success": true,
  *     "id": "uuid",
- *     "title": "Título del resumen",
+ *     "title": "...",
  *     "isFavorite": false,
- *     "createdAt": "2025-01-01T12:00:00",
+ *     "createdAt": "2025-01-01 12:00:00",
  *     "sessionId": "uuid",
- *     "content": { ... }   <-- JSON original guardado por la IA
+ *     "content": { ... }   <- JSONB original guardado por la IA
  *   }
  *
- *   POST /resumen/favorite
- *   Body JSON: { "contentId": "uuid", "userId": "uuid", "isFavorite": true }
- *   → Marca o desmarca el resumen como favorito.
+ *   POST /api/summaries/favorite
+ *        Header: X-User-Id: <UUID>
+ *        Header: X-HTTP-Method-Override: PATCH   (HttpServlet no tiene doPatch)
+ *        Body JSON: { "contentId": "uuid", "isFavorite": true }
+ *   -> Marca o desmarca el resumen como favorito.
  *   Respuesta:
- *   { "success": true }
+ *   { "success": true, "isFavorite": true }
  */
-@WebServlet(urlPatterns = { "/resumen", "/resumen/favorite" })
+@WebServlet(urlPatterns = { "/api/summaries", "/api/summaries/favorite" })
 public class SummaryServlet extends HttpServlet {
 
     private final IContentDAO contentDAO = new ContentDAOImpl();
     private final Gson gson = new Gson();
 
     // -----------------------------------------------------------------------
-    // GET /resumen?id=<UUID>&userId=<UUID>
+    // GET /api/summaries?id=<UUID>
+    // userId viene del header X-User-Id (mismo patron que HistorialServlet)
     // -----------------------------------------------------------------------
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
@@ -62,14 +66,14 @@ public class SummaryServlet extends HttpServlet {
         res.setCharacterEncoding("UTF-8");
 
         String contentId = req.getParameter("id");
-        String userId    = req.getParameter("userId");
+        String userId    = req.getHeader("X-User-Id");
 
         if (contentId == null || contentId.isBlank()) {
-            sendError(res, 400, "Falta el parámetro 'id'.");
+            sendError(res, 400, "Falta el parametro 'id'.");
             return;
         }
         if (userId == null || userId.isBlank()) {
-            sendError(res, 400, "Falta el parámetro 'userId'.");
+            sendError(res, 401, "No autenticado. Falta el header X-User-Id.");
             return;
         }
 
@@ -90,7 +94,10 @@ public class SummaryServlet extends HttpServlet {
     }
 
     // -----------------------------------------------------------------------
-    // POST /resumen/favorite
+    // POST /api/summaries/favorite
+    // Acepta X-HTTP-Method-Override: PATCH porque HttpServlet no tiene doPatch.
+    // userId viene del header X-User-Id.
+    // Body JSON: { "contentId": "uuid", "isFavorite": true }
     // -----------------------------------------------------------------------
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res)
@@ -99,28 +106,40 @@ public class SummaryServlet extends HttpServlet {
         res.setContentType("application/json");
         res.setCharacterEncoding("UTF-8");
 
+        // Solo acepta requests a /favorite
+        String uri = req.getRequestURI();
+        if (!uri.endsWith("/favorite")) {
+            sendError(res, 405, "Metodo no permitido en esta ruta.");
+            return;
+        }
+
+        String userId = req.getHeader("X-User-Id");
+        if (userId == null || userId.isBlank()) {
+            sendError(res, 401, "No autenticado. Falta el header X-User-Id.");
+            return;
+        }
+
         try {
             String body = req.getReader().lines().collect(Collectors.joining());
             JsonObject data = JsonParser.parseString(body).getAsJsonObject();
 
             String  contentId  = data.get("contentId").getAsString();
-            String  userId     = data.get("userId").getAsString();
             boolean isFavorite = data.get("isFavorite").getAsBoolean();
 
-            if (contentId == null || contentId.isBlank() || userId == null || userId.isBlank()) {
-                sendError(res, 400, "Faltan parámetros requeridos.");
+            if (contentId == null || contentId.isBlank()) {
+                sendError(res, 400, "Falta el campo 'contentId'.");
                 return;
             }
 
             boolean updated = contentDAO.toggleFavorite(contentId, userId, isFavorite);
 
             if (!updated) {
-                sendError(res, 404, "No se encontró el contenido o no te pertenece.");
+                sendError(res, 404, "No se encontro el contenido o no te pertenece.");
                 return;
             }
 
             JsonObject response = new JsonObject();
-            response.addProperty("success", true);
+            response.addProperty("success",    true);
             response.addProperty("isFavorite", isFavorite);
             res.getWriter().write(gson.toJson(response));
 
@@ -130,17 +149,17 @@ public class SummaryServlet extends HttpServlet {
     }
 
     // -----------------------------------------------------------------------
-    // CONSULTA DIRECTA: obtiene resumen por ID verificando que sea del usuario
-    // No se modifica ContentDAOImpl para no tocar el código del compañero.
+    // Consulta directa: obtiene resumen por ID verificando que sea del usuario.
+    // No delega a ContentDAOImpl para no depender del codigo de los companeros.
     // -----------------------------------------------------------------------
     private JsonObject getByIdAndUser(String contentId, String userId) throws Exception {
         String sql = """
             SELECT id, user_id, type, title, content::text AS content_json,
                    is_favorite, created_at, session_id
             FROM study_content
-            WHERE id = ?::uuid
+            WHERE id      = ?::uuid
               AND user_id = ?::uuid
-              AND type = 'summary'
+              AND type    = 'summary'
             """;
 
         try (Connection conn = DatabaseConnection.getConnection();
@@ -150,7 +169,6 @@ public class SummaryServlet extends HttpServlet {
             stmt.setString(2, userId);
 
             ResultSet rs = stmt.executeQuery();
-
             if (!rs.next()) return null;
 
             JsonObject result = new JsonObject();
@@ -161,14 +179,13 @@ public class SummaryServlet extends HttpServlet {
             result.addProperty("createdAt",  rs.getTimestamp("created_at").toString());
             result.addProperty("sessionId",  rs.getString("session_id"));
 
-            // El content es JSONB — lo parseamos para devolverlo como objeto
+            // content es JSONB — se devuelve como objeto, no como string
             String contentJson = rs.getString("content_json");
             if (contentJson != null && !contentJson.isBlank()) {
                 try {
                     JsonElement contentElement = JsonParser.parseString(contentJson);
                     result.add("content", contentElement);
                 } catch (JsonSyntaxException e) {
-                    // Si por alguna razón no es JSON válido, lo mandamos como string
                     result.addProperty("content", contentJson);
                 }
             }
@@ -178,13 +195,11 @@ public class SummaryServlet extends HttpServlet {
     }
 
     // -----------------------------------------------------------------------
-    // HELPER
-    // -----------------------------------------------------------------------
     private void sendError(HttpServletResponse res, int status, String message) throws IOException {
         res.setStatus(status);
         JsonObject error = new JsonObject();
         error.addProperty("success", false);
-        error.addProperty("error", message);
+        error.addProperty("error",   message);
         res.getWriter().write(gson.toJson(error));
     }
 }

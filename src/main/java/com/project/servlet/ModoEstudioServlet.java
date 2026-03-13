@@ -1,24 +1,33 @@
 package com.project.servlet;
 
-import com.google.gson.*;
-import com.project.dao.implementation.ContentDAOImpl;
-import com.project.dao.interfaces.IContentDAO;
-import com.project.model.content.*;
-import com.project.util.AIService;
-
-import jakarta.servlet.ServletException;
-import jakarta.servlet.annotation.MultipartConfig;
-import jakarta.servlet.annotation.WebServlet;
-import jakarta.servlet.http.*;
-
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
-import org.apache.pdfbox.Loader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.project.dao.implementation.ContentDAOImpl;
+import com.project.dao.interfaces.IContentDAO;
+import com.project.model.content.Diagram;
+import com.project.model.content.EducationalContent;
+import com.project.model.content.Flashcard;
+import com.project.model.content.Summary;
+import com.project.util.AIService;
+
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 
 
 

@@ -5,7 +5,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.project.dao.interfaces.IHistorialDAO;
 import com.project.database.DatabaseConnection;
 
@@ -57,6 +59,52 @@ public class HistorialDAOImpl implements IHistorialDAO {
             }
 
             return items;
+        }
+    }
+
+    @Override
+    public JsonObject getById(String id, String userId) throws Exception {
+        String sql = """
+            SELECT id, type, title, content::text AS content_json,
+                   is_favorite, created_at, session_id
+            FROM study_content
+            WHERE id = ?::uuid AND user_id = ?::uuid
+            """;
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, id);
+            stmt.setString(2, userId);
+
+            ResultSet rs = stmt.executeQuery();
+            if (!rs.next()) return null;
+
+            JsonObject item = new JsonObject();
+            item.addProperty("id",         rs.getString("id"));
+            item.addProperty("type",       rs.getString("type"));
+            item.addProperty("title",      rs.getString("title"));
+            item.addProperty("isFavorite", rs.getBoolean("is_favorite"));
+            item.addProperty("createdAt",  rs.getTimestamp("created_at").getTime());
+
+            String sessionId = rs.getString("session_id");
+            if (sessionId != null) item.addProperty("sessionId", sessionId);
+
+            // Parsear el JSONB de content y mezclar sus campos en el objeto raíz
+            // Así las páginas reciben la misma estructura que genera ModoEstudioServlet
+            String contentJson = rs.getString("content_json");
+            if (contentJson != null && !contentJson.isBlank()) {
+                try {
+                    JsonObject content = JsonParser.parseString(contentJson).getAsJsonObject();
+                    for (String key : content.keySet()) {
+                        if (!item.has(key)) { // no sobrescribir id/type/title
+                            item.add(key, content.get(key));
+                        }
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            return item;
         }
     }
 
