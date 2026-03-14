@@ -188,6 +188,24 @@
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            const ext = file.name.toLowerCase().split('.').pop();
+            const allowed = ['pdf', 'doc', 'docx', 'txt', 'pptx'];
+
+            if (!allowed.includes(ext)) {
+                showToast('Formato no soportado. Usa: PDF, DOC, DOCX, PPTX o TXT');
+                event.target.value = '';
+                return;
+            }
+
+            // Límite de ~3.5MB por sessionStorage (base64 infla ~33%)
+            if (file.size > 3_500_000) {
+                showToast('Archivo muy grande (máx ~3.5 MB). Intenta con uno más corto.');
+                event.target.value = '';
+                return;
+            }
+
+            // Todos los formatos se envían como archivo al servlet (el backend extrae texto)
             uploadedFile     = file;
             selectedDataType = 'file';
             document.getElementById('fileOption').classList.add('selected');
@@ -276,6 +294,8 @@
             };
 
             const navigate = () => {
+                // Limpiar resultados anteriores para que genere de nuevo
+                sessionStorage.removeItem('studyResults');
                 sessionStorage.setItem('modoEstudioFlow', JSON.stringify(flow));
                 if (configQueue.length > 0) {
                     window.location.href = CONFIG_REQUIRED[configQueue[0]].page;
@@ -287,9 +307,13 @@
             if (uploadedFile && selectedDataType === 'file') {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    // Guardar base64 dentro del flow (persiste entre páginas)
-                    flow.fileBase64 = e.target.result; // incluye prefijo data:type;base64,...
-                    navigate();
+                    flow.fileBase64 = e.target.result;
+                    try {
+                        navigate();
+                    } catch(storageErr) {
+                        showToast('El archivo es demasiado grande. Intenta con un PDF más corto.');
+                        console.error('SessionStorage overflow:', storageErr);
+                    }
                 };
                 reader.onerror = () => showToast('Error leyendo el archivo.');
                 reader.readAsDataURL(uploadedFile);
