@@ -1,7 +1,6 @@
 package com.project.servlet;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -18,6 +17,7 @@ import com.project.dao.interfaces.IContentDAO;
 import com.project.model.content.Diagram;
 import com.project.model.content.EducationalContent;
 import com.project.model.content.Flashcard;
+import com.project.model.content.Quiz;
 import com.project.model.content.Summary;
 import com.project.util.AIService;
 
@@ -35,17 +35,10 @@ import jakarta.servlet.http.Part;
  * Servlet principal del Modo Estudio.
  * URL: /modo-estudio/generar  — POST
  *
- * Body JSON:
- * {
- *   "userId":   "uuid",
- *   "options":  ["esquemas","flashcards","examenes","resumenes"],
- *   "dataType": "text" | "file",
- *   "text":     "...",          // si dataType = text
- *   "configs":  {               // configuraciones de cada módulo
- *     "examenes": { "tipo": "quiz" | "expert_exam", "numPreguntas": 10, "dificultad": "medio" }
- *     "esquemas": { "tipo": "jerarquico" | ... }
- *   }
- * }
+ * CORRECCIONES:
+ * - [BUG-3] Validación de tipo de archivo PDF antes de parsear
+ * - [BUG-3] Mejor manejo de errores cuando el archivo no es PDF válido
+ * - [BUG-3] Se leen los bytes UNA sola vez para evitar doble consumo del stream
  */
 @WebServlet("/modo-estudio/generar")
 @MultipartConfig(maxFileSize = 10_485_760) // 10 MB
@@ -83,7 +76,40 @@ public class ModoEstudioServlet extends HttpServlet {
                 }
 
                 Part filePart = req.getPart("file");
-                textoBase = extractTextFromPDF(filePart.getInputStream());
+                if (filePart == null || filePart.getSize() == 0) {
+                    sendError(res, 400, "No se recibió ningún archivo.");
+                    return;
+                }
+
+                // ─── [BUG-3 FIX] Validar que el archivo sea PDF ───
+                String contentType = filePart.getContentType();
+                String fileName    = filePart.getSubmittedFileName();
+
+                boolean isPdf = (contentType != null && contentType.contains("pdf"))
+                    || (fileName != null && fileName.toLowerCase().endsWith(".pdf"));
+
+                if (!isPdf) {
+                    sendError(res, 400,
+                        "Solo se aceptan archivos PDF. Tipo recibido: "
+                        + (contentType != null ? contentType : "desconocido"));
+                    return;
+                }
+
+                // ─── [BUG-3 FIX] Leer bytes UNA sola vez ───
+                byte[] fileBytes = filePart.getInputStream().readAllBytes();
+
+                // Validar que los bytes empiecen con %PDF (magic bytes)
+                if (fileBytes.length < 5
+                    || fileBytes[0] != '%'
+                    || fileBytes[1] != 'P'
+                    || fileBytes[2] != 'D'
+                    || fileBytes[3] != 'F') {
+                    sendError(res, 400,
+                        "El archivo no es un PDF válido. Asegúrate de subir un archivo .pdf real.");
+                    return;
+                }
+
+                textoBase = extractTextFromPDF(fileBytes);
 
             } else {
                 // ── JSON puro: viene con texto ────────────────────────────
@@ -114,16 +140,16 @@ public class ModoEstudioServlet extends HttpServlet {
             // ── Generar contenido para cada opción seleccionada ───────────
             JsonObject results = new JsonObject();
             for (String option : options) {
-                String contentType = mapOptionToType(option);
-                if (contentType == null) continue;
-
                 // Obtener la config específica de este módulo (si tiene)
                 JsonObject moduleConfig = configs.has(option)
                     ? configs.getAsJsonObject(option) : new JsonObject();
 
+                String contentTypeStr = mapOptionToType(option, moduleConfig);
+                if (contentTypeStr == null) continue;
+
                 try {
                     JsonObject generated = generateAndSave(
-                        userId, contentType, option, textoBase, sessionId, moduleConfig
+                        userId, contentTypeStr, option, textoBase, sessionId, moduleConfig
                     );
                     results.add(option, generated);
                 } catch (Exception e) {
@@ -153,7 +179,10 @@ public class ModoEstudioServlet extends HttpServlet {
                                         String textoBase, String sessionId,
                                         JsonObject moduleConfig) throws Exception {
 
-        String aiResponseJson = AIService.generate(contentType, textoBase, moduleConfig);
+        // AIService solo tiene case "quiz" para exámenes — expert_exam usa el mismo prompt
+        // pero el moduleConfig.tipo le indica a la IA el modo (ver buildPrompt case "quiz")
+        String aiType = "expert_exam".equals(contentType) ? "quiz" : contentType;
+        String aiResponseJson = AIService.generate(aiType, textoBase, moduleConfig);
         JsonObject aiData = JsonParser.parseString(aiResponseJson).getAsJsonObject();
         String title = aiData.has("title") ? aiData.get("title").getAsString() : "Sin título";
 
@@ -175,17 +204,22 @@ public class ModoEstudioServlet extends HttpServlet {
 
     // ─────────────────────────────────────────────────────────────────────────
     // EXTRACCIÓN DE TEXTO DEL PDF
-    // El PDF se descarta — solo guardamos el resultado JSON de la IA
+    // [BUG-3 FIX] Recibe byte[] para evitar doble consumo del InputStream
     // ─────────────────────────────────────────────────────────────────────────
 
-        private String extractTextFromPDF(InputStream pdfStream) throws Exception {
-        try (PDDocument doc = Loader.loadPDF(pdfStream.readAllBytes())) {
+    private String extractTextFromPDF(byte[] pdfBytes) throws Exception {
+        try (PDDocument doc = Loader.loadPDF(pdfBytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
             String text = stripper.getText(doc);
             if (text == null || text.isBlank()) {
-                throw new Exception("No se pudo extraer texto del PDF.");
+                throw new Exception("No se pudo extraer texto del PDF. ¿Es un PDF escaneado sin OCR?");
             }
             return text;
+        } catch (Exception e) {
+            if (e.getMessage() != null && e.getMessage().contains("Missing root object")) {
+                throw new Exception("El archivo PDF está dañado o no es un PDF válido. Intenta con otro archivo.");
+            }
+            throw e;
         }
     }
 
@@ -195,24 +229,30 @@ public class ModoEstudioServlet extends HttpServlet {
 
     /**
      * Mapea la opción del frontend al tipo interno de la BD.
-     * frontend → BD (check constraint)
+     * Para "examenes" lee moduleConfig.tipo para distinguir "quiz" de "expert_exam".
      */
-    private String mapOptionToType(String option) {
+    private String mapOptionToType(String option, JsonObject moduleConfig) {
         return switch (option) {
             case "flashcards" -> "flashcard";
             case "esquemas"   -> "schema";
             case "resumenes"  -> "summary";
-            case "examenes"   -> "quiz";   // ← antes era "quizzes", ahora es "examenes"
-            default           -> null;
+            case "examenes"   -> {
+                String tipo = (moduleConfig.has("tipo") && !moduleConfig.get("tipo").isJsonNull())
+                    ? moduleConfig.get("tipo").getAsString()
+                    : "quiz";
+                yield tipo;
+            }
+            default -> null;
         };
     }
 
     private EducationalContent buildContentObject(String userId, String type,
                                                    String title, String sessionId) {
         return switch (type) {
-            case "flashcard" -> new Flashcard(userId, title, sessionId, null);
-            case "schema"    -> new Diagram(userId, title, sessionId, null);
-            default          -> new Summary(userId, title, sessionId, null);
+            case "flashcard"           -> new Flashcard(userId, title, sessionId, null);
+            case "schema"              -> new Diagram(userId, title, sessionId, null);
+            case "quiz", "expert_exam" -> new Quiz(userId, type, title, sessionId);
+            default                    -> new Summary(userId, title, sessionId, null);
         };
     }
 
