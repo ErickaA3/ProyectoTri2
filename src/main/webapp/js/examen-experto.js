@@ -193,7 +193,13 @@ function submitExam(){closeSubmitModal();finishExam();}
 
 function showExitModal(){document.getElementById('exitModal').classList.add('show');}
 function closeExitModal(){document.getElementById('exitModal').classList.remove('show');}
-function exitWithPenalty(){clearInterval(timerInterval);closeExitModal();window.history.back();}
+function exitWithPenalty() {
+    clearInterval(timerInterval);
+    closeExitModal();
+    // ── GAMIFICACIÓN: penalización por abandono ──
+    sendReward('abandon_exam', 0, examData?.id, 0, 0)
+        .finally(() => { window.history.back(); });
+}
 function exitExam(){clearInterval(timerInterval);window.history.back();}
 
 // ===== FINISH =====
@@ -293,7 +299,22 @@ function finishExam() {
     }).join('');
 
     if (grade >= 70) launchConfetti();
-    setTimeout(() => showXpToast(xpEarned), 1500);
+
+    // ── GAMIFICACIÓN: enviar resultado al servidor ──
+    const timeUsedSecs = (examData.timeMinutes * 60) - totalSeconds;
+    sendReward('expert_exam', grade, examData.id, timeUsedSecs, examData.questions.length)
+        .then(result => {
+            if (result.success) {
+                setTimeout(() => showXpToast(result.xpEarned), 1500);
+                document.getElementById('xpEarned').innerHTML =
+                    `<i class="fas fa-bolt"></i> <span>+${result.xpEarned} XP ganados</span>`;
+            } else {
+                setTimeout(() => showXpToast(xpEarned), 1500);
+            }
+        })
+        .catch(() => {
+            setTimeout(() => showXpToast(xpEarned), 1500);
+        });
 }
 
 // ===== HELPERS =====

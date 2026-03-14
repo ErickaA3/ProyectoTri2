@@ -1,6 +1,11 @@
 package com.project.servlet;
 
+import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.project.dao.implementation.ShopDAOImpl;
 import com.project.dao.interfaces.IShopDAO;
@@ -13,9 +18,6 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import java.io.IOException;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * ShopServlet — maneja todas las operaciones de la tienda.
@@ -32,7 +34,11 @@ import java.util.stream.Collectors;
 public class ShopServlet extends HttpServlet {
 
     private final IShopDAO shopDAO = new ShopDAOImpl();
-    private final Gson     gson    = new Gson();
+    private final Gson gson = new GsonBuilder()
+    .registerTypeAdapter(java.time.LocalDateTime.class,
+        (com.google.gson.JsonSerializer<java.time.LocalDateTime>) (src, type, ctx) ->
+            new com.google.gson.JsonPrimitive(src.toString()))
+    .create();
 
     // ──────────────────────────────────────────────────────────────
     //  GET /shop
