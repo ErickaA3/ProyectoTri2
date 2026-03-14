@@ -144,6 +144,29 @@ public class ShopDAOImpl implements IShopDAO {
     }
 
     // ──────────────────────────────────────────────────────────────
+    //  MONEDAS
+    // ──────────────────────────────────────────────────────────────
+
+    @Override
+    public int getUserCoins(String userId) {
+        String sql = "SELECT coins FROM user_stats WHERE user_id = ?::uuid";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt("coins");
+            }
+
+        } catch (SQLException e) {
+            System.err.println("[ShopDAO] Error en getUserCoins: " + e.getMessage());
+        }
+
+        return 0;
+    }
+
+    // ──────────────────────────────────────────────────────────────
     //  COMPRA
     // ──────────────────────────────────────────────────────────────
 

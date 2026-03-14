@@ -217,6 +217,26 @@
             return;
         }
 
+        // ─── Si ya hay resultados generados, mostrarlos directo ───
+        const cachedResults = sessionStorage.getItem('studyResults');
+        if (cachedResults) {
+            try {
+                results = JSON.parse(cachedResults);
+                // Verificar que los resultados tengan datos válidos
+                const hasData = flow.options.some(o => results[o] && !results[o].error);
+                if (hasData) {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    document.getElementById('mainContent').style.display = 'block';
+                    initResultStars();
+                    buildUI(flow, results);
+                    return;
+                }
+            } catch(e) {
+                // Si el JSON es inválido, regenerar
+                sessionStorage.removeItem('studyResults');
+            }
+        }
+
         initLoadingStars();
         renderLoadingSteps(flow.options);
 

@@ -1,6 +1,8 @@
 package com.project.servlet;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -8,6 +10,14 @@ import java.util.stream.Collectors;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.hwpf.HWPFDocument;
+import org.apache.poi.hwpf.extractor.WordExtractor;
+import org.apache.poi.xslf.usermodel.XMLSlideShow;
+import org.apache.poi.xslf.usermodel.XSLFShape;
+import org.apache.poi.xslf.usermodel.XSLFSlide;
+import org.apache.poi.xslf.usermodel.XSLFTextShape;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -35,10 +45,12 @@ import jakarta.servlet.http.Part;
  * Servlet principal del Modo Estudio.
  * URL: /modo-estudio/generar  — POST
  *
- * CORRECCIONES:
- * - [BUG-3] Validación de tipo de archivo PDF antes de parsear
- * - [BUG-3] Mejor manejo de errores cuando el archivo no es PDF válido
- * - [BUG-3] Se leen los bytes UNA sola vez para evitar doble consumo del stream
+ * Soporta archivos: PDF, DOCX, DOC, PPTX, TXT
+ * - PDF  → Apache PDFBox
+ * - DOCX → Apache POI (XWPF)
+ * - DOC  → Apache POI (HWPF)
+ * - PPTX → Apache POI (XSLF)
+ * - TXT  → lectura directa UTF-8
  */
 @WebServlet("/modo-estudio/generar")
 @MultipartConfig(maxFileSize = 10_485_760) // 10 MB
@@ -64,7 +76,7 @@ public class ModoEstudioServlet extends HttpServlet {
             JsonObject configs = new JsonObject();
 
             if ("file".equals(dataType)) {
-                // ── Multipart: viene con archivo PDF ──────────────────────
+                // ── Multipart: viene con archivo ──────────────────────
                 userId  = req.getParameter("userId");
                 String optionsParam = req.getParameter("options");
                 options = gson.fromJson(optionsParam,
@@ -81,35 +93,30 @@ public class ModoEstudioServlet extends HttpServlet {
                     return;
                 }
 
-                // ─── [BUG-3 FIX] Validar que el archivo sea PDF ───
-                String contentType = filePart.getContentType();
-                String fileName    = filePart.getSubmittedFileName();
+                String fileName = filePart.getSubmittedFileName();
+                String ext = (fileName != null)
+                    ? fileName.toLowerCase().substring(fileName.lastIndexOf('.') + 1)
+                    : "";
 
-                boolean isPdf = (contentType != null && contentType.contains("pdf"))
-                    || (fileName != null && fileName.toLowerCase().endsWith(".pdf"));
-
-                if (!isPdf) {
+                // Validar extensión soportada
+                if (!List.of("pdf", "docx", "doc", "pptx", "txt").contains(ext)) {
                     sendError(res, 400,
-                        "Solo se aceptan archivos PDF. Tipo recibido: "
-                        + (contentType != null ? contentType : "desconocido"));
+                        "Formato no soportado: ." + ext
+                        + ". Formatos aceptados: PDF, DOCX, DOC, PPTX, TXT.");
                     return;
                 }
 
-                // ─── [BUG-3 FIX] Leer bytes UNA sola vez ───
                 byte[] fileBytes = filePart.getInputStream().readAllBytes();
 
-                // Validar que los bytes empiecen con %PDF (magic bytes)
-                if (fileBytes.length < 5
-                    || fileBytes[0] != '%'
-                    || fileBytes[1] != 'P'
-                    || fileBytes[2] != 'D'
-                    || fileBytes[3] != 'F') {
-                    sendError(res, 400,
-                        "El archivo no es un PDF válido. Asegúrate de subir un archivo .pdf real.");
-                    return;
-                }
-
-                textoBase = extractTextFromPDF(fileBytes);
+                // Extraer texto según el formato
+                textoBase = switch (ext) {
+                    case "pdf"  -> extractTextFromPDF(fileBytes);
+                    case "docx" -> extractTextFromDOCX(fileBytes);
+                    case "doc"  -> extractTextFromDOC(fileBytes);
+                    case "pptx" -> extractTextFromPPTX(fileBytes);
+                    case "txt"  -> new String(fileBytes, StandardCharsets.UTF_8);
+                    default     -> null;
+                };
 
             } else {
                 // ── JSON puro: viene con texto ────────────────────────────
@@ -128,7 +135,7 @@ public class ModoEstudioServlet extends HttpServlet {
 
             // ── Validaciones básicas ──────────────────────────────────────
             if (textoBase == null || textoBase.isBlank()) {
-                sendError(res, 400, "No se recibió texto o el PDF estaba vacío."); return;
+                sendError(res, 400, "No se recibió texto o el archivo estaba vacío."); return;
             }
             if (options == null || options.isEmpty()) {
                 sendError(res, 400, "Selecciona al menos un tipo de contenido."); return;
@@ -203,10 +210,10 @@ public class ModoEstudioServlet extends HttpServlet {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // EXTRACCIÓN DE TEXTO DEL PDF
-    // [BUG-3 FIX] Recibe byte[] para evitar doble consumo del InputStream
+    // EXTRACCIÓN DE TEXTO POR FORMATO
     // ─────────────────────────────────────────────────────────────────────────
 
+    /** PDF → Apache PDFBox */
     private String extractTextFromPDF(byte[] pdfBytes) throws Exception {
         try (PDDocument doc = Loader.loadPDF(pdfBytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
@@ -217,9 +224,65 @@ public class ModoEstudioServlet extends HttpServlet {
             return text;
         } catch (Exception e) {
             if (e.getMessage() != null && e.getMessage().contains("Missing root object")) {
-                throw new Exception("El archivo PDF está dañado o no es un PDF válido. Intenta con otro archivo.");
+                throw new Exception("El archivo PDF está dañado o no es un PDF válido.");
             }
             throw e;
+        }
+    }
+
+    /** DOCX → Apache POI XWPF */
+    private String extractTextFromDOCX(byte[] bytes) throws Exception {
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(bytes))) {
+            StringBuilder sb = new StringBuilder();
+            for (XWPFParagraph p : doc.getParagraphs()) {
+                String line = p.getText();
+                if (line != null && !line.isBlank()) {
+                    sb.append(line).append("\n");
+                }
+            }
+            String text = sb.toString().trim();
+            if (text.isEmpty()) {
+                throw new Exception("No se pudo extraer texto del DOCX. El documento puede estar vacío.");
+            }
+            return text;
+        }
+    }
+
+    /** DOC (formato antiguo) → Apache POI HWPF */
+    private String extractTextFromDOC(byte[] bytes) throws Exception {
+        try (HWPFDocument doc = new HWPFDocument(new ByteArrayInputStream(bytes))) {
+            WordExtractor extractor = new WordExtractor(doc);
+            String text = extractor.getText();
+            extractor.close();
+            if (text == null || text.isBlank()) {
+                throw new Exception("No se pudo extraer texto del DOC. El documento puede estar vacío.");
+            }
+            return text.trim();
+        }
+    }
+
+    /** PPTX → Apache POI XSLF */
+    private String extractTextFromPPTX(byte[] bytes) throws Exception {
+        try (XMLSlideShow pptx = new XMLSlideShow(new ByteArrayInputStream(bytes))) {
+            StringBuilder sb = new StringBuilder();
+            int slideNum = 1;
+            for (XSLFSlide slide : pptx.getSlides()) {
+                sb.append("--- Diapositiva ").append(slideNum++).append(" ---\n");
+                for (XSLFShape shape : slide.getShapes()) {
+                    if (shape instanceof XSLFTextShape textShape) {
+                        String text = textShape.getText();
+                        if (text != null && !text.isBlank()) {
+                            sb.append(text).append("\n");
+                        }
+                    }
+                }
+                sb.append("\n");
+            }
+            String text = sb.toString().trim();
+            if (text.isEmpty()) {
+                throw new Exception("No se pudo extraer texto del PPTX. La presentación puede estar vacía.");
+            }
+            return text;
         }
     }
 

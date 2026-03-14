@@ -69,6 +69,12 @@ public interface IShopDAO {
     Purchase buyItem(String userId, int itemId);
 
     /**
+     * Devuelve las monedas actuales del usuario desde user_stats.
+     * Se usa en GET /shop para enviar el balance real al frontend.
+     */
+    int getUserCoins(String userId);
+
+    /**
      * Equipa un ítem que el usuario ya posee.
      * Solo aplica a "avatar" y "background" — los consumibles se aplican automáticamente.
      *
