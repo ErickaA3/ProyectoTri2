@@ -69,6 +69,11 @@ async function loadSummary(summaryId) {
         renderSummary(json);
         showState('card');
 
+        // ── GAMIFICACIÓN: reward por ver resumen completo ──
+        if (typeof sendReward === 'function') {
+            sendReward('resumen', 0, summaryId, 0, 0).catch(() => {});
+        }
+
     } catch (err) {
         showError('No se pudo cargar el resumen', err.message);
         console.error('[loadSummary]', err);

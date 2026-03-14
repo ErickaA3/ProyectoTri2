@@ -214,8 +214,25 @@ function showResults() {
     dc.innerHTML = dh;
 
     if (score >= 70) launchConfetti();
-    const xp = cc * 10 + (isNew ? 25 : 0);
-    setTimeout(() => showXpToast(xp), 1500);
+
+    // ── GAMIFICACIÓN: enviar resultado al servidor ──
+    const fcContentId = (() => {
+        try { return JSON.parse(sessionStorage.getItem('studyResults'))?.flashcards?.id || null; }
+        catch(_) { return null; }
+    })();
+    sendReward('flashcards', score, fcContentId, 0, flashcardsData.length)
+        .then(result => {
+            if (result.success) {
+                setTimeout(() => showXpToast(result.xpEarned), 1500);
+            } else {
+                const fallbackXp = cc * 10 + (isNew ? 25 : 0);
+                setTimeout(() => showXpToast(fallbackXp), 1500);
+            }
+        })
+        .catch(() => {
+            const fallbackXp = cc * 10 + (isNew ? 25 : 0);
+            setTimeout(() => showXpToast(fallbackXp), 1500);
+        });
 }
 
 // ── Restart / Review ──────────────────────────────────────────

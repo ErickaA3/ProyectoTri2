@@ -264,8 +264,20 @@ function finishExam() {
     }).join('');
 
     if (grade >= 70) launchConfetti();
-    const xpEarned = correctCount * 10;
-    setTimeout(() => showXpToast(xpEarned), 1500);
+
+    // ── GAMIFICACIÓN: enviar resultado al servidor ──
+    const timeUsed = examData.hasTimer ? (examData.timeMinutes * 60 - totalSeconds) : 0;
+    sendReward('quiz', grade, examData.id, timeUsed, examData.questions.length)
+        .then(result => {
+            if (result.success) {
+                setTimeout(() => showXpToast(result.xpEarned), 1500);
+            } else {
+                setTimeout(() => showXpToast(correctCount * 10), 1500);
+            }
+        })
+        .catch(() => {
+            setTimeout(() => showXpToast(correctCount * 10), 1500);
+        });
 }
 
 // ===== HELPERS =====

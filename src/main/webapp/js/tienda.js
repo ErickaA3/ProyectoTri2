@@ -25,6 +25,19 @@ let lastPurchasedBackground   = null;
 // ── Context path dinámico (ej: '/project-1.0-SNAPSHOT') ──────
 const CTX = window.location.pathname.split('/pages')[0];
 
+// ── Auth: userId desde localStorage (mismo patrón que el resto del proyecto) ──
+function getShopUserId() {
+    try { return JSON.parse(localStorage.getItem('user'))?.id || null; }
+    catch (_) { return null; }
+}
+function shopHeaders() {
+    const uid = getShopUserId();
+    return {
+        'Content-Type': 'application/json',
+        ...(uid ? { 'X-User-Id': uid } : {})
+    };
+}
+
 // ── Arranque ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
     loadShop();
@@ -43,13 +56,30 @@ document.addEventListener('DOMContentLoaded', function () {
 // ============================================================
 async function loadShop() {
     try {
-        const response = await fetch(CTX + "/shop");
+        const response = await fetch(CTX + "/shop", { headers: shopHeaders() });
         const data     = await response.json();
 
         if (!data.success) {
             console.error("[Tienda] Error al cargar:", data.error);
             return;
         }
+
+        // ── Inyectar data-db-id en los elementos HTML ──
+        // El backend trae items con id real de la BD; el HTML los necesita.
+        const items = data.items || [];
+        items.forEach(item => {
+            if (item.type === 'avatar') {
+                const el = document.querySelector(`.avatar-item[data-price="${item.cost}"]`);
+                if (el) el.dataset.dbId = item.id;
+            } else if (item.type === 'background') {
+                // Mapear por costo ya que cada fondo tiene precio único
+                const el = document.querySelector(`.background-item[data-price="${item.cost}"]`);
+                if (el) el.dataset.dbId = item.id;
+            } else if (item.type === 'streak_shield') {
+                const el = document.querySelector(`.product-card[data-price="${item.cost}"]`);
+                if (el) el.dataset.dbId = item.id;
+            }
+        });
 
         // Marcar items que el usuario ya posee
         ownedItemIds = data.ownedItemIds || [];
@@ -110,7 +140,7 @@ async function buySelectedAvatar() {
     try {
         const response = await fetch(CTX + '/shop/buy', {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: shopHeaders(),
             body:    JSON.stringify({ itemId: selectedAvatarDbId })
         });
         const result = await response.json();
@@ -154,7 +184,7 @@ async function buySelectedBackground() {
     try {
         const response = await fetch(CTX + '/shop/buy', {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: shopHeaders(),
             body:    JSON.stringify({ itemId: selectedBackgroundDbId })
         });
         const result = await response.json();
@@ -215,7 +245,7 @@ async function buyProduct(productName, price, btn) {
     try {
         const response = await fetch(CTX + '/shop/buy', {
             method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: shopHeaders(),
             body:    JSON.stringify({ itemId: dbId })
         });
         const result = await response.json();
@@ -288,7 +318,7 @@ async function equipBackground(bgClass) {
         try {
             await fetch(CTX + '/shop/equip', {
                 method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: shopHeaders(),
                 body:    JSON.stringify({ itemId: dbId })
             });
         } catch (error) {
@@ -318,6 +348,14 @@ function updateBalance(newBalance) {
     const balanceEl = document.getElementById('user-balance-header');
     if (balanceEl) balanceEl.textContent = newBalance.toLocaleString();
     updateInsufficientItems();
+    // Sincronizar con localStorage para que el navbar se actualice
+    try {
+        const user = JSON.parse(localStorage.getItem('user')) || {};
+        if (!user.stats) user.stats = {};
+        user.stats.coins = newBalance;
+        localStorage.setItem('user', JSON.stringify(user));
+        if (typeof refreshNavbarStats === 'function') refreshNavbarStats();
+    } catch (_) {}
 }
 
 function updateInsufficientItems() {
