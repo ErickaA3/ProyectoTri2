@@ -8,6 +8,16 @@ let busy          = false;
 
 const BOT_AV = `<div class="msg-av bot-av"><svg width="20" height="20" viewBox="0 0 100 100" fill="none"><polygon points="50,5 33,36 67,36" fill="#8b5cf6"/><ellipse cx="50" cy="36" rx="17" ry="5" fill="#6d28d9"/><ellipse cx="50" cy="67" rx="24" ry="27" fill="#6d28d9"/><ellipse cx="50" cy="70" rx="14" ry="18" fill="#8b5cf6" opacity="0.6"/><circle cx="36" cy="55" r="9" fill="#1a1a35"/><circle cx="64" cy="55" r="9" fill="#1a1a35"/><circle cx="36" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/><circle cx="64" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/><circle cx="36" cy="55" r="4" fill="#0f0f23"/><circle cx="64" cy="55" r="4" fill="#0f0f23"/><polygon points="50,62 44,68 56,68" fill="#f97316"/></svg></div>`;
 
+// ─── Helper: obtener userId del localStorage ─────────────────
+function getUserId() {
+    try {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        return user.id || null;
+    } catch(e) {
+        return null;
+    }
+}
+
 // ─── Init ────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     // Cargar datos del usuario
@@ -20,6 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('initTime').textContent = fmt(new Date());
 
+    // Verificar que el usuario está logueado
+    if (!getUserId()) {
+        addBotMsg('No se detectó sesión activa. <a href="../index.html" style="color:#2dd4bf;">Inicia sesión</a> para usar el chat.');
+        document.getElementById('sendBtn').disabled = true;
+        return;
+    }
+
     // Cargar sesiones del historial
     loadSessions();
 });
@@ -29,6 +46,12 @@ async function send() {
     const inp = document.getElementById('userInput');
     const txt = inp.value.trim();
     if (!txt || busy) return;
+
+    const userId = getUserId();
+    if (!userId) {
+        addBotMsg('Tu sesión expiró. <a href="../index.html" style="color:#2dd4bf;">Inicia sesión de nuevo</a>.');
+        return;
+    }
 
     addMsg('user', txt);
     inp.value = '';
@@ -42,20 +65,16 @@ async function send() {
             credentials: 'include',
             body: JSON.stringify({
                 mensaje: txt,
-                sessionId: currentSession
+                sessionId: currentSession,
+                userId: userId          // ← NUEVO: envía userId desde localStorage
             })
         });
-
-        if (res.status === 401) {
-            window.location.href = '../index.html';
-            return;
-        }
 
         const data = await res.json();
         setTyping(false);
 
         if (!data.success) {
-            addBotMsg('Hubo un error. Intenta de nuevo.');
+            addBotMsg('Hubo un error: ' + (data.message || 'Intenta de nuevo.'));
             return;
         }
 
@@ -91,8 +110,11 @@ function newChat() {
 
 // ─── Cargar sesiones del historial ──────────────────────────
 async function loadSessions() {
+    const userId = getUserId();
+    if (!userId) return;
+
     try {
-        const res = await fetch(`${API_BASE}/api/chat`, {
+        const res = await fetch(`${API_BASE}/api/chat?userId=${userId}`, {
             method: 'GET',
             credentials: 'include'
         });
@@ -129,7 +151,6 @@ async function loadSessions() {
 // ─── Agregar sesión al sidebar ───────────────────────────────
 function addSessionToSidebar(firstMessage, sessionId) {
     const container = document.querySelector('.recents');
-    const label = container.querySelector('.session-label') || container.querySelector('.section-label');
 
     // Quitar mensaje de "no hay chats"
     const empty = container.querySelector('.empty-sessions');
@@ -157,8 +178,11 @@ async function selectSession(el, sessionId) {
     el.classList.add('active');
     currentSession = sessionId;
 
+    const userId = getUserId();
+    if (!userId) return;
+
     try {
-        const res = await fetch(`${API_BASE}/api/chat?sessionId=${sessionId}`, {
+        const res = await fetch(`${API_BASE}/api/chat?sessionId=${sessionId}&userId=${userId}`, {
             credentials: 'include'
         });
         const data = await res.json();

@@ -80,12 +80,12 @@ public class LoginServlet extends HttpServlet {
     }
 
     private void setCorsHeaders(HttpServletResponse response) {
-    String origin = response.getHeader("Origin");
-    response.setHeader("Access-Control-Allow-Origin", "*");
-    response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    response.setHeader("Access-Control-Allow-Credentials", "false");
-}
+        response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
+        response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+        response.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+
     private String extractJsonField(String json, String field) {
         if (json == null) return null;
         String key = "\"" + field + "\"";
