@@ -69,7 +69,7 @@ function getSidebarHTML(base) {
 
     <aside class="sidebar-cards" id="sidebar">
         <div class="user-profile">
-            <div class="user-avatar">
+            <div class="user-avatar" id="sidebarFrame" style="width:90px;height:90px;overflow:visible;display:flex;align-items:center;justify-content:center;">
                 <i class="fas fa-user"></i>
             </div>
             <div class="user-name">${nombre}</div>
@@ -187,6 +187,9 @@ function initComponents() {
 
     // Marcar página activa
     setActivePage();
+
+    // Auto-cargar marcos.css y marcos.js para el mini-marco del sidebar
+    loadMarcosIfNeeded();
 }
 
 // Marcar la página activa en el menú
@@ -212,5 +215,73 @@ function toggleMenu() {
     }
 }
 
+// Auto-cargar marcos.css y marcos.js para el sidebar
+function loadMarcosIfNeeded() {
+    const base = getBasePath();
+
+    // Cargar CSS si no existe
+    if (!document.querySelector('link[href*="marcos.css"]')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = base + 'css/marcos.css';
+        document.head.appendChild(link);
+    }
+
+    // Cargar fuente Cinzel si no existe
+    if (!document.querySelector('link[href*="Cinzel"]')) {
+        const font = document.createElement('link');
+        font.rel = 'stylesheet';
+        font.href = 'https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&display=swap';
+        document.head.appendChild(font);
+    }
+
+    // Si marcos.js ya está cargado, renderizar directo
+    if (typeof renderFrame === 'function') {
+        renderSidebarFrame();
+        return;
+    }
+
+    // Si no, cargarlo dinámicamente
+    const script = document.createElement('script');
+    script.src = base + 'js/marcos.js';
+    script.onload = () => renderSidebarFrame();
+    document.body.appendChild(script);
+}
+
+function renderSidebarFrame() {
+    if (typeof renderFrame !== 'function') return;
+    const base = getBasePath();
+    const user = getUserData();
+    const lvl  = user?.stats?.level ?? 1;
+    const img  = document.createElement('img');
+    img.src = base + 'images/perfil/perfil_ejemplo.png';
+    img.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:cover;border-radius:50%;z-index:2';
+    img.onerror = function() { this.style.display = 'none'; };
+    // Render frame with null avatar first, then inject image
+    renderFrame(lvl, 'sidebarFrame', null, 0.35);
+    const av = document.querySelector('#sidebarFrame .av');
+    if (av) av.appendChild(img);
+}
+
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initComponents);
+
+// Refrescar stats del navbar sin recargar la página
+// Llamado por gamification.js y tienda.js después de cambios en XP/coins/racha
+function refreshNavbarStats() {
+    const user = getUserData();
+    if (!user) return;
+    const xp      = user.stats?.xp            ?? 0;
+    const monedas = user.stats?.coins          ?? 0;
+    const racha   = user.stats?.streakCurrent  ?? 0;
+
+    const pills = document.querySelectorAll('.stat-pill');
+    if (pills.length >= 3) {
+        const rachaEl = pills[0].querySelector('.stat-value');
+        const xpEl    = pills[1].querySelector('.stat-value');
+        const coinEl  = pills[2].querySelector('.stat-value');
+        if (rachaEl) rachaEl.textContent = racha + ' Días';
+        if (xpEl)    xpEl.textContent    = xp.toLocaleString();
+        if (coinEl)  coinEl.textContent  = monedas.toLocaleString();
+    }
+}
