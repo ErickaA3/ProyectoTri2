@@ -25,63 +25,64 @@ import jakarta.servlet.http.HttpSession;
 @WebServlet("/api/chat")
 public class ChatServlet extends HttpServlet {
 
-    // POST /api/chat → recibe mensaje, llama a IA, guarda en BD, responde
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
         setCorsHeaders(response);
 
-        // Verificar sesión
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("userId") == null) {
-            JsonUtil.sendError(response, 401, "No autenticado.");
-            return;
+        // Leer body completo primero
+        String body = request.getReader().lines().collect(Collectors.joining());
+
+        // Obtener userId: primero de la sesión HTTP, luego del body como fallback
+        UUID userId = getUserIdFromSession(request);
+
+        if (userId == null) {
+            String userIdStr = extractJsonValue(body, "userId");
+            if (userIdStr == null || userIdStr.isBlank()) {
+                JsonUtil.sendError(response, 401, "No autenticado. Inicia sesión de nuevo.");
+                return;
+            }
+            try {
+                userId = UUID.fromString(userIdStr);
+            } catch (IllegalArgumentException e) {
+                JsonUtil.sendError(response, 400, "ID de usuario inválido: " + userIdStr);
+                return;
+            }
         }
 
-        UUID userId;
-        try {
-            userId = UUID.fromString((String) session.getAttribute("userId"));
-        } catch (IllegalArgumentException e) {
-            JsonUtil.sendError(response, 400, "ID de usuario inválido.");
-            return;
-        }
+        String mensaje   = extractJsonValue(body, "mensaje");
+        String sessionId = extractJsonValue(body, "sessionId");
 
-        // Leer body
-        String body       = request.getReader().lines().collect(Collectors.joining());
-        String mensaje    = extractJsonField(body, "mensaje");
-        String sessionId  = extractJsonField(body, "sessionId");
+        processChat(response, userId, mensaje, sessionId);
+    }
+
+    private void processChat(HttpServletResponse response, UUID userId,
+                              String mensaje, String sessionId) throws IOException {
 
         if (mensaje == null || mensaje.isBlank()) {
             JsonUtil.sendError(response, 400, "El mensaje no puede estar vacío.");
             return;
         }
 
-        // Generar sessionId si no viene
-        if (sessionId == null || sessionId.isBlank()) {
+        if (sessionId == null || sessionId.isBlank() || "null".equals(sessionId)) {
             sessionId = UUID.randomUUID().toString();
         }
 
         try (Connection conn = DatabaseConnection.getConnection()) {
 
-            // 1. Cargar historial de esta sesión (últimos 10 mensajes)
             List<AIService.ChatMessage> historial = loadHistory(conn, userId, sessionId);
 
-            // 2. Cargar configuración del profesor
             String[] profesorConfig = loadProfesorConfig(conn, userId);
             String profesorNombre  = profesorConfig[0];
             String personalidad    = profesorConfig[1];
 
-            // 3. Guardar mensaje del usuario en BD
             saveMessage(conn, userId, sessionId, "user", mensaje);
 
-            // 4. Llamar a la IA
             String respuesta = AIService.chat(historial, mensaje, profesorNombre, personalidad);
 
-            // 5. Guardar respuesta del asistente en BD
             saveMessage(conn, userId, sessionId, "assistant", respuesta);
 
-            // 6. Responder al frontend
             String json = "{" +
                 "\"reply\":" + toJsonString(respuesta) + "," +
                 "\"sessionId\":\"" + sessionId + "\"" +
@@ -94,24 +95,27 @@ public class ChatServlet extends HttpServlet {
         }
     }
 
-    // GET /api/chat?sessionId=xxx → historial de una sesión
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
         setCorsHeaders(response);
 
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("userId") == null) {
-            JsonUtil.sendError(response, 401, "No autenticado.");
-            return;
+        UUID userId = getUserIdFromSession(request);
+        if (userId == null) {
+            String userIdStr = request.getParameter("userId");
+            if (userIdStr != null && !userIdStr.isBlank()) {
+                try {
+                    userId = UUID.fromString(userIdStr);
+                } catch (IllegalArgumentException e) {
+                    JsonUtil.sendError(response, 400, "ID de usuario inválido.");
+                    return;
+                }
+            }
         }
 
-        UUID userId;
-        try {
-            userId = UUID.fromString((String) session.getAttribute("userId"));
-        } catch (IllegalArgumentException e) {
-            JsonUtil.sendError(response, 400, "ID de usuario inválido.");
+        if (userId == null) {
+            JsonUtil.sendError(response, 401, "No autenticado.");
             return;
         }
 
@@ -120,7 +124,6 @@ public class ChatServlet extends HttpServlet {
         try (Connection conn = DatabaseConnection.getConnection()) {
 
             if (sessionId != null && !sessionId.isBlank()) {
-                // Historial de una sesión específica
                 List<AIService.ChatMessage> msgs = loadHistory(conn, userId, sessionId);
                 StringBuilder sb = new StringBuilder("[");
                 for (int i = 0; i < msgs.size(); i++) {
@@ -133,7 +136,6 @@ public class ChatServlet extends HttpServlet {
                 sb.append("]");
                 JsonUtil.sendSuccess(response, sb.toString());
             } else {
-                // Lista de sesiones del usuario
                 List<String[]> sessions = loadSessions(conn, userId);
                 StringBuilder sb = new StringBuilder("[");
                 for (int i = 0; i < sessions.size(); i++) {
@@ -158,6 +160,20 @@ public class ChatServlet extends HttpServlet {
     protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException {
         setCorsHeaders(res);
         res.setStatus(HttpServletResponse.SC_OK);
+    }
+
+    // ── Helper: obtener userId de la sesión HTTP ──────────────────────────────
+
+    private UUID getUserIdFromSession(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session == null || session.getAttribute("userId") == null) {
+            return null;
+        }
+        try {
+            return UUID.fromString((String) session.getAttribute("userId"));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     // ── Helpers BD ────────────────────────────────────────────────────────────
@@ -236,7 +252,45 @@ public class ChatServlet extends HttpServlet {
         return list;
     }
 
-    // ── Helpers generales ─────────────────────────────────────────────────────
+    // ── Parser JSON robusto ───────────────────────────────────────────────────
+
+    private String extractJsonValue(String json, String field) {
+        if (json == null) return null;
+
+        String pattern = "\"" + field + "\"";
+        int fieldIdx = json.indexOf(pattern);
+        if (fieldIdx == -1) return null;
+
+        int colonIdx = json.indexOf(':', fieldIdx + pattern.length());
+        if (colonIdx == -1) return null;
+
+        int pos = colonIdx + 1;
+        while (pos < json.length() && json.charAt(pos) == ' ') pos++;
+
+        if (pos >= json.length()) return null;
+
+        // Si el valor es null
+        if (json.startsWith("null", pos)) return null;
+
+        // Si el valor es un string entre comillas
+        if (json.charAt(pos) == '"') {
+            int startVal = pos + 1;
+            int endVal = startVal;
+            while (endVal < json.length()) {
+                if (json.charAt(endVal) == '\\') {
+                    endVal += 2;
+                    continue;
+                }
+                if (json.charAt(endVal) == '"') break;
+                endVal++;
+            }
+            if (endVal > startVal) {
+                return json.substring(startVal, endVal);
+            }
+        }
+
+        return null;
+    }
 
     private String toJsonString(String s) {
         if (s == null) return "null";
@@ -247,23 +301,10 @@ public class ChatServlet extends HttpServlet {
                        .replace("\t", "\\t") + "\"";
     }
 
-    private String extractJsonField(String json, String field) {
-        if (json == null) return null;
-        String key = "\"" + field + "\"";
-        int idx = json.indexOf(key);
-        if (idx == -1) return null;
-        int colon = json.indexOf(":", idx);
-        if (colon == -1) return null;
-        int start = json.indexOf("\"", colon) + 1;
-        int end   = json.indexOf("\"", start);
-        if (start <= 0 || end <= start) return null;
-        return json.substring(start, end);
-    }
-
     private void setCorsHeaders(HttpServletResponse response) {
-        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
         response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-        response.setHeader("Access-Control-Allow-Credentials", "false");
+        response.setHeader("Access-Control-Allow-Credentials", "true");
     }
 }
