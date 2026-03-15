@@ -36,6 +36,29 @@
             <version>3.0.1</version>
         </dependency>
 
+
+        <!-- POI core (DOC - formato antiguo Word) -->
+    <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi</artifactId>
+        <version>5.2.5</version>
+    </dependency>
+    
+    <!-- POI OOXML (DOCX + PPTX - formatos modernos) -->
+    <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi-ooxml</artifactId>
+        <version>5.2.5</version>
+    </dependency>
+    
+    <!-- POI Scratchpad (necesario para HWPF / DOC antiguo) -->
+    <dependency>
+        <groupId>org.apache.poi</groupId>
+        <artifactId>poi-scratchpad</artifactId>
+        <version>5.2.5</version>
+    </dependency>
+
+
         <!-- Servlets -->
         <dependency>
             <groupId>jakarta.servlet</groupId>

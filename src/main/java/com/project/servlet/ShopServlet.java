@@ -1,6 +1,12 @@
 package com.project.servlet;
 
+import java.io.IOException;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
 import com.project.dao.implementation.ShopDAOImpl;
 import com.project.dao.interfaces.IShopDAO;
 import com.project.model.shop.Product;
@@ -11,64 +17,57 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpSession;
 
 /**
  * ShopServlet — maneja todas las operaciones de la tienda.
  *
  * Endpoints:
  *   GET  /shop          → catálogo completo + inventario del usuario
- *   POST /shop/buy      → comprar un ítem
- *   POST /shop/equip    → equipar un ítem ya comprado
+ *   POST /shop/buy      → comprar un ítem  { "itemId": 3 }
+ *   POST /shop/equip    → equipar un ítem  { "itemId": 3 }
  *
- * El userId que llega siempre es un UUID en formato String.
- * Ejemplo: "550e8400-e29b-41d4-a716-446655440000"
- * El frontend lo lee de sessionStorage donde Hans lo guardó al hacer login.
+ * Auth: HttpSession → fallback header X-User-Id
+ * (mismo patrón que FavoritesServlet y ModoEstudioServlet)
  */
 @WebServlet("/shop/*")
 public class ShopServlet extends HttpServlet {
 
     private final IShopDAO shopDAO = new ShopDAOImpl();
-    private final Gson     gson    = new Gson();
+    private final Gson gson = new GsonBuilder()
+    .registerTypeAdapter(java.time.LocalDateTime.class,
+        (com.google.gson.JsonSerializer<java.time.LocalDateTime>) (src, type, ctx) ->
+            new com.google.gson.JsonPrimitive(src.toString()))
+    .create();
 
     // ──────────────────────────────────────────────────────────────
-    //  GET /shop?userId=<uuid>
-    //  Devuelve: catálogo + IDs que el usuario ya tiene + qué tiene equipado
+    //  GET /shop
     // ──────────────────────────────────────────────────────────────
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
 
-        setJsonResponse(res);
+        res.setContentType("application/json");
+        res.setCharacterEncoding("UTF-8");
+
+        String userId = getUserId(req);
+        if (userId == null) { sendError(res, 401, "Sesión no válida."); return; }
 
         try {
-            String userId = req.getParameter("userId");
-            if (userId == null || userId.isBlank()) {
-                sendError(res, 400, "Falta el parámetro userId.");
-                return;
-            }
+            List<Product> allItems         = shopDAO.getAllItems();
+            List<Integer> ownedIds         = shopDAO.getUserInventory(userId);
+            Integer       equippedAvatarId = shopDAO.getEquippedItem(userId, "avatar");
+            Integer       equippedBgId     = shopDAO.getEquippedItem(userId, "background");
+            int           userCoins        = shopDAO.getUserCoins(userId);
 
-            // Catálogo completo
-            List<Product> allItems = shopDAO.getAllItems();
-
-            // IDs que el usuario ya compró (para marcar "✓ TUYO" en el frontend)
-            List<Integer> ownedIds = shopDAO.getUserInventory(userId);
-
-            // Ítem equipado por tipo (el frontend necesita saber cuál está activo)
-            Integer equippedAvatarId     = shopDAO.getEquippedItem(userId, "avatar");
-            Integer equippedBackgroundId = shopDAO.getEquippedItem(userId, "background");
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success",              true);
-            response.put("items",                allItems);
-            response.put("ownedItemIds",         ownedIds);
-            response.put("equippedAvatarId",     equippedAvatarId);      // puede ser null
-            response.put("equippedBackgroundId", equippedBackgroundId);  // puede ser null
+            JsonObject response = new JsonObject();
+            response.addProperty("success", true);
+            response.addProperty("userCoins", userCoins);
+            response.add("items",        gson.toJsonTree(allItems));
+            response.add("ownedItemIds", gson.toJsonTree(ownedIds));
+            if (equippedAvatarId != null) response.addProperty("equippedAvatarId",     equippedAvatarId);
+            if (equippedBgId     != null) response.addProperty("equippedBackgroundId", equippedBgId);
 
             res.getWriter().write(gson.toJson(response));
 
@@ -79,17 +78,21 @@ public class ShopServlet extends HttpServlet {
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  POST /shop/buy   → { "userId": "uuid", "itemId": 3 }
-    //  POST /shop/equip → { "userId": "uuid", "itemId": 3 }
+    //  POST /shop/buy   → { "itemId": 3 }
+    //  POST /shop/equip → { "itemId": 3 }
     // ──────────────────────────────────────────────────────────────
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
 
-        setJsonResponse(res);
+        res.setContentType("application/json");
+        res.setCharacterEncoding("UTF-8");
 
-        String pathInfo = req.getPathInfo();   // "/buy" o "/equip"
+        String userId = getUserId(req);
+        if (userId == null) { sendError(res, 401, "Sesión no válida."); return; }
+
+        String pathInfo = req.getPathInfo();
 
         if (pathInfo == null || pathInfo.equals("/")) {
             sendError(res, 400, "Especifica una acción: /shop/buy o /shop/equip");
@@ -100,8 +103,8 @@ public class ShopServlet extends HttpServlet {
             String body = req.getReader().lines().collect(Collectors.joining());
 
             switch (pathInfo) {
-                case "/buy"   -> handleBuy(body, res);
-                case "/equip" -> handleEquip(body, res);
+                case "/buy"   -> handleBuy(userId, body, res);
+                case "/equip" -> handleEquip(userId, body, res);
                 default       -> sendError(res, 404, "Ruta no encontrada: " + pathInfo);
             }
 
@@ -115,37 +118,33 @@ public class ShopServlet extends HttpServlet {
     //  HANDLERS PRIVADOS
     // ──────────────────────────────────────────────────────────────
 
-    private void handleBuy(String body, HttpServletResponse res) throws IOException {
+    private void handleBuy(String userId, String body, HttpServletResponse res) throws IOException {
         ShopRequest data = gson.fromJson(body, ShopRequest.class);
 
-        if (data == null || data.userId == null || data.userId.isBlank() || data.itemId == 0) {
-            sendError(res, 400, "Se requieren userId (UUID) e itemId.");
+        if (data == null || data.itemId == 0) {
+            sendError(res, 400, "Se requiere itemId.");
             return;
         }
 
-        Purchase result = shopDAO.buyItem(data.userId, data.itemId);
+        Purchase result = shopDAO.buyItem(userId, data.itemId);
 
-        // Si la compra falló, responder con 400 para que el JS lo detecte fácil
-        if (!result.isSuccess()) {
-            res.setStatus(400);
-        }
-
+        if (!result.isSuccess()) res.setStatus(400);
         res.getWriter().write(gson.toJson(result));
     }
 
-    private void handleEquip(String body, HttpServletResponse res) throws IOException {
+    private void handleEquip(String userId, String body, HttpServletResponse res) throws IOException {
         ShopRequest data = gson.fromJson(body, ShopRequest.class);
 
-        if (data == null || data.userId == null || data.userId.isBlank() || data.itemId == 0) {
-            sendError(res, 400, "Se requieren userId (UUID) e itemId.");
+        if (data == null || data.itemId == 0) {
+            sendError(res, 400, "Se requiere itemId.");
             return;
         }
 
-        boolean equipped = shopDAO.equipItem(data.userId, data.itemId);
+        boolean equipped = shopDAO.equipItem(userId, data.itemId);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", equipped);
-        response.put("message", equipped
+        JsonObject response = new JsonObject();
+        response.addProperty("success", equipped);
+        response.addProperty("message", equipped
                 ? "Ítem equipado correctamente."
                 : "No se pudo equipar. Verifica que poseas el ítem.");
 
@@ -154,32 +153,36 @@ public class ShopServlet extends HttpServlet {
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  UTILIDADES
+    //  HELPERS — mismo patrón que FavoritesServlet
     // ──────────────────────────────────────────────────────────────
 
-    private void setJsonResponse(HttpServletResponse res) {
-        res.setContentType("application/json");
-        res.setCharacterEncoding("UTF-8");
+    /**
+     * Obtiene el userId desde la sesión HTTP.
+     * Fallback: header X-User-Id (útil para pruebas con Thunder Client).
+     */
+    private String getUserId(HttpServletRequest req) {
+        HttpSession session = req.getSession(false);
+        if (session != null) {
+            Object uid = session.getAttribute("userId");
+            if (uid != null) return uid.toString();
+        }
+        String header = req.getHeader("X-User-Id");
+        return (header != null && !header.isBlank()) ? header : null;
     }
 
     private void sendError(HttpServletResponse res, int status, String message) throws IOException {
         res.setStatus(status);
-        Map<String, Object> error = new HashMap<>();
-        error.put("success", false);
-        error.put("error",   message);
+        JsonObject error = new JsonObject();
+        error.addProperty("success", false);
+        error.addProperty("error", message);
         res.getWriter().write(gson.toJson(error));
     }
 
     // ──────────────────────────────────────────────────────────────
-    //  CLASE INTERNA — body de los POST
+    //  CLASE INTERNA
     // ──────────────────────────────────────────────────────────────
 
-    /**
-     * Gson mapea el JSON del body a esta clase automáticamente.
-     * Se usa para tanto /buy como /equip porque los dos reciben lo mismo.
-     */
     private static class ShopRequest {
-        String userId;   // UUID como String: "550e8400-e29b-41d4-a716-446655440000"
-        int    itemId;
+        int itemId;   // userId ya no va aquí, viene de la sesión
     }
 }

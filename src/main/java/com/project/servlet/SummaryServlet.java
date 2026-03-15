@@ -1,185 +1,146 @@
+
 package com.project.servlet;
-
+ 
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.util.stream.Collectors;
-
+ 
 import com.google.gson.Gson;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonSyntaxException;
 import com.project.dao.implementation.ContentDAOImpl;
 import com.project.dao.interfaces.IContentDAO;
-import com.project.database.DatabaseConnection;
-
+ 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-
+ 
 /**
- * Servlet para el visor de Resúmenes.
+ * Servlet para visualizar resúmenes individuales.
+ *
+ * [BUG-4 FIX] — Este servlet NO existía. Sin él, resumenes.js hacía
+ *               fetch a /api/summaries y recibía 404, por lo que
+ *               los resúmenes nunca se mostraban.
  *
  * Endpoints:
- *
- *   GET  /resumen?id=<UUID>&userId=<UUID>
- *   → Devuelve los datos del resumen si pertenece al userId.
- *   Respuesta:
- *   {
- *     "success": true,
- *     "id": "uuid",
- *     "title": "Título del resumen",
- *     "isFavorite": false,
- *     "createdAt": "2025-01-01T12:00:00",
- *     "sessionId": "uuid",
- *     "content": { ... }   <-- JSON original guardado por la IA
- *   }
- *
- *   POST /resumen/favorite
- *   Body JSON: { "contentId": "uuid", "userId": "uuid", "isFavorite": true }
- *   → Marca o desmarca el resumen como favorito.
- *   Respuesta:
- *   { "success": true }
+ *   GET  /api/summaries?id=UUID       → devuelve el resumen completo
+ *   POST /api/summaries/favorite      → toggle favorito
  */
-@WebServlet(urlPatterns = { "/resumen", "/resumen/favorite" })
+@WebServlet({"/api/summaries", "/api/summaries/favorite"})
 public class SummaryServlet extends HttpServlet {
-
+ 
     private final IContentDAO contentDAO = new ContentDAOImpl();
     private final Gson gson = new Gson();
-
-    // -----------------------------------------------------------------------
-    // GET /resumen?id=<UUID>&userId=<UUID>
-    // -----------------------------------------------------------------------
+ 
+    // ─── GET /api/summaries?id=UUID ─────────────────────────────────────────
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-
+ 
         res.setContentType("application/json");
         res.setCharacterEncoding("UTF-8");
-
-        String contentId = req.getParameter("id");
-        String userId    = req.getParameter("userId");
-
-        if (contentId == null || contentId.isBlank()) {
-            sendError(res, 400, "Falta el parámetro 'id'.");
-            return;
-        }
-        if (userId == null || userId.isBlank()) {
-            sendError(res, 400, "Falta el parámetro 'userId'.");
-            return;
-        }
-
+ 
         try {
-            JsonObject summary = getByIdAndUser(contentId, userId);
-
-            if (summary == null) {
-                sendError(res, 404, "Resumen no encontrado o no tienes permiso para verlo.");
+            String userId    = req.getHeader("X-User-Id");
+            String contentId = req.getParameter("id");
+ 
+            if (contentId == null || contentId.isBlank()) {
+                sendError(res, 400, "Falta el parámetro 'id'.");
                 return;
             }
-
-            summary.addProperty("success", true);
-            res.getWriter().write(gson.toJson(summary));
-
+            if (userId == null || userId.isBlank()) {
+                sendError(res, 401, "Falta el header X-User-Id.");
+                return;
+            }
+ 
+            // Usa el método existente del DAO
+            String rawJson = contentDAO.getContentJson(contentId, userId);
+ 
+            if (rawJson == null) {
+                sendError(res, 404, "Resumen no encontrado o no pertenece al usuario.");
+                return;
+            }
+ 
+            // rawJson tiene: { type, title, isFavorite, content:{...} }
+            // resumenes.js espera: { success, id, title, isFavorite, createdAt, content:{...} }
+            JsonObject data = JsonParser.parseString(rawJson).getAsJsonObject();
+ 
+            JsonObject response = new JsonObject();
+            response.addProperty("success", true);
+            response.addProperty("id", contentId);
+            response.addProperty("title",
+                data.has("title") ? data.get("title").getAsString() : "Sin título");
+            response.addProperty("isFavorite",
+                data.has("isFavorite") && data.get("isFavorite").getAsBoolean());
+ 
+            // createdAt y sessionId — los obtenemos por consulta separada
+            // (getContentJson no los incluye; usamos getFullMetadata)
+            String[] meta = ((ContentDAOImpl) contentDAO).getMetadata(contentId, userId);
+            if (meta != null) {
+                response.addProperty("createdAt", meta[0]);  // timestamp as string
+                response.addProperty("sessionId", meta[1]);  // session_id
+            }
+ 
+            // content (el JSONB de la IA)
+            if (data.has("content") && data.get("content").isJsonObject()) {
+                response.add("content", data.getAsJsonObject("content"));
+            } else {
+                response.add("content", new JsonObject());
+            }
+ 
+            res.getWriter().write(gson.toJson(response));
+ 
         } catch (Exception e) {
-            sendError(res, 500, "Error al obtener el resumen: " + e.getMessage());
+            sendError(res, 500, "Error interno: " + e.getMessage());
         }
     }
-
-    // -----------------------------------------------------------------------
-    // POST /resumen/favorite
-    // -----------------------------------------------------------------------
+ 
+    // ─── POST /api/summaries/favorite ───────────────────────────────────────
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-
+ 
         res.setContentType("application/json");
         res.setCharacterEncoding("UTF-8");
-
+ 
+        // Solo /favorite responde a POST
+        String path = req.getServletPath() + (req.getPathInfo() != null ? req.getPathInfo() : "");
+        if (!path.endsWith("/favorite")) {
+            sendError(res, 405, "Método no permitido para esta ruta.");
+            return;
+        }
+ 
         try {
+            String userId = req.getHeader("X-User-Id");
+            if (userId == null || userId.isBlank()) {
+                sendError(res, 401, "Falta el header X-User-Id.");
+                return;
+            }
+ 
             String body = req.getReader().lines().collect(Collectors.joining());
             JsonObject data = JsonParser.parseString(body).getAsJsonObject();
-
-            String  contentId  = data.get("contentId").getAsString();
-            String  userId     = data.get("userId").getAsString();
-            boolean isFavorite = data.get("isFavorite").getAsBoolean();
-
-            if (contentId == null || contentId.isBlank() || userId == null || userId.isBlank()) {
-                sendError(res, 400, "Faltan parámetros requeridos.");
+ 
+            String contentId = data.has("contentId") ? data.get("contentId").getAsString() : null;
+            boolean isFavorite = data.has("isFavorite") && data.get("isFavorite").getAsBoolean();
+ 
+            if (contentId == null || contentId.isBlank()) {
+                sendError(res, 400, "Falta contentId en el body.");
                 return;
             }
-
+ 
             boolean updated = contentDAO.toggleFavorite(contentId, userId, isFavorite);
-
-            if (!updated) {
-                sendError(res, 404, "No se encontró el contenido o no te pertenece.");
-                return;
-            }
-
+ 
             JsonObject response = new JsonObject();
-            response.addProperty("success", true);
-            response.addProperty("isFavorite", isFavorite);
+            response.addProperty("success", updated);
+            if (!updated) response.addProperty("error", "No se pudo actualizar el favorito.");
             res.getWriter().write(gson.toJson(response));
-
+ 
         } catch (Exception e) {
-            sendError(res, 500, "Error al actualizar favorito: " + e.getMessage());
+            sendError(res, 500, "Error interno: " + e.getMessage());
         }
     }
-
-    // -----------------------------------------------------------------------
-    // CONSULTA DIRECTA: obtiene resumen por ID verificando que sea del usuario
-    // No se modifica ContentDAOImpl para no tocar el código del compañero.
-    // -----------------------------------------------------------------------
-    private JsonObject getByIdAndUser(String contentId, String userId) throws Exception {
-        String sql = """
-            SELECT id, user_id, type, title, content::text AS content_json,
-                   is_favorite, created_at, session_id
-            FROM study_content
-            WHERE id = ?::uuid
-              AND user_id = ?::uuid
-              AND type = 'summary'
-            """;
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setString(1, contentId);
-            stmt.setString(2, userId);
-
-            ResultSet rs = stmt.executeQuery();
-
-            if (!rs.next()) return null;
-
-            JsonObject result = new JsonObject();
-            result.addProperty("id",         rs.getString("id"));
-            result.addProperty("title",      rs.getString("title"));
-            result.addProperty("type",       rs.getString("type"));
-            result.addProperty("isFavorite", rs.getBoolean("is_favorite"));
-            result.addProperty("createdAt",  rs.getTimestamp("created_at").toString());
-            result.addProperty("sessionId",  rs.getString("session_id"));
-
-            // El content es JSONB — lo parseamos para devolverlo como objeto
-            String contentJson = rs.getString("content_json");
-            if (contentJson != null && !contentJson.isBlank()) {
-                try {
-                    JsonElement contentElement = JsonParser.parseString(contentJson);
-                    result.add("content", contentElement);
-                } catch (JsonSyntaxException e) {
-                    // Si por alguna razón no es JSON válido, lo mandamos como string
-                    result.addProperty("content", contentJson);
-                }
-            }
-
-            return result;
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // HELPER
-    // -----------------------------------------------------------------------
+ 
     private void sendError(HttpServletResponse res, int status, String message) throws IOException {
         res.setStatus(status);
         JsonObject error = new JsonObject();

@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi ProfesorIA - Mi Perfil</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/perfil.css">
+    <link rel="stylesheet" href="../css/marcos.css">
     <link rel="stylesheet" href="../css/styles-shared.css">
 </head>
 <body data-page="perfil">
@@ -25,7 +27,7 @@
 
         <!-- Profile Card -->
         <section class="profile-card">
-            <div class="profile-avatar">
+            <div class="profile-avatar" id="profileFrame" style="overflow:visible;width:120px;height:120px;display:flex;align-items:center;justify-content:center;">
                 <i class="fas fa-user"></i>
             </div>
             <div class="profile-info">
@@ -191,7 +193,43 @@
     </div>
 
     <script src="../js/components.js"></script>
+    <script src="../js/marcos.js"></script>
     <script src="../js/perfil.js"></script>
+    <script>
+    // Renderizar marco con foto de perfil
+    function renderProfileFrame(lvl) {
+        renderFrame(lvl, 'profileFrame', null, 0.52);
+        const av = document.querySelector('#profileFrame .av');
+        if (av) {
+            const img = document.createElement('img');
+            img.src = '../images/perfil/perfil_ejemplo.png';
+            img.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:cover;border-radius:50%;z-index:2';
+            img.onerror = function() { this.style.display = 'none'; };
+            av.appendChild(img);
+        }
+    }
+
+    // Esperar a que perfil.js ponga el nivel en el DOM
+    const _poll = setInterval(() => {
+        const el = document.getElementById('profile-level');
+        const lvl = parseInt(el?.textContent);
+        if (lvl >= 1 && lvl <= 10) {
+            clearInterval(_poll);
+            renderProfileFrame(lvl);
+        }
+    }, 200);
+    // Tope: después de 5s renderiza con localStorage
+    setTimeout(() => {
+        clearInterval(_poll);
+        const el = document.getElementById('profileFrame');
+        if (el && !el.querySelector('.marco-container')) {
+            try {
+                const lvl = JSON.parse(localStorage.getItem('user'))?.stats?.level || 1;
+                renderProfileFrame(lvl);
+            } catch(_) { renderProfileFrame(1); }
+        }
+    }, 5000);
+    </script>
 
 </body>
 </html>

@@ -20,15 +20,18 @@ public interface IHistorialDAO {
     JsonArray getHistory(String userId, String type, String date, String search) throws Exception;
 
     /**
+     * Obtiene un ítem del historial con su contenido completo (JSONB).
+     * Verifica que pertenezca al userId.
+     * @return JsonObject con todos los campos incluyendo "content", o null si no existe
+     */
+    com.google.gson.JsonObject getById(String id, String userId) throws Exception;
+
+    /**
      * Elimina todo el historial de un usuario.
      * @return Número de filas eliminadas
      */
     int deleteAll(String userId) throws Exception;
 }
-
-
-
-
 
 
 

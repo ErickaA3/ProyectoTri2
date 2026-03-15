@@ -217,6 +217,26 @@
             return;
         }
 
+        // ─── Si ya hay resultados generados, mostrarlos directo ───
+        const cachedResults = sessionStorage.getItem('studyResults');
+        if (cachedResults) {
+            try {
+                results = JSON.parse(cachedResults);
+                // Verificar que los resultados tengan datos válidos
+                const hasData = flow.options.some(o => results[o] && !results[o].error);
+                if (hasData) {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    document.getElementById('mainContent').style.display = 'block';
+                    initResultStars();
+                    buildUI(flow, results);
+                    return;
+                }
+            } catch(e) {
+                // Si el JSON es inválido, regenerar
+                sessionStorage.removeItem('studyResults');
+            }
+        }
+
         initLoadingStars();
         renderLoadingSteps(flow.options);
 
@@ -916,23 +936,39 @@
 
     // — Resumen —
     function buildResumenPanel(data) {
-        const text = data.summaryText || '';
-        // Convertir markdown básico a HTML
-        const html = text
-            .replace(/^## (.+)$/gm,  '<h3>$1</h3>')
-            .replace(/^### (.+)$/gm, '<h4>$1</h4>')
-            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-            .replace(/^- (.+)$/gm,   '<li>$1</li>')
-            .replace(/\n/g, '<br>');
+        const sections = data.sections || [];
+        const keywords = data.keywords || [];
+
+        const previewSections = sections.slice(0, 2).map(sec => `
+            <div class="se-resumen-section-preview">
+                <div class="se-resumen-section-num">${sec.number || ''}</div>
+                <div class="se-resumen-section-body">
+                    <div class="se-resumen-section-heading">${sec.heading || ''}</div>
+                    <div class="se-resumen-section-text">${sec.body ? sec.body.substring(0, 120) + (sec.body.length > 120 ? '…' : '') : ''}</div>
+                </div>
+            </div>
+        `).join('');
+
+        const kwTags = keywords.slice(0, 5).map(kw =>
+            `<span class="se-keyword-tag">${kw}</span>`
+        ).join('');
+
+        const readMins = data.readingMinutes || Math.max(1, Math.round(sections.length * 1.5));
 
         return `
             <div class="se-panel-inner">
                 <div class="se-panel-stats">
-                    <div class="se-stat"><span class="se-stat-val">${text.split(' ').length}</span><span class="se-stat-lbl">palabras</span></div>
-                    <div class="se-stat"><span class="se-stat-val">${(text.match(/^## /gm) || []).length || 1}</span><span class="se-stat-lbl">secciones</span></div>
+                    <div class="se-stat"><span class="se-stat-val">${sections.length}</span><span class="se-stat-lbl">secciones</span></div>
+                    <div class="se-stat"><span class="se-stat-val">${keywords.length}</span><span class="se-stat-lbl">palabras clave</span></div>
+                    <div class="se-stat"><span class="se-stat-val">${readMins} min</span><span class="se-stat-lbl">lectura</span></div>
                 </div>
-                <div class="se-resumen-content">${html}</div>
+                ${previewSections}
+                ${sections.length > 2 ? `<div class="se-more-badge">+${sections.length - 2} secciones más</div>` : ''}
+                ${kwTags ? `<div class="se-keywords-row" style="display:flex;flex-wrap:wrap;gap:6px;margin:0.75rem 0;">${kwTags}</div>` : ''}
                 <div class="se-actions">
+                    <button class="se-action-btn primary" onclick="goStudy('resumenes')">
+                        <i class="fas fa-book-open"></i> Leer completo
+                    </button>
                     <button class="se-fav-btn" id="favBtn-resumenes" onclick="toggleFavorite('resumenes')">
                         <i class="far fa-heart"></i> Guardar
                     </button>
@@ -945,17 +981,22 @@
     // ACCIONES
     // ================================================================
     function goStudy(opt) {
-        const routes = {
-            flashcards: '../pages/flashcards.html',
-            esquemas:   '../pages/diagrams.html',
-            examenes:   '../pages/quiz.html',
-            resumenes:  '../pages/favoritos.html'
-        };
-        // Para examen experto, redirigir a exam.html
-        if (opt === 'examenes' && flow?.configs?.examenes?.tipo === 'expert_exam') {
-            window.location.href = '../pages/exam.html';
+        if (opt === 'examenes') {
+            const tipo = flow?.configs?.examenes?.tipo;
+            window.location.href = tipo === 'expert_exam'
+                ? '../pages/examen-experto.html'
+                : '../pages/examen-quiz.html';
             return;
         }
+        if (opt === 'resumenes') {
+            const id = results?.resumenes?.id;
+            window.location.href = '../pages/resumenes.html' + (id ? '?id=' + id : '');
+            return;
+        }
+        const routes = {
+            flashcards: '../pages/flashcards.html',
+            esquemas:   '../pages/seleccion-esquema.html'
+        };
         if (routes[opt]) window.location.href = routes[opt];
     }
 
