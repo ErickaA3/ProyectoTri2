@@ -309,15 +309,16 @@ public class AIService {
     // CHAT CON HISTORIAL (para el módulo del chatbot de Hans)
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /**
-     * @param historial      Lista de mensajes previos [{role, content}, ...]
-     * @param nuevoMensaje   El mensaje nuevo del usuario
-     * @param profesorNombre Nombre del profesor configurado
-     * @param personalidad   Personalidad del profesor configurada
-     * @return Texto de respuesta del asistente
-     */
+    /** Chat SIN contexto (compatibilidad). */
     public static String chat(List<ChatMessage> historial, String nuevoMensaje,
                                String profesorNombre, String personalidad) throws Exception {
+        return chat(historial, nuevoMensaje, profesorNombre, personalidad, null);
+    }
+
+    /** Chat CON contexto RAG. */
+    public static String chat(List<ChatMessage> historial, String nuevoMensaje,
+                               String profesorNombre, String personalidad,
+                               String contexto) throws Exception {
         if (API_KEY == null || API_KEY.isBlank()) {
             throw new Exception("API Key no configurada.");
         }
@@ -327,15 +328,32 @@ public class AIService {
         String persona = (personalidad != null && !personalidad.isBlank())
             ? personalidad : "amigable y motivador";
 
+        StringBuilder sp = new StringBuilder();
+        sp.append("Eres ").append(nombre).append(", el asistente educativo de Mi ProfesorIA. ");
+        sp.append("Tu personalidad es ").append(persona).append(".\n");
+        sp.append("Respondes siempre en español. Usas **negritas** para resaltar.\n\n");
+
+        if (contexto != null && !contexto.isBlank()) {
+            sp.append("═══ DATOS DEL ESTUDIANTE ═══\n");
+            sp.append(contexto);
+            sp.append("═══ FIN DE DATOS ═══\n\n");
+
+            sp.append("REGLAS:\n");
+            sp.append("1. Usa la información de arriba para responder sobre temas académicos del estudiante.\n");
+            sp.append("2. NO inventes datos que no estén ahí.\n");
+            sp.append("3. Si el tema está en su contenido, usa ESA info para explicarle.\n");
+            sp.append("4. Si el tema NO está en sus datos, dile que no tienes esa info y sugiérele **Modo Estudio**.\n");
+            sp.append("5. Stats, monedas, tienda, misiones → solo datos reales.\n");
+            sp.append("6. Sé conversacional y natural. Si el estudiante hace preguntas de seguimiento ");
+            sp.append("(como \"y sobre eso?\", \"y la película?\", \"cuéntame más\"), ");
+            sp.append("entiende que se refiere al tema que se estaba discutiendo antes en la conversación.\n");
+            sp.append("7. Presta atención al historial de la conversación para entender el contexto.\n");
+            sp.append("8. Sé motivador, amigable y conciso (máx 3-4 párrafos).\n");
+        }
+
         JsonObject systemMsg = new JsonObject();
         systemMsg.addProperty("role", "system");
-        systemMsg.addProperty("content",
-            "Eres " + nombre + ", un asistente educativo con IA. "
-            + "Tu personalidad es " + persona + ". "
-            + "Ayudas a estudiantes a entender temas académicos de forma clara y didáctica. "
-            + "Responde siempre en español, de forma concisa y con ejemplos cuando sea útil. "
-            + "Puedes usar negritas con **texto** para resaltar conceptos importantes."
-        );
+        systemMsg.addProperty("content", sp.toString());
 
         JsonArray messages = new JsonArray();
         messages.add(systemMsg);
@@ -358,8 +376,8 @@ public class AIService {
         JsonObject body = new JsonObject();
         body.addProperty("model", MODEL);
         body.add("messages", messages);
-        body.addProperty("temperature", 0.8);
-        body.addProperty("max_tokens", 800);
+        body.addProperty("temperature", 0.7);
+        body.addProperty("max_tokens", 1200);
 
         HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create(API_URL))

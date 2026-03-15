@@ -61,7 +61,7 @@ function getNavbarHTML(base) {
 // HTML del Sidebar
 function getSidebarHTML(base) {
     const user   = getUserData();
-    const nombre = user?.username    ?? 'Estudiante';
+    const nombre = user?.fullName || user?.username || 'Estudiante';
     const nivel  = user?.stats?.level ?? 1;
 
     return `

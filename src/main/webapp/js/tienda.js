@@ -1,19 +1,15 @@
 // ============================================================
 //  tienda(1).js — Mi ProfesorIA
 //  Igual que tienda.js PERO con compras conectadas al backend:
-//    - loadShop()        → GET  /shop
-//    - buySelectedAvatar → POST /shop/buy
-//    - buySelectedBackground → POST /shop/buy
-//    - buyProduct        → POST /shop/buy
-//    - equipBackground   → POST /shop/equip (además del CSS)
+//    - loadShop()              → GET  /shop
+//    - buySelectedBackground   → POST /shop/buy
+//    - buyProduct              → POST /shop/buy
+//    - equipBackground         → POST /shop/equip
 // ============================================================
 
 // ── Estado global ─────────────────────────────────────────────
 let userBalance               = 0;         // viene del backend vía sessionStorage
 let ownedItemIds              = [];        // IDs enteros de BD que el usuario ya tiene
-let selectedAvatarPrice       = 0;
-let selectedAvatarId          = null;      // data-id HTML  (ej: 'avatar-1')
-let selectedAvatarDbId        = null;      // data-db-id    (id entero para el backend)
 let selectedBackgroundPrice   = 0;
 let selectedBackgroundId      = null;      // data-id HTML  (ej: 'bg-galaxy')
 let selectedBackgroundDbId    = null;      // data-db-id    (id entero para el backend)
@@ -24,19 +20,6 @@ let lastPurchasedBackground   = null;
 
 // ── Context path dinámico (ej: '/project-1.0-SNAPSHOT') ──────
 const CTX = window.location.pathname.split('/pages')[0];
-
-// ── Auth: userId desde localStorage (mismo patrón que el resto del proyecto) ──
-function getShopUserId() {
-    try { return JSON.parse(localStorage.getItem('user'))?.id || null; }
-    catch (_) { return null; }
-}
-function shopHeaders() {
-    const uid = getShopUserId();
-    return {
-        'Content-Type': 'application/json',
-        ...(uid ? { 'X-User-Id': uid } : {})
-    };
-}
 
 // ── Arranque ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
@@ -56,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ============================================================
 async function loadShop() {
     try {
-        const response = await fetch(CTX + "/shop", { headers: shopHeaders() });
+        const response = await fetch(CTX + "/shop");
         const data     = await response.json();
 
         if (!data.success) {
@@ -64,34 +47,33 @@ async function loadShop() {
             return;
         }
 
-        // ── Inyectar data-db-id en los elementos HTML ──
-        // El backend trae items con id real de la BD; el HTML los necesita.
-        const items = data.items || [];
-        items.forEach(item => {
-            if (item.type === 'avatar') {
-                const el = document.querySelector(`.avatar-item[data-price="${item.cost}"]`);
-                if (el) el.dataset.dbId = item.id;
-            } else if (item.type === 'background') {
-                // Mapear por costo ya que cada fondo tiene precio único
-                const el = document.querySelector(`.background-item[data-price="${item.cost}"]`);
-                if (el) el.dataset.dbId = item.id;
-            } else if (item.type === 'streak_shield') {
-                const el = document.querySelector(`.product-card[data-price="${item.cost}"]`);
-                if (el) el.dataset.dbId = item.id;
-            }
-        });
+        // 1. Inyectar data-db-id en el HTML usando los items del backend
+        //    Matchea por type + cost (todos los costos son únicos por tipo)
+        if (data.items) {
+            data.items.forEach(item => {
+                if (item.type === 'background') {
+                    const el = document.querySelector(`.background-item[data-price="${item.cost}"]`);
+                    if (el) el.dataset.dbId = item.id;
+                } else {
+                    // streak_shield u otros productos
+                    const el = document.querySelector(`.product-card[data-price="${item.cost}"]`);
+                    if (el) el.dataset.dbId = item.id;
+                }
+            });
+            console.log("[Tienda] data-db-id inyectados desde backend.");
+        }
 
-        // Marcar items que el usuario ya posee
-        ownedItemIds = data.ownedItemIds || [];
-        markOwnedItems(ownedItemIds);
-
-        // Balance real desde el backend (fuente de verdad)
+        // 2. Balance real desde el backend (fuente de verdad)
         if (data.userCoins !== undefined) {
             userBalance = data.userCoins;
             updateBalance(userBalance);
         }
 
-        // Equipar el fondo guardado
+        // 3. Marcar items que el usuario ya posee
+        ownedItemIds = data.ownedItemIds || [];
+        markOwnedItems(ownedItemIds);
+
+        // 4. Equipar el fondo guardado
         if (data.equippedBackgroundId) {
             const bgEl = document.querySelector(`[data-db-id="${data.equippedBackgroundId}"]`);
             if (bgEl) equipBackground(bgEl.dataset.class);
@@ -118,7 +100,7 @@ function markOwnedItems(ids) {
             preview.appendChild(badge);
         }
 
-        const priceEl = el.querySelector('.background-price, .avatar-price');
+        const priceEl = el.querySelector('.background-price');
         if (priceEl) priceEl.textContent = '✓ Comprado';
 
         // Registrar en ownedBackgrounds para la lógica de equipar al click
@@ -130,61 +112,30 @@ function markOwnedItems(ids) {
 }
 
 // ============================================================
-//  COMPRAR AVATAR — POST /shop/buy
-// ============================================================
-async function buySelectedAvatar() {
-    if (selectedAvatarPrice === 0) { showNotSelectedModal('avatar'); return; }
-    const balance = getBalance();
-    if (balance < selectedAvatarPrice) { showInsufficientModal(selectedAvatarPrice); return; }
-
-    try {
-        const response = await fetch(CTX + '/shop/buy', {
-            method:  'POST',
-            headers: shopHeaders(),
-            body:    JSON.stringify({ itemId: selectedAvatarDbId })
-        });
-        const result = await response.json();
-
-        if (result.success) {
-            ownedItemIds.push(selectedAvatarDbId);
-            updateBalance(result.remainingCoins);
-            sessionStorage.setItem('userCoins', result.remainingCoins);
-
-            // Marcar el avatar como poseído visualmente
-            const el = document.querySelector(`[data-db-id="${selectedAvatarDbId}"]`);
-            if (el) {
-                el.classList.add('owned');
-                const priceEl = el.querySelector('.avatar-price');
-                if (priceEl) priceEl.textContent = '✓ Comprado';
-            }
-
-            showPurchaseModal(result.itemName || 'Avatar', result.costPaid, result.remainingCoins);
-            selectedAvatarPrice = 0;
-            selectedAvatarId    = null;
-            selectedAvatarDbId  = null;
-            document.querySelectorAll('.avatar-item').forEach(i => i.classList.remove('selected'));
-        } else {
-            showInsufficientModal(selectedAvatarPrice);
-            console.error('[Tienda] Compra fallida:', result.message);
-        }
-
-    } catch (error) {
-        console.error('[Tienda] Error de conexión al comprar avatar:', error);
-    }
-}
-
-// ============================================================
 //  COMPRAR FONDO — POST /shop/buy
 // ============================================================
 async function buySelectedBackground() {
     if (selectedBackgroundPrice === 0) { showNotSelectedModal('fondo'); return; }
+    if (!selectedBackgroundDbId || isNaN(selectedBackgroundDbId)) {
+        console.error('[Tienda] Fondo sin data-db-id. ¿Existe en store_items?');
+        return;
+    }
+    // ¿Ya lo tiene?
+    if (ownedItemIds.includes(selectedBackgroundDbId) || ownedBackgrounds.includes(selectedBackgroundId)) {
+        showAlreadyOwnedModal('fondo');
+        return;
+    }
     const balance = getBalance();
     if (balance < selectedBackgroundPrice) { showInsufficientModal(selectedBackgroundPrice); return; }
+
+    // Loading state
+    const buyBtn = document.querySelector('.category-section .buy-button');
+    if (buyBtn) { buyBtn.disabled = true; buyBtn.textContent = 'Comprando...'; }
 
     try {
         const response = await fetch(CTX + '/shop/buy', {
             method:  'POST',
-            headers: shopHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ itemId: selectedBackgroundDbId })
         });
         const result = await response.json();
@@ -218,12 +169,15 @@ async function buySelectedBackground() {
             selectedBackgroundClass = null;
             document.querySelectorAll('.background-item').forEach(i => i.classList.remove('selected'));
         } else {
-            showInsufficientModal(selectedBackgroundPrice);
+            // Mostrar mensaje real del backend (ej: "Ya tienes este ítem")
+            showErrorModal(result.message || 'No se pudo completar la compra.');
             console.error('[Tienda] Compra fallida:', result.message);
         }
 
     } catch (error) {
         console.error('[Tienda] Error de conexión al comprar fondo:', error);
+    } finally {
+        if (buyBtn) { buyBtn.disabled = false; buyBtn.textContent = 'Comprar Fondo'; }
     }
 }
 
@@ -242,10 +196,14 @@ async function buyProduct(productName, price, btn) {
     const balance = getBalance();
     if (balance < price) { showInsufficientModal(price); return; }
 
+    // Loading state
+    btn.disabled = true;
+    btn.textContent = 'Comprando...';
+
     try {
         const response = await fetch(CTX + '/shop/buy', {
             method:  'POST',
-            headers: shopHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ itemId: dbId })
         });
         const result = await response.json();
@@ -255,30 +213,22 @@ async function buyProduct(productName, price, btn) {
             sessionStorage.setItem('userCoins', result.remainingCoins);
             showPurchaseModal(productName, price, result.remainingCoins);
         } else {
-            showInsufficientModal(price);
+            showErrorModal(result.message || 'No se pudo completar la compra.');
             console.error('[Tienda] Compra fallida:', result.message);
         }
 
     } catch (error) {
         console.error('[Tienda] Error de conexión al comprar producto:', error);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Comprar';
     }
 }
 
 // ============================================================
 //  SELECCIÓN
 // ============================================================
-function selectAvatar(element, price, id) {
-    if (element.classList.contains('insufficient')) { showInsufficientModal(price); return; }
-    if (element.classList.contains('owned'))        return; // ya lo tiene
-    document.querySelectorAll('.avatar-item').forEach(item => item.classList.remove('selected'));
-    element.classList.add('selected');
-    selectedAvatarPrice = price;
-    selectedAvatarId    = id;
-    selectedAvatarDbId  = parseInt(element.dataset.dbId);
-}
-
 function selectBackground(element, price, id, bgClass) {
-    if (element.classList.contains('insufficient')) { showInsufficientModal(price); return; }
     if (ownedBackgrounds.includes(id))              { equipBackground(bgClass); return; }
     document.querySelectorAll('.background-item').forEach(item => item.classList.remove('selected'));
     element.classList.add('selected');
@@ -318,7 +268,7 @@ async function equipBackground(bgClass) {
         try {
             await fetch(CTX + '/shop/equip', {
                 method:  'POST',
-                headers: shopHeaders(),
+                headers: { 'Content-Type': 'application/json' },
                 body:    JSON.stringify({ itemId: dbId })
             });
         } catch (error) {
@@ -348,22 +298,9 @@ function updateBalance(newBalance) {
     const balanceEl = document.getElementById('user-balance-header');
     if (balanceEl) balanceEl.textContent = newBalance.toLocaleString();
     updateInsufficientItems();
-    // Sincronizar con localStorage para que el navbar se actualice
-    try {
-        const user = JSON.parse(localStorage.getItem('user')) || {};
-        if (!user.stats) user.stats = {};
-        user.stats.coins = newBalance;
-        localStorage.setItem('user', JSON.stringify(user));
-        if (typeof refreshNavbarStats === 'function') refreshNavbarStats();
-    } catch (_) {}
 }
 
 function updateInsufficientItems() {
-    document.querySelectorAll('.avatar-item').forEach(item => {
-        if (item.classList.contains('owned')) return;
-        item.classList.toggle('insufficient', parseInt(item.dataset.price) > userBalance);
-    });
-
     document.querySelectorAll('.background-item').forEach(item => {
         if (item.classList.contains('owned')) return;
         item.classList.toggle('insufficient', parseInt(item.dataset.price) > userBalance);
@@ -402,6 +339,28 @@ function showNotSelectedModal(tipo) {
 
 function closeModal() {
     document.getElementById('insufficientModal').classList.remove('show');
+}
+
+function showAlreadyOwnedModal(tipo) {
+    const modal = document.getElementById('insufficientModal');
+    modal.querySelector('.modal-title').textContent   = '¡Ya es tuyo!';
+    modal.querySelector('.modal-message').textContent = `Este ${tipo} ya fue comprado. Selecciónalo para equiparlo.`;
+    modal.querySelector('.modal-icon').textContent    = '✅';
+    document.getElementById('modal-price').textContent   = '—';
+    document.getElementById('modal-balance').textContent = userBalance.toLocaleString();
+    document.getElementById('modal-needed').textContent  = '—';
+    modal.classList.add('show');
+}
+
+function showErrorModal(message) {
+    const modal = document.getElementById('insufficientModal');
+    modal.querySelector('.modal-title').textContent   = 'Error';
+    modal.querySelector('.modal-message').textContent = message;
+    modal.querySelector('.modal-icon').textContent    = '⚠️';
+    document.getElementById('modal-price').textContent   = '—';
+    document.getElementById('modal-balance').textContent = userBalance.toLocaleString();
+    document.getElementById('modal-needed').textContent  = '—';
+    modal.classList.add('show');
 }
 
 function showPurchaseModal(itemName, price, newBalance) {

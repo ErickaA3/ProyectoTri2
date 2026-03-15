@@ -112,7 +112,7 @@ public class ProfileServlet extends HttpServlet {
 
             User user = optUser.get();
             if (fullName  != null && !fullName.isBlank())  user.setFullName(fullName);
-            if (country   != null && !country.isBlank())   user.setCountry(country);
+            if (country   != null) user.setCountry(country.isBlank() ? null : country);
             if (language  != null && !language.isBlank())  user.setLanguage(language);
             if (birthdate != null && !birthdate.isBlank()) user.setBirthdate(java.time.LocalDate.parse(birthdate));
 
@@ -122,6 +122,9 @@ public class ProfileServlet extends HttpServlet {
         } catch (SQLException e) {
             e.printStackTrace();
             JsonUtil.sendError(response, 500, "Error interno del servidor.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            JsonUtil.sendError(response, 400, "Datos inválidos: " + e.getMessage());
         }
     }
 
@@ -132,10 +135,10 @@ public class ProfileServlet extends HttpServlet {
     }
 
     private void setCorsHeaders(HttpServletResponse response) {
-        response.setHeader("Access-Control-Allow-Origin", "*");
+        response.setHeader("Access-Control-Allow-Origin", "http://localhost:8080");
         response.setHeader("Access-Control-Allow-Methods", "GET, PUT, OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-        response.setHeader("Access-Control-Allow-Credentials", "false");
+        response.setHeader("Access-Control-Allow-Credentials", "true");
     }
 
     private String extractJsonField(String json, String field) {

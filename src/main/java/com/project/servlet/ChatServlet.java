@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import com.project.database.DatabaseConnection;
 import com.project.util.AIService;
 import com.project.util.JsonUtil;
+import com.project.util.UserContextService;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -77,9 +78,21 @@ public class ChatServlet extends HttpServlet {
             String profesorNombre  = profesorConfig[0];
             String personalidad    = profesorConfig[1];
 
+            // ── RAG: construir búsqueda con contexto conversacional ──
+            // Usar los últimos mensajes + el actual para que la búsqueda
+            // entienda de qué se está hablando (no solo el último mensaje)
+            StringBuilder searchContext = new StringBuilder();
+            int start = Math.max(0, historial.size() - 6);
+            for (int i = start; i < historial.size(); i++) {
+                searchContext.append(historial.get(i).content).append(" ");
+            }
+            searchContext.append(mensaje);
+
+            String contexto = UserContextService.buildContext(userId, searchContext.toString());
+
             saveMessage(conn, userId, sessionId, "user", mensaje);
 
-            String respuesta = AIService.chat(historial, mensaje, profesorNombre, personalidad);
+            String respuesta = AIService.chat(historial, mensaje, profesorNombre, personalidad, contexto);
 
             saveMessage(conn, userId, sessionId, "assistant", respuesta);
 
