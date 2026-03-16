@@ -326,13 +326,17 @@
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    border: 3px solid var(--accent-cyan);
+    background: linear-gradient(135deg, #1a1a3e, #2a2a5e);
+    border: 2px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     object-fit: cover;
     transition: border-color 0.3s ease;
 }
 
 .friend-card:hover .friend-avatar {
-    border-color: #eab308;
+    border-color: rgba(45, 212, 191, 0.4);
 }
 
 .friend-status {

@@ -28,7 +28,7 @@
                         <i class="fas fa-crown"></i>
                     </div>
                     <div class="victories-badge-info">
-                        <span class="victories-badge-value">24</span>
+                        <span class="victories-badge-value" id="victoriesCount">0</span>
                         <span class="victories-badge-label">Victorias</span>
                     </div>
                     <div class="victories-badge-ring"></div>
@@ -52,12 +52,16 @@
             <button class="tab-btn" onclick="switchTab('invitaciones', this)">
                 <i class="fas fa-envelope"></i>
                 Invitaciones
-                <span class="tab-badge">3</span>
+                <span class="tab-badge" id="badgeInvitations" style="display:none"></span>
             </button>
             <button class="tab-btn" onclick="switchTab('retos', this)">
-                <i class="fas fa-swords"></i>
+                <i class="fas fa-bolt"></i>
                 Retos Activos
-                <span class="tab-badge">2</span>
+                <span class="tab-badge" id="badgeRetos" style="display:none"></span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('notificaciones', this)">
+                <i class="fas fa-bell"></i>
+                Notificaciones
             </button>
         </div>
 
@@ -91,9 +95,19 @@
         <div class="tab-content" id="tab-retos">
             <div class="challenges-list" id="challengesList"></div>
             <div class="empty-state" id="emptyChallenges" style="display: none;">
-                <i class="fas fa-swords"></i>
+                <i class="fas fa-bolt"></i>
                 <h3>No tienes retos activos</h3>
                 <p>Crea un nuevo duelo para retar a tus amigos.</p>
+            </div>
+        </div>
+
+        <!-- Tab Content: Notificaciones -->
+        <div class="tab-content" id="tab-notificaciones">
+            <div class="notifications-list" id="notificationsList"></div>
+            <div class="empty-state" id="emptyNotifications" style="display: none;">
+                <i class="fas fa-bell-slash"></i>
+                <h3>Sin notificaciones</h3>
+                <p>Cuando se resuelva un duelo o recibas un reto aparecerá aquí.</p>
             </div>
         </div>
     </main>
@@ -223,7 +237,6 @@
                             <option value="5">5 preguntas</option>
                             <option value="10" selected>10 preguntas</option>
                             <option value="15">15 preguntas</option>
-                            <option value="20">20 preguntas</option>
                         </select>
                     </div>
                 </div>
@@ -244,319 +257,10 @@
         <span id="toastMessage"></span>
     </div>
 
+    <!-- Anti-loop: limpiar datos de duelo ANTES de que cargue cualquier JS -->
+    <script>sessionStorage.removeItem('duelData');</script>
     <script src="../js/components.js"></script>
-
-    <script>
-        // Mock data
-        let friends = [
-            { id: 1, name: 'Ana García', username: '@anagarcia', avatar: 'https://i.pravatar.cc/150?img=1', wins: 15, losses: 8, online: true },
-            { id: 2, name: 'Carlos Ruiz', username: '@carlosruiz', avatar: 'https://i.pravatar.cc/150?img=3', wins: 22, losses: 5, online: false },
-            { id: 3, name: 'María López', username: '@marialopez', avatar: 'https://i.pravatar.cc/150?img=5', wins: 18, losses: 12, online: true },
-            { id: 4, name: 'Juan Pérez', username: '@juanperez', avatar: 'https://i.pravatar.cc/150?img=7', wins: 10, losses: 15, online: false },
-            { id: 5, name: 'Laura Sánchez', username: '@laurasanchez', avatar: 'https://i.pravatar.cc/150?img=9', wins: 25, losses: 3, online: true },
-            { id: 6, name: 'Pedro Martínez', username: '@pedromartinez', avatar: 'https://i.pravatar.cc/150?img=11', wins: 12, losses: 10, online: true }
-        ];
-
-        let invitations = [
-            { id: 1, from: 'Sofia Ramírez', username: '@sofiaramirez', avatar: 'https://i.pravatar.cc/150?img=2', time: 'hace 2 horas' },
-            { id: 2, from: 'Diego Torres', username: '@diegotorres', avatar: 'https://i.pravatar.cc/150?img=4', time: 'hace 5 horas' },
-            { id: 3, from: 'Elena Castro', username: '@elenacastro', avatar: 'https://i.pravatar.cc/150?img=6', time: 'hace 1 día' }
-        ];
-
-        let challenges = [
-            { id: 1, opponent: 'Ana García', avatar: 'https://i.pravatar.cc/150?img=1', topic: 'Matemáticas - Cálculo', status: 'waiting', time: 'Esperando respuesta', createdBy: 'you' },
-            { id: 2, opponent: 'Laura Sánchez', avatar: 'https://i.pravatar.cc/150?img=9', topic: 'Historia Universal', status: 'pending', time: 'Tu turno', createdBy: 'them' }
-        ];
-
-        /* ===== STARS ===== */
-        function generateStars(count = 15) {
-            let html = '';
-            for (let i = 0; i < count; i++) {
-                const size  = 1 + Math.random() * 2;
-                const left  = Math.random() * 100;
-                const top   = Math.random() * 100;
-                const delay = Math.random() * 3;
-                html += `<div class="star" style="width:${size}px;height:${size}px;left:${left}%;top:${top}%;animation-delay:${delay}s"></div>`;
-            }
-            return html;
-        }
-
-        // Header victory badge stars
-        document.getElementById('headerStars').innerHTML = generateStars(12);
-
-        /* ===== RENDER FRIENDS ===== */
-        function renderFriends() {
-            const grid = document.getElementById('friendsGrid');
-            const searchTerm = document.getElementById('searchFriends').value.toLowerCase();
-            
-            const filtered = friends.filter(f =>
-                f.name.toLowerCase().includes(searchTerm) ||
-                f.username.toLowerCase().includes(searchTerm)
-            );
-
-            grid.innerHTML = filtered.map(friend => `
-                <div class="friend-card">
-                    <div class="friend-stars">${generateStars(8)}</div>
-                    <div class="friend-avatar-wrapper">
-                        <img src="${friend.avatar}" alt="${friend.name}" class="friend-avatar">
-                        <span class="friend-status ${friend.online ? 'online' : 'offline'}"></span>
-                    </div>
-                    <div class="friend-info">
-                        <h4 class="friend-name">${friend.name}</h4>
-                        <p class="friend-username">${friend.username}</p>
-                        <div class="friend-stats">
-                            <span class="stat-item win">
-                                <i class="fas fa-trophy"></i> ${friend.wins}
-                            </span>
-                            <span class="stat-item loss">
-                                <i class="fas fa-flag"></i> ${friend.losses}
-                            </span>
-                        </div>
-                    </div>
-                    <button class="btn-challenge" onclick="challengeFriend(${friend.id})">
-                        <i class="fas fa-swords"></i>
-                        Retar
-                    </button>
-                </div>
-            `).join('');
-        }
-
-        /* ===== RENDER INVITATIONS ===== */
-        function renderInvitations() {
-            const list  = document.getElementById('invitationsList');
-            const empty = document.getElementById('emptyInvitations');
-            
-            if (invitations.length === 0) {
-                list.style.display  = 'none';
-                empty.style.display = 'block';
-            } else {
-                list.style.display  = 'block';
-                empty.style.display = 'none';
-                
-                list.innerHTML = invitations.map(inv => `
-                    <div class="invitation-card">
-                        <div class="invitation-stars">${generateStars(8)}</div>
-                        <img src="${inv.avatar}" alt="${inv.from}" class="invitation-avatar">
-                        <div class="invitation-info">
-                            <h4 class="invitation-name">${inv.from}</h4>
-                            <p class="invitation-username">${inv.username}</p>
-                            <p class="invitation-time">
-                                <i class="fas fa-clock"></i>
-                                ${inv.time}
-                            </p>
-                        </div>
-                        <div class="invitation-actions">
-                            <button class="btn-accept" onclick="acceptInvitation(${inv.id})">
-                                <i class="fas fa-check"></i>
-                                Aceptar
-                            </button>
-                            <button class="btn-decline" onclick="declineInvitation(${inv.id})">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                `).join('');
-            }
-        }
-
-        /* ===== RENDER CHALLENGES ===== */
-        function renderChallenges() {
-            const list  = document.getElementById('challengesList');
-            const empty = document.getElementById('emptyChallenges');
-            
-            if (challenges.length === 0) {
-                list.style.display  = 'none';
-                empty.style.display = 'block';
-            } else {
-                list.style.display  = 'block';
-                empty.style.display = 'none';
-                
-                list.innerHTML = challenges.map(ch => `
-                    <div class="challenge-card ${ch.status}">
-                        <div class="challenge-stars">${generateStars(8)}</div>
-                        <div class="challenge-header">
-                            <img src="${ch.avatar}" alt="${ch.opponent}" class="challenge-avatar">
-                            <div class="challenge-info">
-                                <h4 class="challenge-opponent">${ch.opponent}</h4>
-                                <p class="challenge-topic">
-                                    <i class="fas fa-book"></i>
-                                    ${ch.topic}
-                                </p>
-                            </div>
-                            <span class="challenge-status ${ch.status}">
-                                ${ch.status === 'waiting' ? 'Esperando' : 'Tu turno'}
-                            </span>
-                        </div>
-                        <div class="challenge-actions">
-                            <div class="challenge-time">
-                                <i class="fas fa-clock"></i>
-                                ${ch.time}
-                            </div>
-                            ${ch.status === 'pending' ? `
-                                <button class="btn-play-challenge" onclick="playChallenge(${ch.id})">
-                                    <i class="fas fa-play"></i>
-                                    Jugar Ahora
-                                </button>
-                            ` : `
-                                <button class="btn-view-challenge" onclick="viewChallenge(${ch.id})">
-                                    <i class="fas fa-eye"></i>
-                                    Ver Detalles
-                                </button>
-                            `}
-                        </div>
-                    </div>
-                `).join('');
-            }
-        }
-
-        /* ===== TABS ===== */
-        function switchTab(tab, element) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            element.classList.add('active');
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.getElementById(`tab-${tab}`).classList.add('active');
-        }
-
-        function searchFriends() { renderFriends(); }
-
-        function challengeFriend(id) {
-            document.getElementById('opponentSelect').value = id;
-            openCreateDuelModal();
-        }
-
-        /* ===== MODALS ===== */
-        function openAddFriendModal()  { document.getElementById('addFriendModal').classList.add('show'); }
-        function closeAddFriendModal() {
-            document.getElementById('addFriendModal').classList.remove('show');
-            document.getElementById('friendEmailInput').value = '';
-        }
-
-        function sendFriendRequest() {
-            const email = document.getElementById('friendEmailInput').value;
-            if (email) { closeAddFriendModal(); showToast('Solicitud enviada correctamente', 'success'); }
-        }
-
-        function openCreateDuelModal() {
-            const select = document.getElementById('opponentSelect');
-            select.innerHTML = '<option value="">Elige un amigo...</option>' +
-                friends.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-            document.getElementById('createDuelModal').classList.add('show');
-        }
-
-        function closeCreateDuelModal() {
-            document.getElementById('createDuelModal').classList.remove('show');
-            clearFile();
-            setTopicMode('text', document.querySelector('.topic-mode-btn'));
-        }
-
-        function createDuel() {
-            const opponent = document.getElementById('opponentSelect').value;
-            const mode     = document.getElementById('topicUploadMode').style.display === 'none' ? 'text' : 'upload';
-            const topic    = mode === 'text' ? document.getElementById('duelTopic').value : document.getElementById('fileName').textContent;
-            
-            if (opponent && topic) {
-                closeCreateDuelModal();
-                showToast('¡Duelo creado exitosamente!', 'success');
-                document.querySelectorAll('.tab-btn')[2].click();
-            } else {
-                showToast('Completa todos los campos', 'info');
-            }
-        }
-
-        /* ===== TOPIC MODE TOGGLE ===== */
-        function setTopicMode(mode, btn) {
-            document.querySelectorAll('.topic-mode-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            if (mode === 'text') {
-                document.getElementById('topicTextMode').style.display   = 'block';
-                document.getElementById('topicUploadMode').style.display = 'none';
-            } else {
-                document.getElementById('topicTextMode').style.display   = 'none';
-                document.getElementById('topicUploadMode').style.display = 'block';
-            }
-        }
-
-        /* ===== FILE UPLOAD ===== */
-        function handleFileSelect(input) {
-            if (input.files && input.files[0]) showFilePreview(input.files[0]);
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-            document.getElementById('fileDropZone').classList.add('drag-over');
-        }
-
-        function handleDragLeave(e) {
-            document.getElementById('fileDropZone').classList.remove('drag-over');
-        }
-
-        function handleDrop(e) {
-            e.preventDefault();
-            document.getElementById('fileDropZone').classList.remove('drag-over');
-            const file = e.dataTransfer.files[0];
-            if (file) showFilePreview(file);
-        }
-
-        function showFilePreview(file) {
-            const ext = file.name.split('.').pop().toLowerCase();
-            const iconMap = { pdf: 'fa-file-pdf', doc: 'fa-file-word', docx: 'fa-file-word', txt: 'fa-file-alt' };
-            const icon = iconMap[ext] || 'fa-file';
-
-            document.getElementById('fileTypeIcon').className = `fas ${icon}`;
-            document.getElementById('fileName').textContent   = file.name;
-            document.getElementById('fileSize').textContent   = formatFileSize(file.size);
-            document.getElementById('fileDropZone').style.display = 'none';
-            document.getElementById('filePreview').style.display  = 'flex';
-        }
-
-        function clearFile() {
-            document.getElementById('topicFile').value = '';
-            document.getElementById('fileDropZone').style.display = 'flex';
-            document.getElementById('filePreview').style.display  = 'none';
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes < 1024) return bytes + ' B';
-            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-        }
-
-        /* ===== INVITATIONS / CHALLENGES ===== */
-        function acceptInvitation(id) {
-            invitations = invitations.filter(inv => inv.id !== id);
-            renderInvitations();
-            showToast('Solicitud aceptada', 'success');
-        }
-
-        function declineInvitation(id) {
-            invitations = invitations.filter(inv => inv.id !== id);
-            renderInvitations();
-            showToast('Solicitud rechazada', 'info');
-        }
-
-        function playChallenge(id)  { window.location.href = 'duelos.html?id=' + id; }
-        function viewChallenge(id)  { console.log('Viewing challenge:', id); }
-
-        /* ===== TOAST ===== */
-        function showToast(message, type = 'success') {
-            const toast = document.getElementById('toast');
-            toast.className = `toast show toast-${type}`;
-            document.getElementById('toastMessage').textContent = message;
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
-
-        /* ===== CLOSE MODAL ON BACKDROP ===== */
-        document.querySelectorAll('.modal-overlay').forEach(modal => {
-            modal.addEventListener('click', function(e) {
-                if (e.target === this) this.classList.remove('show');
-            });
-        });
-
-        /* ===== INIT ===== */
-        renderFriends();
-        renderInvitations();
-        renderChallenges();
-    </script>
+    <script src="../js/gamification.js"></script>
+    <script src="../js/duelos.js?v=3"></script>
 </body>
 </html>
