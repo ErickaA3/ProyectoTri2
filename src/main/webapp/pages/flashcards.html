@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Flashcards</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/flashcards.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+</head>
+<body data-page="modo-estudio">
+
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <!-- Toast XP -->
+    <div class="fc-xp-toast" id="xpToast">
+        <i class="fas fa-star"></i>
+        <span class="xp-amount" id="xpAmount">+25 XP</span>
+    </div>
+
+    <!-- Confetti -->
+    <div class="confetti-container" id="confettiContainer"></div>
+
+    <main class="content" id="mainContent">
+        <canvas id="starsCanvas"></canvas>
+
+        <div class="flashcard-wrapper">
+
+            <!-- ===== VISTA DE ESTUDIO ===== -->
+            <div class="fc-study-view" id="studyView">
+
+                <div class="fc-header">
+                    <button class="fc-back-btn" onclick="goBack(event)" title="Volver">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <div class="fc-title-area">
+                        <div class="fc-title"><i class="fas fa-layer-group"></i> Flashcards</div>
+                        <div class="fc-subtitle" id="topicLabel">Cargando...</div>
+                    </div>
+                    <div class="fc-high-score">
+                        <i class="fas fa-star"></i>
+                        <span id="highScoreDisplay">0%</span>
+                    </div>
+                </div>
+
+                <div class="fc-progress-bar">
+                    <div class="fc-progress-fill" id="progressFill" style="width: 3%"></div>
+                </div>
+
+                <div class="fc-counter">
+                    Tarjeta <span id="currentNum">1</span> de <span id="totalNum">0</span>
+                </div>
+
+                <div class="fc-card-zone">
+                    <button class="fc-nav-arrow" id="prevBtn" disabled onclick="prevCard()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <div class="fc-card-container" onclick="flipCard()">
+                        <div class="fc-card" id="flashcard">
+                            <div class="fc-card-face fc-card-front">
+                                <div class="fc-face-label"><i class="fas fa-question-circle"></i> Pregunta</div>
+                                <div class="fc-face-text" id="questionText"></div>
+                                <div class="fc-tap-hint"><i class="fas fa-hand-pointer"></i> Toca para ver respuesta</div>
+                            </div>
+                            <div class="fc-card-face fc-card-back">
+                                <div class="fc-face-label"><i class="fas fa-lightbulb"></i> Respuesta</div>
+                                <div class="fc-face-text" id="answerText"></div>
+                                <div class="fc-tap-hint"><i class="fas fa-check-double"></i> ¿La sabías?</div>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="fc-nav-arrow" id="nextBtn" onclick="nextCard()">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <div class="fc-eval-buttons" id="evalButtons">
+                    <button class="fc-eval-btn correct" onclick="markAnswer(true)"><i class="fas fa-check"></i> La sabía</button>
+                    <button class="fc-eval-btn incorrect" onclick="markAnswer(false)"><i class="fas fa-times"></i> No la sabía</button>
+                </div>
+
+                <div class="fc-dots" id="dotsContainer"></div>
+
+                <div class="fc-keyboard-hints">
+                    <div class="fc-key-hint"><span class="fc-key">Espacio</span> voltear</div>
+                    <div class="fc-key-hint"><span class="fc-key">←</span><span class="fc-key">→</span> navegar</div>
+                    <div class="fc-key-hint"><span class="fc-key">1</span> correcta</div>
+                    <div class="fc-key-hint"><span class="fc-key">2</span> incorrecta</div>
+                </div>
+            </div>
+
+            <!-- ===== VISTA DE RESULTADOS ===== -->
+            <div class="fc-results" id="resultsView">
+                <div class="fc-results-card">
+                    <img class="fc-results-emoji" id="resultsEmoji" src="../images/modo-estudio/giphy.gif" alt="resultado">
+                    <div class="fc-results-title" id="resultsTitle">¡Excelente trabajo!</div>
+                    <div class="fc-results-subtitle" id="resultsSubtitle">Has completado todas las flashcards</div>
+
+                    <div class="fc-new-highscore" id="newHighscore">
+                        <img src="../images/gifs/star.gif" alt="star">
+                        <span>¡Nuevo récord personal!</span>
+                        <img src="../images/gifs/star.gif" alt="star">
+                    </div>
+
+                    <div class="fc-score-ring-container">
+                        <svg class="fc-score-ring" viewBox="0 0 180 180">
+                            <circle class="fc-score-ring-bg" cx="90" cy="90" r="75" />
+                            <circle class="fc-score-ring-fill" id="scoreRing" cx="90" cy="90" r="75" stroke-dasharray="471.24" stroke-dashoffset="471.24" />
+                        </svg>
+                        <div class="fc-score-center">
+                            <div class="fc-score-number" id="scoreNumber">0%</div>
+                            <div class="fc-score-label">Nota Final</div>
+                        </div>
+                    </div>
+
+                    <div class="fc-stats-row">
+                        <div class="fc-stat-box">
+                            <div class="fc-stat-icon stat-green"><i class="fas fa-check-circle"></i></div>
+                            <div class="fc-stat-value stat-green" id="correctCount">0</div>
+                            <div class="fc-stat-name">Correctas</div>
+                        </div>
+                        <div class="fc-stat-box">
+                            <div class="fc-stat-icon stat-red"><i class="fas fa-times-circle"></i></div>
+                            <div class="fc-stat-value stat-red" id="incorrectCount">0</div>
+                            <div class="fc-stat-name">Incorrectas</div>
+                        </div>
+                        <div class="fc-stat-box">
+                            <div class="fc-stat-icon stat-yellow"><i class="fas fa-trophy"></i></div>
+                            <div class="fc-stat-value stat-yellow" id="highScoreResult">0%</div>
+                            <div class="fc-stat-name">High Score</div>
+                        </div>
+                    </div>
+
+                    <div class="fc-answers-detail" id="answersDetail">
+                        <div class="fc-answers-title"><i class="fas fa-list-check"></i> Detalle de respuestas</div>
+                    </div>
+
+                    <div class="fc-results-actions">
+                        <button class="fc-action-btn primary" onclick="restartFlashcards()"><i class="fas fa-redo"></i> Intentar de nuevo</button>
+                        <button class="fc-action-btn secondary" onclick="reviewMistakes()"><i class="fas fa-search"></i> Repasar errores</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="../js/components.js"></script>
+    <script src="../js/gamification.js"></script>
+    <script src="../js/flashcards.js"></script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Historial</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+    <link rel="stylesheet" href="../css/historial.css">
+</head>
+<body data-page="historial">
+
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="content">
+
+        <div class="page-header">
+            <div class="page-header-left">
+                <h2 class="page-title">
+                    <i class="fas fa-clock-rotate-left"></i>
+                    Historial
+                </h2>
+                <p class="page-subtitle">Revisa tu actividad reciente</p>
+            </div>
+            <button class="btn-limpiar" onclick="showClearModal()">
+                Limpiar historial
+            </button>
+        </div>
+
+        <div class="controls-bar">
+            <div class="controls-left">
+                <div class="filter-tabs">
+                    <button class="filter-tab active" onclick="setFilter('recientes', this)">Recientes</button>
+                    <button class="filter-tab" onclick="setFilter('tipo', this)">Por tipo</button>
+                </div>
+                <div class="date-picker-wrapper">
+                    <i class="fas fa-calendar-alt"></i>
+                    <input type="date" id="datePicker">
+                    <button class="btn-clear-date" id="btnClearDate" onclick="clearDate()" title="Quitar filtro de fecha">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="historial-search">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Buscar en tu historial...">
+            </div>
+        </div>
+
+        <!-- Lista dinámica — historial.js rellena aquí -->
+        <div id="historyContainer"></div>
+
+        <div class="empty-state" id="emptyState" style="display:none;">
+            <i class="fas fa-clock-rotate-left"></i>
+            <h3>No se encontraron resultados</h3>
+            <p>Intenta con otro nombre o selecciona otra fecha en el calendario.</p>
+        </div>
+
+    </main>
+
+    <!-- Modal: limpiar todo -->
+    <div class="modal-overlay" id="clearModal">
+        <div class="modal">
+            <div class="modal-icon warning">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3>¿Limpiar todo el historial?</h3>
+            <p>Se eliminarán todos los registros de actividad. Esta acción no se puede deshacer.</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeClearModal()">Cancelar</button>
+                <button class="modal-btn confirm" onclick="clearAllHistory()">Limpiar todo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: eliminar un ítem -->
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <div class="modal-icon warning">
+                <i class="fas fa-trash-alt"></i>
+            </div>
+            <h3>¿Eliminar del historial?</h3>
+            <p>¿Estás seguro de eliminar <span class="highlight" id="deleteItemName"></span> de tu historial?</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeDeleteModal()">Cancelar</button>
+                <button class="modal-btn confirm" onclick="confirmDelete()">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage"></span>
+    </div>
+
+    <script src="../js/components.js"></script>
+    <script src="../js/historial.js"></script>
+</body>
+</html>

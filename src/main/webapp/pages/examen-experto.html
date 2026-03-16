@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Examen Experto</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+    <link rel="stylesheet" href="../css/examen-experto.css">
+    
+</head>
+<body data-page="modo-estudio">
+
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <canvas id="starsCanvas"></canvas>
+
+    <!-- Confetti & XP Toast -->
+    <div class="confetti-container" id="confettiContainer"></div>
+    <div class="exam-xp-toast" id="xpToast">
+        <img src="glowing-star_1f31f.gif" alt="star">
+        <span class="xp-text">Ganaste</span>
+        <span class="xp-amount" id="xpToastAmount">+50 XP</span>
+    </div>
+
+    <main class="content" style="padding: 0; overflow-x: hidden;">
+    <div class="exam-wrapper">
+
+        <!-- ===== EXAM SCREEN ===== -->
+        <div class="exam-screen" id="examScreen">
+            <div class="exam-topbar">
+                <div class="exam-topbar-left">
+                    <button class="btn-salir" onclick="showExitModal()"><i class="fas fa-arrow-left"></i> Salir</button>
+                    <div class="exam-title-bar"><i class="fas fa-graduation-cap"></i> <span id="examTitleBar">Examen Experto</span></div>
+                    <div class="mode-badge-top"><i class="fas fa-graduation-cap"></i> Experto</div>
+                </div>
+                <div class="exam-topbar-right">
+                    <div class="highscore-display"><i class="fas fa-crown"></i> <span id="highscoreValue">Best: --</span></div>
+                    <div class="xp-display"><i class="fas fa-bolt"></i> <span id="xpValue">+50 XP</span></div>
+                    <div class="question-counter"><span id="currentQ">1</span> / <span id="totalQ">10</span></div>
+                    <div class="timer" id="timer"><i class="fas fa-clock"></i> <span class="timer-value" id="timerValue">20:00</span></div>
+                </div>
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:10%"></div></div>
+            </div>
+
+            <div class="question-area">
+                <div class="question-card" id="questionCard">
+                    <div class="question-number" id="questionNumber"></div>
+                    <div class="question-text" id="questionText"></div>
+                    <div class="options-list" id="optionsList"></div>
+                    <div class="nav-buttons">
+                        <button class="btn-nav btn-anterior" id="btnAnterior" onclick="prevQuestion()" disabled><i class="fas fa-chevron-left"></i> Anterior</button>
+                        <div class="question-dots" id="questionDots"></div>
+                        <button class="btn-nav btn-siguiente" id="btnSiguiente" onclick="nextQuestion()">Siguiente <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== RESULTS SCREEN ===== -->
+        <div class="results-screen" id="resultsScreen">
+            <div class="results-card">
+                <img class="results-emoji" id="resultsEmoji" src="giphy.gif" alt="emoji">
+                <div class="results-main-title" id="resultsMainTitle">¡Bien hecho!</div>
+                <div class="results-main-subtitle" id="resultsMainSubtitle">Sigue practicando</div>
+
+                <!-- New High Score (igual a flashcards) -->
+                <div class="new-highscore" id="newHighscore">
+                    <img src="glowing-star_1f31f.gif" alt="star">
+                    <span>¡Nuevo récord personal!</span>
+                    <img src="glowing-star_1f31f.gif" alt="star">
+                </div>
+
+                <!-- Grade circle (igual a flashcards score ring) -->
+                <div class="grade-circle-wrapper">
+                    <div class="grade-circle">
+                        <svg viewBox="0 0 180 180">
+                            <circle class="track" cx="90" cy="90" r="75"/>
+                            <circle class="fill-circle" id="gradeFill" cx="90" cy="90" r="75"/>
+                        </svg>
+                        <span class="grade-number" id="gradeNumber">0</span>
+                        <span class="grade-label">Nota Final</span>
+                    </div>
+                </div>
+
+                <!-- XP Earned -->
+                <div class="xp-earned" id="xpEarned"><i class="fas fa-bolt"></i> <span>+0 XP ganados</span></div>
+
+                <div class="grade-message" id="gradeMessage"></div>
+                <div class="results-stats" id="resultsStats"></div>
+
+                <div class="results-review" id="resultsReview">
+                    <div class="review-title"><i class="fas fa-list-check"></i> Detalle de respuestas</div>
+                    <div class="review-list" id="reviewList"></div>
+                </div>
+
+                <div class="results-actions">
+                    <button class="btn-result btn-retry" onclick="retryExam()"><i class="fas fa-redo"></i> Intentar de nuevo</button>
+                    <button class="btn-result btn-exit" onclick="exitExam()"><i class="fas fa-home"></i> Volver al inicio</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    </main>
+
+    <!-- Timer Alert -->
+    <div class="timer-alert" id="timerAlert">
+        <div class="timer-alert-box">
+            <div class="timer-alert-icon"><i class="fas fa-hourglass-half"></i></div>
+            <h3 id="alertTitle"></h3><p id="alertMessage"></p>
+            <button class="btn-alert-ok" onclick="closeTimerAlert()">Entendido</button>
+        </div>
+    </div>
+
+    <!-- Submit Modal -->
+    <div class="modal-overlay" id="submitModal">
+        <div class="modal">
+            <div class="modal-icon submit"><i class="fas fa-paper-plane"></i></div>
+            <h3>¿Entregar examen?</h3>
+            <p id="submitMessage"></p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeSubmitModal()">Seguir revisando</button>
+                <button class="modal-btn confirm-green" onclick="submitExam()">Entregar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exit Modal -->
+    <div class="modal-overlay" id="exitModal">
+        <div class="modal">
+            <div class="modal-icon exit"><i class="fas fa-door-open"></i></div>
+            <h3>¿Salir del examen?</h3>
+            <div class="penalty-warning"><i class="fas fa-exclamation-triangle"></i> Abandonar te penalizará con -25 XP y se registrará como examen no completado.</div>
+            <p>Esta acción no se puede deshacer.</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeExitModal()">Continuar examen</button>
+                <button class="modal-btn confirm-red" onclick="exitWithPenalty()">Abandonar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/components.js"></script>
+    <script src="../js/gamification.js"></script>
+    <script src="../js/examen-experto.js"></script>
+</body>
+</html>

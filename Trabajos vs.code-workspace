@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../../OneDrive/Documentos/Trabajos vs"
+		},
+		{
+			"name": "ProyectoTri2",
+			"path": "."
+		}
+	],
+	"settings": {
+		"java.debug.settings.onBuildFailureProceed": true
+	}
+}

@@ -1,0 +1,719 @@
+/* ============================================================
+   tienda.css — Mi ProfesorIA
+   Rediseño: fondos como protagonista, layout full-width
+   Header, sidebar y scrollbar vienen de styles-shared.css
+   ============================================================ */
+
+/* ── Variables ───────────────────────────────────────────────*/
+:root {
+    --primary-bg:      #0f0f23;
+    --secondary-bg:    #1a1a35;
+    --card-bg:         #252547;
+    --accent-cyan:     #2dd4bf;
+    --accent-purple:   #8b5cf6;
+    --text-primary:    #ffffff;
+    --text-secondary:  #a0a0c0;
+    --border-color:    #2a2a4a;
+    --shadow-sm:       0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-lg:       0 8px 32px rgba(0, 0, 0, 0.5);
+    --gold:            #fbbf24;
+    --gold-dim:        rgba(251, 191, 36, 0.15);
+}
+
+/* ── Content area ────────────────────────────────────────────*/
+.content {
+    flex: 1;
+    padding: 2rem 3rem;
+    overflow-y: auto;
+    background: var(--primary-bg);
+    transition: background 0.8s ease;
+    position: relative;
+}
+
+/* ── Canvas para efectos animados ────────────────────────────*/
+.content-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.content.bg-galaxy  #galaxyCanvas  { opacity: 1; }
+.content.bg-forest  #forestCanvas  { opacity: 1; }
+.content.bg-volcano #volcanoCanvas { opacity: 1; }
+.content.bg-ocean   #oceanCanvas   { opacity: 1; }
+.content.bg-sky     #skyCanvas     { opacity: 1; }
+.content.bg-rain    #rainCanvas    { opacity: 1; }
+.content.bg-aurora  #auroraCanvas  { opacity: 1; }
+
+.content > *:not(canvas) {
+    position: relative;
+    z-index: 1;
+}
+
+/* ── Fondos del área de contenido ────────────────────────────*/
+.content.bg-galaxy {
+    background: radial-gradient(ellipse at 20% 30%, rgba(88, 28, 135, 0.8) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(30, 64, 175, 0.6) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, #1B2735 0%, #090A0F 100%);
+}
+.content.bg-volcano {
+    background: linear-gradient(to bottom, rgba(26, 15, 15, 0.2) 0%, rgba(15, 15, 35, 0.4) 100%),
+                url('../images/backgrounds/volcano-bg.jpg') center/cover no-repeat;
+}
+.content.bg-ocean   { background: url('../images/backgrounds/ocean-bg.png')  center/cover no-repeat; }
+.content.bg-forest  {
+    background: linear-gradient(to bottom, rgba(10, 26, 10, 0.3) 0%, rgba(5, 16, 5, 0.5) 100%),
+                url('../images/backgrounds/forest-bg.jpg') center/cover no-repeat;
+}
+.content.bg-aurora  { background: url('../images/backgrounds/aurora-bg.jpg') center/cover no-repeat; }
+.content.bg-sky     { background: url('../images/backgrounds/sky-bg.png')    center/cover no-repeat; }
+.content.bg-rain    { background: url('../images/backgrounds/rain-bg.png')   center/cover no-repeat; }
+
+
+/* ============================================================
+   TÍTULO
+   ============================================================ */
+@keyframes gradientShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+.content-header { text-align: center; padding: 20px 0; }
+
+.title-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 450px;
+    margin-bottom: 0.5rem;
+}
+
+.title-default {
+    font-size: 4rem;
+    font-weight: 800;
+    margin-bottom: 0;
+    background: linear-gradient(135deg, #2dd4bf, #06b6d4, #8b5cf6, #ec4899, #2dd4bf);
+    background-size: 300% 300%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientShift 8s ease infinite;
+    text-shadow: 0 0 40px rgba(45, 212, 191, 0.3);
+    position: relative;
+    display: inline-block;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
+
+.title-default::before {
+    content: '🛒';
+    margin-right: 15px;
+    -webkit-text-fill-color: initial;
+    font-size: 3.5rem;
+    vertical-align: middle;
+    filter: drop-shadow(0 0 10px rgba(45, 212, 191, 0.5));
+}
+
+.title-image {
+    display: none;
+    max-height: 450px;
+    width: auto;
+    filter: drop-shadow(0 15px 60px rgba(0, 0, 0, 0.7));
+    transition: transform 0.3s ease;
+}
+.title-image:hover { transform: scale(1.03); }
+
+.content.bg-forest  .title-default { display: none; }
+.content.bg-forest  .title-forest  { display: block; }
+.content.bg-galaxy  .title-default { display: none; }
+.content.bg-galaxy  .title-galaxy  { display: block; }
+.content.bg-volcano .title-default { display: none; }
+.content.bg-volcano .title-volcano { display: block; }
+.content.bg-ocean   .title-default { display: none; }
+.content.bg-ocean   .title-ocean   { display: block; }
+.content.bg-aurora  .title-default { display: none; }
+.content.bg-aurora  .title-aurora  { display: block; }
+.content.bg-sky     .title-default { display: none; }
+.content.bg-sky     .title-sky     { display: block; }
+.content.bg-rain    .title-default { display: none; }
+.content.bg-rain    .title-rain    { display: block; }
+
+
+/* ============================================================
+   SECCIONES
+   ============================================================ */
+.category-section {
+    background: rgba(26, 26, 53, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 35px 35px 30px;
+    margin-bottom: 25px;
+    box-shadow: var(--shadow-md);
+    transition: background 0.5s ease, border-color 0.5s ease;
+}
+
+.section-header { margin-bottom: 32px; }
+
+.category-title {
+    font-size: 22px;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    font-weight: 700;
+    transition: color 0.5s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.category-title i {
+    color: var(--accent-cyan);
+    font-size: 18px;
+}
+
+.section-subtitle {
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin: 8px 0 0;
+}
+
+
+/* ============================================================
+   BACKGROUND GRID — 4 columnas, cards inmersivas
+   ============================================================ */
+.background-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+.background-item {
+    background: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.background-item:hover {
+    transform: translateY(-6px) scale(1.02);
+    box-shadow: 0 12px 35px rgba(45, 212, 191, 0.25);
+    border-color: rgba(45, 212, 191, 0.5);
+}
+
+.background-item.selected {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.3), 0 8px 30px rgba(45, 212, 191, 0.4);
+    transform: translateY(-4px);
+}
+
+.background-item.owned { border-color: var(--gold); }
+.background-item.owned:hover {
+    box-shadow: 0 12px 35px rgba(251, 191, 36, 0.2);
+    border-color: var(--gold);
+}
+
+.background-item.insufficient {
+    opacity: 0.35;
+    cursor: not-allowed;
+    filter: grayscale(0.4);
+}
+.background-item.insufficient:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+/* ── Preview card ──────────────────────────────────────────*/
+.background-preview {
+    width: 100%;
+    height: 130px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 14px 14px 0 0;
+    isolation: isolate;
+}
+
+.preview-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0);
+    pointer-events: none;
+    border-radius: inherit;
+    transition: background 0.15s ease;
+}
+
+.background-item:hover .preview-overlay {
+    animation: flash 0.5s ease;
+}
+
+@keyframes flash {
+    0%   { background: rgba(255, 255, 255, 0); }
+    30%  { background: rgba(255, 255, 255, 0.15); }
+    100% { background: rgba(255, 255, 255, 0); }
+}
+
+/* ── Info area ─────────────────────────────────────────────*/
+.background-info {
+    padding: 12px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.background-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.background-price {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--gold);
+    font-weight: 700;
+    font-size: 13px;
+}
+.background-price i { font-size: 11px; }
+.background-price.free { color: var(--accent-cyan); }
+
+
+/* ── Badges ──────────────────────────────────────────────────*/
+.owned-badge, .equipped-badge {
+    position: absolute;
+    top: 8px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    z-index: 2;
+    backdrop-filter: blur(4px);
+}
+
+.owned-badge {
+    right: 8px;
+    background: rgba(76, 175, 80, 0.9);
+    color: white;
+    box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+}
+.equipped-badge {
+    left: 8px;
+    background: rgba(33, 150, 243, 0.9);
+    color: white;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.4);
+}
+
+
+/* ============================================================
+   BOTÓN COMPRAR FONDO
+   ============================================================ */
+.buy-button {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, var(--accent-cyan) 0%, #14b8a6 100%);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.35s ease;
+    box-shadow: 0 4px 20px rgba(45, 212, 191, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+.buy-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(45, 212, 191, 0.4);
+}
+.buy-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+
+/* ============================================================
+   STREAK PROTECTOR BANNER
+   ============================================================ */
+.section-products {
+    padding: 30px 40px;
+}
+
+.streak-banner {
+    display: flex;
+    align-items: center;
+    gap: 30px;
+    padding: 8px 0;
+}
+
+.streak-visual {
+    position: relative;
+    flex-shrink: 0;
+    width: 90px;
+    height: 90px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.streak-shield-icon {
+    font-size: 48px;
+    filter: drop-shadow(0 4px 12px rgba(45, 212, 191, 0.4));
+    z-index: 1;
+    position: relative;
+    animation: floatShield 3s ease-in-out infinite;
+}
+
+@keyframes floatShield {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-6px); }
+}
+
+.streak-pulse {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(45, 212, 191, 0.2) 0%, transparent 70%);
+    animation: pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50%      { transform: scale(1.3); opacity: 0; }
+}
+
+.streak-info {
+    flex: 1;
+    padding: 0 8px;
+}
+
+.streak-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 10px;
+}
+
+.streak-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.6;
+    max-width: 500px;
+}
+
+.streak-action {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.streak-price {
+    color: var(--gold);
+    font-weight: 700;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.streak-price i { font-size: 14px; }
+
+.product-buy-btn {
+    padding: 12px 24px;
+    background: linear-gradient(135deg, var(--accent-cyan) 0%, #14b8a6 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.35s ease;
+    box-shadow: 0 4px 15px rgba(45, 212, 191, 0.25);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.product-buy-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(45, 212, 191, 0.4);
+}
+.product-buy-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* product-card wrapper (display:contents, solo para JS data-price) */
+.product-card.insufficient .product-buy-btn { opacity: 0.5; }
+
+
+/* ============================================================
+   MODALES
+   ============================================================ */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+.modal.show {
+    display: flex;
+    animation: modalIn 0.3s ease;
+}
+@keyframes modalIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.modal-content {
+    background: var(--secondary-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    padding: 35px;
+    max-width: 420px;
+    text-align: center;
+    animation: modalSlide 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes modalSlide {
+    from { transform: translateY(20px) scale(0.95); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.modal-icon    { font-size: 50px; margin-bottom: 15px; }
+.modal-title   { font-size: 22px; margin-bottom: 10px; font-weight: 700; }
+.modal-message { color: var(--text-secondary); margin-bottom: 15px; }
+
+.modal-details {
+    background: var(--card-bg);
+    padding: 15px;
+    border-radius: 14px;
+    margin-bottom: 15px;
+    text-align: left;
+}
+.modal-details p { margin: 5px 0; font-size: 14px; }
+
+.modal-btn {
+    padding: 12px 30px;
+    background: linear-gradient(135deg, var(--accent-cyan) 0%, #14b8a6 100%);
+    color: white;
+    border: none;
+    border-radius: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin: 5px;
+}
+.modal-btn:hover { transform: translateY(-2px); }
+
+.modal-btn-secondary {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+}
+
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+
+/* ============================================================
+   ESTILOS TEMÁTICOS POR FONDO
+   ============================================================ */
+
+/* GALAXIA */
+.content.bg-galaxy .category-section {
+    background: rgba(88, 28, 135, 0.7);
+    border-color: rgba(139, 92, 246, 0.5);
+}
+.content.bg-galaxy .background-item,
+.content.bg-galaxy .product-card {
+    background: rgba(76, 29, 149, 0.75);
+    border-color: rgba(139, 92, 246, 0.4);
+}
+.content.bg-galaxy .background-item:hover {
+    border-color: rgba(167, 139, 250, 0.9);
+    box-shadow: 0 12px 35px rgba(139, 92, 246, 0.4);
+}
+.content.bg-galaxy .buy-button,
+.content.bg-galaxy .product-buy-btn {
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+}
+.content.bg-galaxy .category-title { color: #c4b5fd; }
+.content.bg-galaxy .category-title i { color: #a78bfa; }
+
+/* VOLCÁN */
+.content.bg-volcano .category-section {
+    background: rgba(127, 29, 29, 0.7);
+    border-color: rgba(239, 68, 68, 0.5);
+}
+.content.bg-volcano .background-item {
+    background: rgba(153, 27, 27, 0.75);
+    border-color: rgba(248, 113, 113, 0.4);
+}
+.content.bg-volcano .background-item:hover {
+    border-color: rgba(251, 146, 60, 0.9);
+    box-shadow: 0 12px 35px rgba(249, 115, 22, 0.4);
+}
+.content.bg-volcano .buy-button,
+.content.bg-volcano .product-buy-btn {
+    background: linear-gradient(135deg, #dc2626, #f97316);
+}
+.content.bg-volcano .category-title { color: #fca5a5; }
+.content.bg-volcano .category-title i { color: #f87171; }
+
+/* OCÉANO */
+.content.bg-ocean .category-section {
+    background: rgba(7, 89, 133, 0.7);
+    border-color: rgba(56, 189, 248, 0.4);
+}
+.content.bg-ocean .background-item {
+    background: rgba(12, 74, 110, 0.8);
+    border-color: rgba(56, 189, 248, 0.35);
+}
+.content.bg-ocean .background-item:hover {
+    border-color: rgba(125, 211, 252, 0.9);
+    box-shadow: 0 12px 35px rgba(56, 189, 248, 0.4);
+}
+.content.bg-ocean .buy-button,
+.content.bg-ocean .product-buy-btn {
+    background: linear-gradient(135deg, #0284c7, #06b6d4);
+}
+.content.bg-ocean .category-title { color: #7dd3fc; }
+.content.bg-ocean .category-title i { color: #38bdf8; }
+
+/* AMAZONAS */
+.content.bg-forest .category-section {
+    background: rgba(20, 83, 45, 0.75);
+    border-color: rgba(74, 222, 128, 0.4);
+}
+.content.bg-forest .background-item {
+    background: rgba(22, 101, 52, 0.8);
+    border-color: rgba(74, 222, 128, 0.35);
+}
+.content.bg-forest .background-item:hover {
+    border-color: rgba(134, 239, 172, 0.9);
+    box-shadow: 0 12px 35px rgba(74, 222, 128, 0.4);
+}
+.content.bg-forest .buy-button,
+.content.bg-forest .product-buy-btn {
+    background: linear-gradient(135deg, #15803d, #22c55e);
+}
+.content.bg-forest .category-title { color: #86efac; }
+.content.bg-forest .category-title i { color: #4ade80; }
+
+/* AURORA */
+.content.bg-aurora .category-section {
+    background: rgba(6, 78, 59, 0.75);
+    border-color: rgba(52, 211, 153, 0.45);
+}
+.content.bg-aurora .background-item {
+    background: rgba(6, 95, 70, 0.8);
+    border-color: rgba(52, 211, 153, 0.4);
+}
+.content.bg-aurora .background-item:hover {
+    border-color: rgba(110, 231, 183, 0.9);
+    box-shadow: 0 12px 35px rgba(52, 211, 153, 0.5);
+}
+.content.bg-aurora .buy-button,
+.content.bg-aurora .product-buy-btn {
+    background: linear-gradient(135deg, #059669, #10b981);
+}
+.content.bg-aurora .category-title { color: #6ee7b7; }
+.content.bg-aurora .category-title i { color: #34d399; }
+
+/* CIELO NOCTURNO */
+.content.bg-sky .category-section {
+    background: rgba(30, 41, 59, 0.8);
+    border-color: rgba(148, 163, 184, 0.4);
+}
+.content.bg-sky .background-item {
+    background: rgba(51, 65, 85, 0.8);
+    border-color: rgba(148, 163, 184, 0.35);
+}
+.content.bg-sky .background-item:hover {
+    border-color: rgba(203, 213, 225, 0.8);
+    box-shadow: 0 12px 35px rgba(148, 163, 184, 0.3);
+}
+.content.bg-sky .buy-button,
+.content.bg-sky .product-buy-btn {
+    background: linear-gradient(135deg, #475569, #64748b);
+}
+.content.bg-sky .category-title { color: #cbd5e1; }
+.content.bg-sky .category-title i { color: #94a3b8; }
+
+/* LLUVIA DIGITAL */
+.content.bg-rain .category-section {
+    background: rgba(8, 51, 68, 0.8);
+    border-color: rgba(45, 212, 191, 0.4);
+}
+.content.bg-rain .background-item {
+    background: rgba(17, 94, 89, 0.75);
+    border-color: rgba(45, 212, 191, 0.35);
+}
+.content.bg-rain .background-item:hover {
+    border-color: rgba(94, 234, 212, 0.9);
+    box-shadow: 0 12px 35px rgba(45, 212, 191, 0.4);
+}
+.content.bg-rain .buy-button,
+.content.bg-rain .product-buy-btn {
+    background: linear-gradient(135deg, #0d9488, #2dd4bf);
+}
+.content.bg-rain .category-title { color: #5eead4; }
+.content.bg-rain .category-title i { color: #2dd4bf; }
+
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 1200px) {
+    .background-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 900px) {
+    .background-grid { grid-template-columns: repeat(2, 1fr); }
+    .streak-banner { flex-direction: column; text-align: center; gap: 16px; }
+    .streak-action { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 768px) {
+    .content { padding: 1rem; }
+    .category-section { padding: 20px; }
+    .background-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .background-preview { height: 100px; }
+    .title-default { font-size: 2.5rem; }
+}
+
+@media (max-width: 480px) {
+    .background-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .background-preview { height: 90px; }
+    .background-name { font-size: 12px; }
+    .background-price { font-size: 11px; }
+}

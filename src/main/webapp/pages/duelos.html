@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Duelos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+    <link rel="stylesheet" href="../css/duelos.css">
+</head>
+<body data-page="duelos">
+    
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="content">
+        <div class="page-header">
+            <div class="page-header-left">
+                <h2 class="page-title">
+                    <i class="fas fa-trophy"></i>
+                    Duelos
+                </h2>
+                <p class="page-subtitle">Reta a tus amigos y demuestra lo que sabes</p>
+                <!-- Victorias badge compacto -->
+                <div class="victories-badge">
+                    <div class="victories-badge-stars" id="headerStars"></div>
+                    <div class="victories-badge-icon">
+                        <i class="fas fa-crown"></i>
+                    </div>
+                    <div class="victories-badge-info">
+                        <span class="victories-badge-value" id="victoriesCount">0</span>
+                        <span class="victories-badge-label">Victorias</span>
+                    </div>
+                    <div class="victories-badge-ring"></div>
+                </div>
+            </div>
+            <button class="btn-nuevo-duelo" onclick="openCreateDuelModal()">
+                <i class="fas fa-plus"></i>
+                Nuevo Duelo
+            </button>
+        </div>
+
+        <!-- Section divider -->
+        <div class="section-divider"></div>
+
+        <!-- Tabs -->
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchTab('amigos', this)">
+                <i class="fas fa-users"></i>
+                Amigos
+            </button>
+            <button class="tab-btn" onclick="switchTab('invitaciones', this)">
+                <i class="fas fa-envelope"></i>
+                Invitaciones
+                <span class="tab-badge" id="badgeInvitations" style="display:none"></span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('retos', this)">
+                <i class="fas fa-bolt"></i>
+                Retos Activos
+                <span class="tab-badge" id="badgeRetos" style="display:none"></span>
+            </button>
+            <button class="tab-btn" onclick="switchTab('notificaciones', this)">
+                <i class="fas fa-bell"></i>
+                Notificaciones
+            </button>
+        </div>
+
+        <!-- Tab Content: Amigos -->
+        <div class="tab-content active" id="tab-amigos">
+            <div class="search-add-container">
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchFriends" placeholder="Buscar amigos..." oninput="searchFriends()">
+                </div>
+                <button class="btn-add-friend" onclick="openAddFriendModal()">
+                    <i class="fas fa-user-plus"></i>
+                    Agregar Amigo
+                </button>
+            </div>
+
+            <div class="friends-grid" id="friendsGrid"></div>
+        </div>
+
+        <!-- Tab Content: Invitaciones -->
+        <div class="tab-content" id="tab-invitaciones">
+            <div class="invitations-list" id="invitationsList"></div>
+            <div class="empty-state" id="emptyInvitations" style="display: none;">
+                <i class="fas fa-inbox"></i>
+                <h3>No tienes invitaciones pendientes</h3>
+                <p>Cuando alguien te envíe una solicitud de amistad aparecerá aquí.</p>
+            </div>
+        </div>
+
+        <!-- Tab Content: Retos Activos -->
+        <div class="tab-content" id="tab-retos">
+            <div class="challenges-list" id="challengesList"></div>
+            <div class="empty-state" id="emptyChallenges" style="display: none;">
+                <i class="fas fa-bolt"></i>
+                <h3>No tienes retos activos</h3>
+                <p>Crea un nuevo duelo para retar a tus amigos.</p>
+            </div>
+        </div>
+
+        <!-- Tab Content: Notificaciones -->
+        <div class="tab-content" id="tab-notificaciones">
+            <div class="notifications-list" id="notificationsList"></div>
+            <div class="empty-state" id="emptyNotifications" style="display: none;">
+                <i class="fas fa-bell-slash"></i>
+                <h3>Sin notificaciones</h3>
+                <p>Cuando se resuelva un duelo o recibas un reto aparecerá aquí.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Agregar Amigo -->
+    <div class="modal-overlay" id="addFriendModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-user-plus"></i>
+                    Agregar Amigo
+                </h3>
+                <button class="modal-close" onclick="closeAddFriendModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">Ingresa el correo o nombre de usuario de tu amigo</p>
+                <div class="input-group">
+                    <i class="fas fa-at"></i>
+                    <input type="text" id="friendEmailInput" placeholder="correo@ejemplo.com">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeAddFriendModal()">Cancelar</button>
+                <button class="modal-btn confirm" onclick="sendFriendRequest()">
+                    <i class="fas fa-paper-plane"></i>
+                    Enviar Solicitud
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Crear Duelo -->
+    <div class="modal-overlay" id="createDuelModal">
+        <div class="modal large">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-trophy"></i>
+                    Crear Nuevo Duelo
+                </h3>
+                <button class="modal-close" onclick="closeCreateDuelModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-user"></i>
+                        Selecciona tu oponente
+                    </label>
+                    <select id="opponentSelect" class="form-select">
+                        <option value="">Elige un amigo...</option>
+                    </select>
+                </div>
+
+                <!-- Tema del duelo: dos opciones -->
+                <div class="form-group">
+                    <label>
+                        <i class="fas fa-book"></i>
+                        Tema del duelo
+                    </label>
+                    <div class="topic-mode-toggle">
+                        <button class="topic-mode-btn active" onclick="setTopicMode('text', this)">
+                            <i class="fas fa-pen"></i>
+                            Escribir tema
+                        </button>
+                        <button class="topic-mode-btn" onclick="setTopicMode('upload', this)">
+                            <i class="fas fa-upload"></i>
+                            Subir documento
+                        </button>
+                    </div>
+
+                    <!-- Modo texto -->
+                    <div id="topicTextMode">
+                        <input type="text" id="duelTopic" class="form-input" placeholder="Ej: Matemáticas – Álgebra Lineal">
+                    </div>
+
+                    <!-- Modo upload -->
+                    <div id="topicUploadMode" style="display:none;">
+                        <div class="file-drop-zone" id="fileDropZone"
+                             onclick="document.getElementById('topicFile').click()"
+                             ondragover="handleDragOver(event)"
+                             ondrop="handleDrop(event)"
+                             ondragleave="handleDragLeave(event)">
+                            <input type="file" id="topicFile" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleFileSelect(this)">
+                            <div class="file-drop-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <p class="file-drop-text">Arrastra tu documento aquí o <span class="file-drop-link">haz clic para buscar</span></p>
+                            <p class="file-drop-hint">PDF, Word (.doc, .docx), TXT</p>
+                        </div>
+                        <div id="filePreview" class="file-preview" style="display:none;">
+                            <div class="file-preview-icon">
+                                <i class="fas fa-file-alt" id="fileTypeIcon"></i>
+                            </div>
+                            <div class="file-preview-info">
+                                <span class="file-preview-name" id="fileName">archivo.pdf</span>
+                                <span class="file-preview-size" id="fileSize">—</span>
+                            </div>
+                            <button class="file-preview-remove" onclick="clearFile()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-clock"></i>
+                            Tiempo por pregunta
+                        </label>
+                        <select id="timePerQuestion" class="form-select">
+                            <option value="15">15 segundos</option>
+                            <option value="30" selected>30 segundos</option>
+                            <option value="45">45 segundos</option>
+                            <option value="60">60 segundos</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <i class="fas fa-list-ol"></i>
+                            Número de preguntas
+                        </label>
+                        <select id="numQuestions" class="form-select">
+                            <option value="5">5 preguntas</option>
+                            <option value="10" selected>10 preguntas</option>
+                            <option value="15">15 preguntas</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeCreateDuelModal()">Cancelar</button>
+                <button class="modal-btn confirm" onclick="createDuel()">
+                    <i class="fas fa-swords"></i>
+                    Crear Duelo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage"></span>
+    </div>
+
+    <!-- Anti-loop: limpiar datos de duelo ANTES de que cargue cualquier JS -->
+    <script>sessionStorage.removeItem('duelData');</script>
+    <script src="../js/components.js"></script>
+    <script src="../js/gamification.js"></script>
+    <script src="../js/duelos.js?v=3"></script>
+</body>
+</html>

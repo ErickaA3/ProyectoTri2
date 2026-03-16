@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Mi Perfil</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/perfil.css">
+    <link rel="stylesheet" href="../css/marcos.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+</head>
+<body data-page="perfil">
+
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <!-- Content -->
+    <main class="content">
+        <div class="page-header">
+            <h2 class="page-title">
+                <i class="fas fa-user-circle"></i>
+                Mi Perfil
+            </h2>
+            <p class="page-subtitle">Gestiona tu información personal y preferencias</p>
+        </div>
+
+        <!-- Profile Card -->
+        <section class="profile-card">
+            <div class="profile-avatar" id="profileFrame" style="overflow:visible;width:120px;height:120px;display:flex;align-items:center;justify-content:center;">
+                <i class="fas fa-user"></i>
+            </div>
+            <div class="profile-info">
+                <h2 class="profile-name" id="profile-username">—</h2>
+                <p class="profile-email" id="profile-email">—</p>
+                <div class="profile-badges">
+                    <span class="badge badge-level">
+                        <i class="fas fa-chart-line"></i>
+                        Nivel <span id="profile-level">—</span>
+                    </span>
+                </div>
+            </div>
+            <button class="btn-edit" id="btn-edit-profile">
+                <i class="fas fa-pen"></i>
+                Editar Perfil
+            </button>
+        </section>
+
+        <!-- Stats Grid -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-fire"></i>
+                </div>
+                <div class="stat-value" id="stat-streak">—</div>
+                <div class="stat-label">Días de racha</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="stat-value" id="stat-xp">—</div>
+                <div class="stat-label">Puntos XP</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-coins"></i>
+                </div>
+                <div class="stat-value" id="stat-coins">—</div>
+                <div class="stat-label">Monedas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <div class="stat-value" id="stat-streak-record">—</div>
+                <div class="stat-label">Mejor racha</div>
+            </div>
+        </section>
+
+        <!-- Objetivos y Misiones -->
+        <section class="objectives-grid">
+
+            <!-- Objetivos Semanales -->
+            <div class="objectives-section">
+                <div class="section-header">
+                    <div class="section-header-icon weekly">
+                        <i class="fas fa-trophy"></i>
+                    </div>
+                    <div>
+                        <h3 class="section-title">Objetivos Semanales</h3>
+                        <p class="section-subtitle" id="weekly-reset-label">—</p>
+                    </div>
+                </div>
+                <div id="weekly-objectives-list">
+                    <div class="loading-placeholder">
+                        <i class="fas fa-spinner fa-spin"></i> Cargando...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Misiones Diarias -->
+            <div class="objectives-section">
+                <div class="section-header">
+                    <div class="section-header-icon daily">
+                        <i class="fas fa-sun"></i>
+                    </div>
+                    <div>
+                        <h3 class="section-title">Misiones Diarias</h3>
+                        <p class="section-subtitle" id="daily-reset-label">—</p>
+                    </div>
+                </div>
+                <div id="daily-missions-list">
+                    <div class="loading-placeholder">
+                        <i class="fas fa-spinner fa-spin"></i> Cargando...
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Información Personal -->
+        <section class="info-card">
+            <div class="info-card-header">
+                <div class="info-card-icon">
+                    <i class="fas fa-id-card"></i>
+                </div>
+                <h3 class="info-card-title">Información Personal</h3>
+            </div>
+            <div class="info-grid-content">
+                <div class="info-row">
+                    <span class="info-label">Nombre completo</span>
+                    <span class="info-value" id="info-fullname">—</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Fecha de nacimiento</span>
+                    <span class="info-value" id="info-birthdate">—</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">País</span>
+                    <span class="info-value" id="info-country">—</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Idioma</span>
+                    <span class="info-value" id="info-language">—</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Fecha de registro</span>
+                    <span class="info-value" id="info-createdat">—</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal Editar Perfil -->
+    <div class="modal-overlay" id="modal-edit" style="display:none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i class="fas fa-pen"></i> Editar Perfil</h3>
+                <button class="modal-close" id="btn-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre completo</label>
+                    <input type="text" id="edit-fullname" placeholder="Tu nombre completo">
+                </div>
+                <div class="form-group">
+                    <label>País</label>
+                    <input type="text" id="edit-country" placeholder="Tu país">
+                </div>
+                <div class="form-group">
+                    <label>Idioma</label>
+                    <select id="edit-language">
+                        <option value="es">Español</option>
+                        <option value="en">English</option>
+                        <option value="pt">Português</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fecha de nacimiento</label>
+                    <input type="date" id="edit-birthdate">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" id="btn-modal-cancel">Cancelar</button>
+                <button class="btn-save" id="btn-modal-save">
+                    <i class="fas fa-check"></i> Guardar
+                </button>
+            </div>
+            <p class="modal-error" id="modal-error-msg" style="display:none;"></p>
+        </div>
+    </div>
+
+    <script src="../js/components.js"></script>
+    <script src="../js/marcos.js"></script>
+    <script src="../js/perfil.js"></script>
+    <script>
+    // Renderizar marco con foto de perfil
+    function renderProfileFrame(lvl) {
+        renderFrame(lvl, 'profileFrame', null, 0.52);
+        const av = document.querySelector('#profileFrame .av');
+        if (av) {
+            const img = document.createElement('img');
+            img.src = '../images/perfil/perfil_ejemplo.png';
+            img.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:cover;border-radius:50%;z-index:2';
+            img.onerror = function() { this.style.display = 'none'; };
+            av.appendChild(img);
+        }
+    }
+
+    // Esperar a que perfil.js ponga el nivel en el DOM
+    const _poll = setInterval(() => {
+        const el = document.getElementById('profile-level');
+        const lvl = parseInt(el?.textContent);
+        if (lvl >= 1 && lvl <= 10) {
+            clearInterval(_poll);
+            renderProfileFrame(lvl);
+        }
+    }, 200);
+    // Tope: después de 5s renderiza con localStorage
+    setTimeout(() => {
+        clearInterval(_poll);
+        const el = document.getElementById('profileFrame');
+        if (el && !el.querySelector('.marco-container')) {
+            try {
+                const lvl = JSON.parse(localStorage.getItem('user'))?.stats?.level || 1;
+                renderProfileFrame(lvl);
+            } catch(_) { renderProfileFrame(1); }
+        }
+    }, 5000);
+    </script>
+
+</body>
+</html>

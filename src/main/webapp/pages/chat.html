@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mi ProfesorIA - Mi Profesor</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="../css/styles-shared.css">
+<link rel="stylesheet" href="../css/chat.css">
+</head>
+<body data-page="mi-profesor">
+
+  <!-- ══ NAVBAR + NAV-SIDEBAR desde components.js ══ -->
+  <div id="navbar-container"></div>
+  <div id="sidebar-container"></div>
+
+  <main class="content">
+
+    <!-- ══ CHAT SIDEBAR (búho + historial) ══ -->
+    <aside class="chat-sidebar">
+
+      <!-- Logo + nuevo chat -->
+      <div class="chat-logo-area">
+        <div class="chat-logo-row">
+          <div>
+            <div class="chat-logo-text">Mi ProfesorIA</div>
+            <div class="chat-logo-sub">Asistente educativo con IA</div>
+          </div>
+          <span class="online-badge"><span class="online-dot"></span>En línea</span>
+        </div>
+        <button class="new-chat-btn" onclick="newChat()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Nuevo chat
+        </button>
+      </div>
+
+      <!-- Búho con órbitas -->
+      <div class="owl-area">
+        <div class="owl-stage">
+          <svg class="ring1" width="116" height="116" viewBox="0 0 126 126" style="position:absolute;top:-8px;left:-8px;">
+            <circle cx="63" cy="4"    r="3.5" fill="#8b5cf6"/>
+            <circle cx="122" cy="63"  r="2.5" fill="#2dd4bf"/>
+            <circle cx="63"  cy="122" r="3"   fill="#ec4899"/>
+          </svg>
+          <svg class="ring2" width="132" height="132" viewBox="0 0 142 142" style="position:absolute;top:-16px;left:-16px;">
+            <circle cx="71"  cy="3"   r="2"   fill="#2dd4bf"/>
+            <circle cx="139" cy="71"  r="1.8" fill="#f97316"/>
+            <circle cx="71"  cy="139" r="2.5" fill="#8b5cf6"/>
+            <circle cx="3"   cy="71"  r="1.8" fill="#ec4899"/>
+          </svg>
+          <svg class="owl-svg" id="owlSvg" width="100" height="100" viewBox="0 0 100 100" fill="none">
+            <polygon points="50,5 33,36 67,36" fill="#8b5cf6"/>
+            <ellipse cx="50" cy="36" rx="17" ry="5" fill="#6d28d9"/>
+            <text x="44" y="28" font-size="11" fill="#f97316">★</text>
+            <circle cx="42" cy="18" r="1.5" fill="#2dd4bf" opacity="0.8"/>
+            <circle cx="58" cy="22" r="1"   fill="#ec4899" opacity="0.8"/>
+            <ellipse cx="50" cy="67" rx="24" ry="27" fill="#6d28d9"/>
+            <ellipse cx="50" cy="70" rx="14" ry="18" fill="#8b5cf6" opacity="0.55"/>
+            <ellipse cx="26" cy="68" rx="10" ry="16" fill="#5b21b6" transform="rotate(-12,26,68)"/>
+            <ellipse cx="74" cy="68" rx="10" ry="16" fill="#5b21b6" transform="rotate(12,74,68)"/>
+            <circle cx="36" cy="55" r="11" fill="#1a1a35"/>
+            <circle cx="64" cy="55" r="11" fill="#1a1a35"/>
+            <circle cx="36" cy="55" r="8"  fill="#2dd4bf" opacity="0.92"/>
+            <circle cx="64" cy="55" r="8"  fill="#2dd4bf" opacity="0.92"/>
+            <g class="el"><circle cx="36" cy="55" r="5" fill="#0f0f23"/><circle cx="38" cy="53" r="1.5" fill="white"/></g>
+            <g class="er"><circle cx="64" cy="55" r="5" fill="#0f0f23"/><circle cx="66" cy="53" r="1.5" fill="white"/></g>
+            <circle cx="36" cy="55" r="8" fill="none" stroke="#2dd4bf" stroke-width="1" opacity="0.3"/>
+            <circle cx="64" cy="55" r="8" fill="none" stroke="#2dd4bf" stroke-width="1" opacity="0.3"/>
+            <polygon points="50,62 44,68 56,68" fill="#f97316"/>
+            <g class="mg"><path d="M 38 74 Q 50 80 62 74" stroke="#2dd4bf" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>
+            <line x1="38" y1="92" x2="30" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="38" y1="92" x2="38" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="38" y1="92" x2="46" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="62" y1="92" x2="54" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="62" y1="92" x2="62" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="62" y1="92" x2="70" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="owl-name">Búho ProfesorIA</div>
+        <div class="owl-sub">Mago del Conocimiento</div>
+      </div>
+
+      <!-- Chats recientes -->
+      <div class="recents">
+        <div class="section-label">Chats recientes</div>
+        <!-- Los items se cargan dinámicamente desde chat.js -->
+      </div>
+
+      <!-- Perfil del chat sidebar -->
+      <div class="chat-profile-area">
+        <div class="chat-profile-card">
+          <div class="chat-avatar" id="chatAvatar">?</div>
+          <div class="chat-profile-info">
+            <div class="chat-profile-name" id="chatProfileName">Usuario</div>
+            <div class="chat-profile-plan">Plan Pro</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ══ CHAT PRINCIPAL ══ -->
+    <div class="chat-main">
+
+      <div class="msgs" id="msgsArea">
+
+        <!-- Mensaje de bienvenida -->
+        <div class="msg bot" id="welcomeMsg">
+          <div class="msg-av bot-av">
+            <svg width="20" height="20" viewBox="0 0 100 100" fill="none">
+              <polygon points="50,5 33,36 67,36" fill="#8b5cf6"/>
+              <ellipse cx="50" cy="36" rx="17" ry="5" fill="#6d28d9"/>
+              <ellipse cx="50" cy="67" rx="24" ry="27" fill="#6d28d9"/>
+              <ellipse cx="50" cy="70" rx="14" ry="18" fill="#8b5cf6" opacity="0.6"/>
+              <circle cx="36" cy="55" r="9" fill="#1a1a35"/><circle cx="64" cy="55" r="9" fill="#1a1a35"/>
+              <circle cx="36" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/><circle cx="64" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/>
+              <circle cx="36" cy="55" r="4" fill="#0f0f23"/><circle cx="64" cy="55" r="4" fill="#0f0f23"/>
+              <polygon points="50,62 44,68 56,68" fill="#f97316"/>
+            </svg>
+          </div>
+          <div class="msg-body">
+            <div class="msg-who">Búho ProfesorIA</div>
+            <div class="bubble">¡Hola! Soy tu <strong>Búho ProfesorIA</strong>, tu guía del conocimiento. ¿En qué te puedo ayudar hoy?</div>
+            <div class="msg-time" id="initTime"></div>
+          </div>
+        </div>
+
+        <!-- Typing indicator -->
+        <div class="typing" id="typingRow">
+          <div class="msg-av bot-av">
+            <svg width="20" height="20" viewBox="0 0 100 100" fill="none">
+              <polygon points="50,5 33,36 67,36" fill="#8b5cf6"/>
+              <ellipse cx="50" cy="36" rx="17" ry="5" fill="#6d28d9"/>
+              <ellipse cx="50" cy="67" rx="24" ry="27" fill="#6d28d9"/>
+              <ellipse cx="50" cy="70" rx="14" ry="18" fill="#8b5cf6" opacity="0.6"/>
+              <circle cx="36" cy="55" r="9" fill="#1a1a35"/><circle cx="64" cy="55" r="9" fill="#1a1a35"/>
+              <circle cx="36" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/><circle cx="64" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/>
+              <circle cx="36" cy="55" r="4" fill="#0f0f23"/><circle cx="64" cy="55" r="4" fill="#0f0f23"/>
+              <polygon points="50,62 44,68 56,68" fill="#f97316"/>
+            </svg>
+          </div>
+          <div class="typing-dots">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Input -->
+      <div class="input-area">
+        <div class="input-box">
+          <textarea id="userInput" rows="1" placeholder="Escríbeme tu pregunta..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="send()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+            </svg>
+          </button>
+        </div>
+        <div class="input-hint">Enter para enviar · Shift+Enter nueva línea</div>
+      </div>
+
+    </div><!-- /chat-main -->
+  </main>
+
+  <script src="../js/components.js"></script>
+  <script src="../js/chat.js"></script>
+</body>
+</html>

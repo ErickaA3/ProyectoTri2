@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Favoritos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/favoritos.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+</head>
+<body data-page="favoritos">
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <!-- Content -->
+    <main class="content">
+        <div class="page-header">
+            <h2 class="page-title">
+                <i class="fas fa-heart"></i>
+                Favoritos
+            </h2>
+            <p class="page-subtitle">Tu contenido guardado en un solo lugar</p>
+        </div>
+
+        <div class="search-container">
+            <div class="search-bar">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Buscar en tus favoritos..." oninput="filterFavorites()">
+            </div>
+        </div>
+
+        <div class="filter-container">
+            <button class="filter-tab active" onclick="setFilter('all', this)">
+                <i class="fas fa-heart"></i>
+                Todos
+            </button>
+            <button class="filter-tab" onclick="setFilter('flashcard', this)">
+                <i class="fas fa-layer-group"></i>
+                Flashcards
+            </button>
+            <button class="filter-tab" onclick="setFilter('schema', this)">
+                <i class="fas fa-project-diagram"></i>
+                Esquemas
+            </button>
+            <button class="filter-tab" onclick="setFilter('summary', this)">
+                <i class="fas fa-file-alt"></i>
+                Resúmenes
+            </button>
+            <button class="filter-tab" onclick="setFilter('quiz', this)">
+                <i class="fas fa-clipboard-list"></i>
+                Quizzes
+            </button>
+        </div>
+
+        <div class="favorites-grid" id="favoritesGrid"></div>
+
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <i class="fas fa-heart-crack"></i>
+            <h3>No tienes favoritos aún</h3>
+            <p>Guarda tu contenido favorito desde flashcards, esquemas, resúmenes o quizzes.</p>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="removeModal">
+        <div class="modal">
+            <div class="modal-icon">
+                <i class="fas fa-heart-crack"></i>
+            </div>
+            <h3>¿Eliminar de favoritos?</h3>
+            <p>¿Estás seguro de quitar <span class="modal-item-name" id="modalItemName"></span> de tus favoritos?</p>
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeRemoveModal()">Cancelar</button>
+                <button class="modal-btn confirm" onclick="confirmRemove()">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+        <i class="fas fa-check-circle"></i>
+        <span id="toastMessage">Eliminado de favoritos</span>
+    </div>
+
+    <script src="../js/favoritos.js"></script>
+    <script src="../js/components.js"></script>
+</body>
+</html>
