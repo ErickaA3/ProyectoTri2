@@ -59,7 +59,7 @@ function renderFrame(level, containerId, avatarContent, scale) {
 
     // Avatar HTML (shared across all frames)
     const avHtml = `<div class="av">${avatarInner}</div>`;
-    const badgeHtml = s < 0.5 ? '' : `<div class="badge ${getBadgeClass(lvl)}">Nv. ${lvl}</div>`;
+    const badgeHtml = '';
 
     let frameHtml = '';
 

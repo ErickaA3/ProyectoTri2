@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi ProfesorIA - Duelo</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles-shared.css">
+    <link rel="stylesheet" href="../css/examen-experto.css">
+</head>
+<body data-page="duelos">
+
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <canvas id="starsCanvas"></canvas>
+    <main class="content" style="padding: 0; overflow-x: hidden;">
+    <div class="exam-wrapper">
+        <div class="exam-topbar">
+            <div class="exam-topbar-left">
+                <button class="btn-salir" onclick="confirmExit()"><i class="fas fa-arrow-left"></i> Salir</button>
+                <div class="exam-title-bar"><i class="fas fa-bolt"></i><span id="duelTitle">Duelo</span></div>
+                <div class="mode-badge-top"><i class="fas fa-trophy"></i><span>DUELO</span></div>
+            </div>
+            <div class="exam-topbar-right">
+                <div class="question-counter"><span id="qCurrent">1</span> / <span id="qTotal">10</span></div>
+                <div class="timer" id="timerBox"><i class="fas fa-clock"></i><span class="timer-value" id="timerDisplay">00:00</span></div>
+            </div>
+        </div>
+        <div class="progress-container"><div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div></div>
+        <div class="exam-screen" id="examScreen">
+            <div class="question-area">
+                <div class="question-card" id="questionCard">
+                    <div class="question-number" id="qNumber">Pregunta 1</div>
+                    <div class="question-text" id="qText"></div>
+                    <div class="options-list" id="optionsList"></div>
+                    <div class="nav-buttons">
+                        <div class="question-dots" id="qDots"></div>
+                        <button class="btn-nav btn-siguiente" id="btnNext" onclick="nextQuestion()" disabled>Siguiente <i class="fas fa-arrow-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="results-screen" id="resultsScreen">
+            <div class="results-card">
+                <h2 class="results-main-title" id="resultsTitle">¡Duelo completado!</h2>
+                <p class="results-main-subtitle" id="resultsSubtitle"></p>
+                <div class="grade-circle-wrapper"><div class="grade-circle">
+                    <svg viewBox="0 0 160 160"><circle class="track" cx="80" cy="80" r="75"/><circle class="fill-circle" id="gradeCircle" cx="80" cy="80" r="75"/></svg>
+                    <div class="grade-number" id="gradeNumber">0</div><div class="grade-label" id="gradeLabel">/ 10</div>
+                </div></div>
+                <div class="xp-earned" id="xpEarned" style="display:none;"><i class="fas fa-bolt"></i><span id="xpAmount"></span></div>
+                <p class="grade-message" id="gradeMessage"></p>
+                <div class="results-stats" id="resultsStats"></div>
+                <div class="results-review" id="reviewSection" style="display:none;">
+                    <div class="review-title"><i class="fas fa-list-check"></i> Revisión</div>
+                    <div class="review-list" id="reviewList"></div>
+                </div>
+                <div class="results-actions">
+                    <button class="btn-result btn-retry" onclick="window.location.href='duelos.html'"><i class="fas fa-arrow-left"></i> Volver a Duelos</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </main>
+    <div class="modal-overlay" id="exitModal"><div class="modal">
+        <div class="modal-icon exit"><i class="fas fa-door-open"></i></div>
+        <h3>¿Salir del duelo?</h3><p>Si sales se contará como <span class="highlight">derrota</span>.</p>
+        <div class="modal-actions"><button class="modal-btn cancel" onclick="closeExitModal()">Continuar</button><button class="modal-btn confirm-red" onclick="window.location.href='duelos.html'">Salir</button></div>
+    </div></div>
+    <script src="../js/components.js"></script>
+    <script src="../js/gamification.js"></script>
+    <script>
+    const CTX=window.location.pathname.split('/pages')[0];
+    function getUserId(){try{return JSON.parse(localStorage.getItem('user'))?.id||null}catch(_){return null}}
+    function duelHeaders(){const u=getUserId();return{'Content-Type':'application/json',...(u?{'X-User-Id':u}:{})}}
+
+    const duelData=JSON.parse(sessionStorage.getItem('duelData')||'null');
+
+    // ── VALIDACIÓN: si no hay datos, NO redirigir (evita loops) ──
+    if(!duelData || !duelData.questions || duelData.questions.length===0){
+        sessionStorage.removeItem('duelData');
+        document.querySelector('.exam-wrapper').innerHTML=`
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:1.5rem;text-align:center;padding:2rem;">
+                <i class="fas fa-exclamation-triangle" style="font-size:3rem;color:var(--accent-yellow,#fbbf24);"></i>
+                <h2 style="margin:0;">No hay datos de duelo</h2>
+                <p style="color:var(--text-secondary,#a0a0c0);margin:0;">Vuelve a la página de duelos y selecciona "Jugar Ahora" desde un reto activo.</p>
+                <a href="duelos.html" style="padding:12px 28px;background:var(--accent-cyan,#2dd4bf);color:#0f0f23;border-radius:12px;text-decoration:none;font-weight:600;font-family:inherit;">Ir a Duelos</a>
+            </div>`;
+    } else {
+    // ── FLUJO NORMAL ──
+
+    const questions=duelData.questions||[],totalQ=questions.length,duelId=duelData.duelId;
+    let currentQ=0,score=0,answers=[],startTime=Date.now(),questionStart=Date.now(),timerInterval=null,selectedIdx=null;
+
+    document.getElementById('duelTitle').textContent=duelData.title||'Duelo';
+    document.getElementById('qTotal').textContent=totalQ;
+    document.getElementById('qDots').innerHTML=questions.map((_,i)=>`<div class="q-dot ${i===0?'current':''}" id="dot-${i}"></div>`).join('');
+
+    timerInterval=setInterval(()=>{
+        const e=Math.floor((Date.now()-startTime)/1000);
+        document.getElementById('timerDisplay').textContent=String(Math.floor(e/60)).padStart(2,'0')+':'+String(e%60).padStart(2,'0');
+    },1000);
+
+    initStars();showQuestion(0);
+
+    function showQuestion(idx){
+        const q=questions[idx];if(!q)return;currentQ=idx;selectedIdx=null;questionStart=Date.now();
+        document.querySelectorAll('.q-dot').forEach((d,i)=>d.classList.toggle('current',i===idx));
+        const card=document.getElementById('questionCard');
+        card.classList.add('exit');
+        setTimeout(()=>{
+            card.classList.remove('exit');
+            document.getElementById('qNumber').textContent=`Pregunta ${idx+1}`;
+            document.getElementById('qText').textContent=q.question;
+            document.getElementById('qCurrent').textContent=idx+1;
+            document.getElementById('progressFill').style.width=`${((idx+1)/totalQ)*100}%`;
+            document.getElementById('optionsList').innerHTML=(q.options||[]).map((opt,i)=>`<button class="option-btn" onclick="selectOption(${i},this)"><span class="option-letter">${String.fromCharCode(65+i)}</span><span class="option-text">${opt}</span></button>`).join('');
+            const btn=document.getElementById('btnNext');btn.disabled=true;
+            btn.innerHTML=idx<totalQ-1?'Siguiente <i class="fas fa-arrow-right"></i>':'<i class="fas fa-flag-checkered"></i> Finalizar';
+            if(idx===totalQ-1){btn.classList.remove('btn-siguiente');btn.classList.add('btn-entregar');}
+        },idx===0?0:300);
+    }
+
+    function selectOption(idx,el){
+        if(selectedIdx!==null)return;selectedIdx=idx;
+        const q=questions[currentQ],correct=q.correct,isCorrect=idx===correct,timeMs=Date.now()-questionStart;
+        if(isCorrect)score++;
+        answers.push({questionIndex:currentQ,answerGiven:String(idx),isCorrect,timeMs});
+        document.getElementById(`dot-${currentQ}`).classList.add('answered');
+        document.querySelectorAll('.option-btn').forEach((btn,i)=>{
+            btn.style.pointerEvents='none';
+            const letter=btn.querySelector('.option-letter');
+            if(i===correct){btn.style.borderColor='var(--accent-green)';btn.style.background='rgba(34,197,94,0.15)';letter.style.background='var(--accent-green)';letter.style.color='#0f0f23';letter.style.borderColor='var(--accent-green)';}
+            if(i===idx&&!isCorrect){btn.style.borderColor='var(--accent-red)';btn.style.background='rgba(239,68,68,0.15)';letter.style.background='var(--accent-red)';letter.style.color='#fff';letter.style.borderColor='var(--accent-red)';}
+        });
+        document.getElementById('btnNext').disabled=false;
+    }
+
+    function nextQuestion(){if(selectedIdx===null)return;if(currentQ<totalQ-1)showQuestion(currentQ+1);else finishDuel();}
+
+    async function finishDuel(){
+        clearInterval(timerInterval);
+        const totalTime=Math.floor((Date.now()-startTime)/1000);
+        document.getElementById('examScreen').classList.add('hidden');
+        document.getElementById('resultsScreen').classList.add('active');
+
+        const pct=totalQ>0?(score/totalQ)*100:0;
+        const circ=2*Math.PI*75,offset=circ-(circ*pct/100);
+        const circle=document.getElementById('gradeCircle');
+        circle.style.stroke=pct>=80?'var(--accent-green)':pct>=50?'var(--accent-yellow)':'var(--accent-red)';
+        setTimeout(()=>{circle.style.strokeDashoffset=offset;},200);
+        document.getElementById('gradeNumber').textContent=score;
+        document.getElementById('gradeLabel').textContent=`/ ${totalQ}`;
+
+        const m=Math.floor(totalTime/60),s=totalTime%60;
+        document.getElementById('resultsStats').innerHTML=`
+            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(34,197,94,0.2);color:var(--accent-green)"><i class="fas fa-check"></i></div><div class="stat-card-value">${score}</div><div class="stat-card-label">Correctas</div></div>
+            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(239,68,68,0.2);color:var(--accent-red)"><i class="fas fa-times"></i></div><div class="stat-card-value">${totalQ-score}</div><div class="stat-card-label">Incorrectas</div></div>
+            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(45,212,191,0.2);color:var(--accent-cyan)"><i class="fas fa-clock"></i></div><div class="stat-card-value">${m}:${String(s).padStart(2,'0')}</div><div class="stat-card-label">Tiempo</div></div>
+            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(251,191,36,0.2);color:var(--accent-yellow)"><i class="fas fa-percentage"></i></div><div class="stat-card-value">${Math.round(pct)}%</div><div class="stat-card-label">Acierto</div></div>`;
+
+        document.getElementById('reviewSection').style.display='block';
+        document.getElementById('reviewList').innerHTML=answers.map((a,i)=>{
+            const q=questions[a.questionIndex],cls=a.isCorrect?'correct':'incorrect',icon=a.isCorrect?'fa-check':'fa-times';
+            return `<div class="review-item ${cls}"><div class="review-icon"><i class="fas ${icon}"></i></div><div class="review-q"><div class="review-q-text">${i+1}. ${q.question}</div><div class="review-a-text">Tu: ${q.options[parseInt(a.answerGiven)]||'—'}${!a.isCorrect?' · Correcta: '+q.options[q.correct]:''}</div></div></div>`;
+        }).join('');
+
+        try{
+            const res=await fetch(CTX+'/api/duels/submit',{method:'POST',headers:duelHeaders(),body:JSON.stringify({duelId,score,maxScore:totalQ,timeSecs:totalTime,answers})});
+            const data=await res.json();
+            console.log('[Duelo] Submit:',data);
+            if(data.success)showDuelResult(data,totalTime);
+            else{document.getElementById('resultsTitle').textContent='Completado';document.getElementById('resultsSubtitle').textContent=data.error||'Error al enviar resultado';}
+        }catch(e){console.error('[Duelo]',e);document.getElementById('resultsTitle').textContent='Completado';document.getElementById('resultsSubtitle').textContent='Error de conexión';}
+        sessionStorage.removeItem('duelData');
+    }
+
+    function showDuelResult(data){
+        const title=document.getElementById('resultsTitle'),sub=document.getElementById('resultsSubtitle'),msg=document.getElementById('gradeMessage');
+        if(data.duelFinished){
+            if(data.result==='win'){title.textContent='🏆 ¡Victoria!';title.style.color='var(--accent-yellow)';msg.textContent=`Oponente: ${data.otherScore}/${totalQ}`;msg.style.color='var(--accent-green)';}
+            else if(data.result==='loss'){title.textContent='😞 Derrota';title.style.color='var(--accent-red)';msg.textContent=`Oponente: ${data.otherScore}/${totalQ}`;msg.style.color='var(--accent-red)';}
+            else{title.textContent='🤝 Empate';title.style.color='var(--accent-cyan)';msg.textContent=`Ambos: ${score}/${totalQ}`;msg.style.color='var(--accent-cyan)';}
+            sub.textContent=`Tiempo oponente: ${Math.floor(data.otherTime/60)}m ${data.otherTime%60}s`;
+            if(data.reward){
+                const xpEarned=data.reward.xpEarned||0;
+                const coinsEarned=data.reward.coinsEarned||0;
+                if(xpEarned>0||coinsEarned>0){
+                    document.getElementById('xpEarned').style.display='flex';
+                    document.getElementById('xpAmount').textContent=`+${xpEarned} XP · +${coinsEarned} monedas`;
+                }
+                // Actualizar localStorage con los nuevos stats
+                try{
+                    const u=JSON.parse(localStorage.getItem('user'))||{};
+                    if(!u.stats)u.stats={};
+                    if(data.reward.newXp!==undefined)u.stats.xp=data.reward.newXp;
+                    if(data.reward.newCoins!==undefined)u.stats.coins=data.reward.newCoins;
+                    if(data.reward.newLevel!==undefined)u.stats.level=data.reward.newLevel;
+                    localStorage.setItem('user',JSON.stringify(u));
+                }catch(_){}
+            }
+        }else{
+            title.textContent='⏳ ¡Resultado enviado!';title.style.color='var(--accent-cyan)';
+            sub.textContent='Tu resultado fue guardado';
+            msg.innerHTML='<span style="color:var(--accent-yellow)"><i class="fas fa-hourglass-half"></i> Esperando a que tu oponente juegue...</span><br><small style="color:var(--text-secondary)">Podrás ver el resultado en Notificaciones cuando termine.</small>';
+        }
+    }
+
+    function confirmExit(){document.getElementById('exitModal').classList.add('show');}
+    function closeExitModal(){document.getElementById('exitModal').classList.remove('show');}
+    document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');}));
+
+    function initStars(){
+        const c=document.getElementById('starsCanvas');if(!c)return;const ctx=c.getContext('2d');
+        c.width=window.innerWidth;c.height=window.innerHeight;
+        const stars=Array.from({length:150},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.5+0.3,o:Math.random()*0.5+0.1,d:(Math.random()-0.5)*0.01}));
+        function draw(){ctx.clearRect(0,0,c.width,c.height);stars.forEach(s=>{s.o+=s.d;if(s.o<0.05||s.o>0.6)s.d*=-1;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(200,180,255,${s.o})`;ctx.fill();});requestAnimationFrame(draw);}
+        draw();window.addEventListener('resize',()=>{c.width=window.innerWidth;c.height=window.innerHeight;});
+    }
+    } // end else (duelData exists)
+    </script>
+</body>
+</html>

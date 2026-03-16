@@ -4,9 +4,10 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Polaris</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <style>
+@font-face{font-family:'Coolvetica';src:url('css/fonts/coolvetica-rg.otf') format('opentype');font-weight:400;font-display:swap}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{
   --cyan:#2dd4bf;--cyan-dim:rgba(45,212,191,0.15);--cyan-glow:rgba(45,212,191,0.35);
@@ -18,20 +19,20 @@
 html,body{width:100%;height:100%;font-family:'DM Sans',sans-serif;color:var(--text);overflow:hidden}
 body{background:var(--bg);background-image:radial-gradient(ellipse 80% 60% at 20% -10%,rgba(45,212,191,0.06) 0%,transparent 60%),radial-gradient(ellipse 60% 50% at 80% 110%,rgba(139,92,246,0.05) 0%,transparent 60%),radial-gradient(ellipse 40% 40% at 50% 50%,rgba(56,189,248,0.03) 0%,transparent 70%)}
 body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(45,212,191,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(45,212,191,0.02) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
-.navbar{position:relative;z-index:10;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;border-bottom:1px solid var(--border);background:rgba(5,6,15,0.7);backdrop-filter:blur(24px)}
-.nav-brand{font-family:'Syne',sans-serif;font-weight:800;font-size:1.15rem;letter-spacing:.12em;text-transform:uppercase;background:linear-gradient(135deg,var(--text),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.navbar{position:relative;z-index:10;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 2.5rem;border-bottom:1px solid var(--border);background:#23234b;backdrop-filter:blur(24px)}
+.nav-brand{font-family:'Coolvetica',sans-serif;font-weight:800;font-size:1.15rem;letter-spacing:.12em;text-transform:uppercase;background:linear-gradient(135deg,var(--text),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .nav-links{display:flex;gap:2rem;align-items:center}
 .nav-links a{color:var(--muted);text-decoration:none;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;transition:color .25s}
 .nav-links a:hover{color:var(--cyan)}
 .hero{position:relative;z-index:1;height:calc(100vh - 64px);display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center}
 .hero-badge{display:inline-flex;align-items:center;gap:.5rem;padding:5px 14px;border:1px solid rgba(45,212,191,0.2);border-radius:50px;background:rgba(45,212,191,0.05);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);margin-bottom:1.8rem;animation:fadeUp .8s ease both}
-.hero h1{font-family:'Syne',sans-serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:800;line-height:1.1;color:var(--text);margin-bottom:1.2rem;animation:fadeUp .8s ease .1s both}
+.hero h1{font-family:'Coolvetica',sans-serif;font-size:clamp(2.5rem,5vw,4rem);font-weight:800;line-height:1.1;color:var(--text);margin-bottom:1.2rem;animation:fadeUp .8s ease .1s both}
 .hero h1 span{background:linear-gradient(135deg,var(--cyan),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hero p{color:var(--text-dim);font-size:1rem;font-weight:300;max-width:420px;line-height:1.7;margin-bottom:2.5rem;animation:fadeUp .8s ease .2s both}
 .cta-group{display:flex;gap:1rem;animation:fadeUp .8s ease .3s both}
-.btn-primary{padding:13px 32px;border:none;border-radius:50px;background:linear-gradient(135deg,var(--cyan),var(--blue));color:#030711;font-family:'Syne',sans-serif;font-size:.82rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+.btn-primary{padding:13px 32px;border:none;border-radius:50px;background:linear-gradient(135deg,var(--cyan),var(--blue));color:#030711;font-family:'Coolvetica',sans-serif;font-size:.82rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:all .25s}
 .btn-primary:hover{transform:translateY(-2px);box-shadow:0 10px 35px var(--cyan-glow)}
-.btn-ghost{padding:13px 28px;border:1px solid var(--border-hover);border-radius:50px;background:transparent;color:var(--text-dim);font-family:'Syne',sans-serif;font-size:.82rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+.btn-ghost{padding:13px 28px;border:1px solid var(--border-hover);border-radius:50px;background:transparent;color:var(--text-dim);font-family:'Coolvetica',sans-serif;font-size:.82rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;transition:all .25s}
 .btn-ghost:hover{color:var(--cyan);border-color:var(--cyan);background:var(--cyan-dim)}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .3s}
 .modal-overlay.show{opacity:1;pointer-events:all}
@@ -41,7 +42,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .modal-close{position:absolute;top:16px;right:20px;background:none;border:none;color:var(--muted);font-size:1rem;cursor:pointer;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;transition:all .2s}
 .modal-close:hover{color:var(--text);background:var(--border)}
 .tabs{display:flex;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:24px}
-.tab{flex:1;padding:8px;border:none;border-radius:8px;background:none;color:var(--muted);font-family:'Syne',sans-serif;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:all .25s}
+.tab{flex:1;padding:8px;border:none;border-radius:8px;background:none;color:var(--muted);font-family:'Coolvetica',sans-serif;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;transition:all .25s}
 .tab.active{background:var(--cyan-dim);color:var(--cyan);border:1px solid rgba(45,212,191,0.2)}
 .form-group{margin-bottom:14px}
 .form-group label{display:block;font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
@@ -59,7 +60,7 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 .alert.show{display:flex}
 .alert-error{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);color:var(--error)}
 .alert-success{background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.25);color:var(--success)}
-.submit-btn{width:100%;padding:13px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));color:#030711;font-family:'Syne',sans-serif;font-size:.82rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;margin-top:6px;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:.5rem}
+.submit-btn{width:100%;padding:13px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));color:#030711;font-family:'Coolvetica',sans-serif;font-size:.82rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;margin-top:6px;transition:all .25s;display:flex;align-items:center;justify-content:center;gap:.5rem}
 .submit-btn:hover{transform:translateY(-1px);box-shadow:0 8px 25px var(--cyan-glow)}
 .submit-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 .spinner{width:15px;height:15px;border:2px solid rgba(3,7,17,0.3);border-top-color:#030711;border-radius:50%;animation:spin .6s linear infinite;display:none}
@@ -71,11 +72,8 @@ body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(
 <body>
 
 <nav class="navbar">
-  <div class="nav-brand">⋆ Polaris</div>
-  <div class="nav-links">
-    <a href="#">Explorar</a>
-    <a href="#">Acerca</a>
-    <a href="#">Contacto</a>
+  <div class="nav-brand">
+    <img src="images/icons/PolarisLogo.svg" alt="Polaris" style="height:36px;width:auto;object-fit:contain;" onerror="this.onerror=null;this.style.display='none';this.insertAdjacentHTML('afterend','<span style=\'font-family:Coolvetica,sans-serif;font-size:1.15rem;letter-spacing:.12em;background:linear-gradient(135deg,var(--text),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;\'>⋆ Polaris</span>')">
   </div>
 </nav>
 
