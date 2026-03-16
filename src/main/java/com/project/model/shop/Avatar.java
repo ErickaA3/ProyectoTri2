@@ -6,7 +6,7 @@ package com.project.model.shop;
  */
 public class Avatar extends Product {
 
-    private String emoji;   // ej: "👨‍🏫", "🧙‍♂️"
+    private String emoji;   
 
     // ────────────────────── constructores ──────────────────────
 

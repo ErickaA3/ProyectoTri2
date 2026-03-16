@@ -1,6 +1,7 @@
 // ============================================================
 // examen-quiz.js
 // Lógica del Modo Quiz — formativo, feedback inmediato
+// CORREGIDO: Usa configuraciones, retry/review funciona
 // ============================================================
 
 // ===== STARS CANVAS =====
@@ -61,13 +62,21 @@ function loadExamData() {
         }
 
         const cfg = flow?.configs?.examenes || {};
+        
+        // CORREGIDO: Leer número de preguntas de la configuración
+        const numPreguntas = cfg.numPreguntas || results.examenes.questions.length;
+        // Limitar las preguntas según la configuración
+        const allQuestions = results.examenes.questions;
+        const questionsToUse = allQuestions.slice(0, Math.min(numPreguntas, allQuestions.length));
+        
         return {
             id:          results.examenes.id,
             title:       results.examenes.title || 'Quiz',
             hasTimer:    cfg.hasTimer ?? false,
-            timeMinutes: cfg.timerMinutos ?? 10,
+            timeMinutes: cfg.timerMinutos ?? 10,  // CORREGIDO: usar timerMinutos
             showExplain: cfg.showExplain ?? true,
-            questions:   results.examenes.questions
+            questions:   questionsToUse,
+            allQuestions: allQuestions  // Guardar todas por si hace retry
         };
     } catch(e) {
         console.error('Error cargando datos del quiz:', e);
@@ -75,14 +84,16 @@ function loadExamData() {
     }
 }
 
-const examData = loadExamData();
+// Variables globales
+let examData = null;
+let originalQuestions = [];  // Para retry completo
 
 // ===== STATE =====
 let currentQuestion = 0;
-let answers         = examData ? new Array(examData.questions.length).fill(null) : [];
-let questionLocked  = examData ? new Array(examData.questions.length).fill(false) : [];
-let questionResults = examData ? new Array(examData.questions.length).fill(null) : [];
-let totalSeconds    = examData ? examData.timeMinutes * 60 : 0;
+let answers         = [];
+let questionLocked  = [];
+let questionResults = [];
+let totalSeconds    = 0;
 let timerInterval = null;
 let alertShownAt2min = false, alertShownAt1min = false, examFinished = false;
 let correctCount = 0, incorrectCount = 0, streak = 0, bestStreak = 0;
@@ -90,12 +101,46 @@ const letters = ['A','B','C','D'];
 
 // ===== INIT =====
 function initExam() {
+    examData = loadExamData();
     if (!examData) return;
+    
+    // Guardar preguntas originales para retry
+    originalQuestions = [...examData.allQuestions];
+    
+    // Inicializar arrays según número de preguntas
+    resetState();
+    
     initStars();
     document.getElementById('examTitleBar').textContent = examData.title;
     document.getElementById('totalQ').textContent = examData.questions.length;
-    if (examData.hasTimer) { document.getElementById('timer').classList.remove('timer-hidden'); startTimer(); }
-    renderQuestion(); renderDots();
+    
+    if (examData.hasTimer) { 
+        document.getElementById('timer').classList.remove('timer-hidden'); 
+        startTimer(); 
+    }
+    
+    renderQuestion(); 
+    renderDots();
+}
+
+function resetState() {
+    currentQuestion = 0;
+    answers = new Array(examData.questions.length).fill(null);
+    questionLocked = new Array(examData.questions.length).fill(false);
+    questionResults = new Array(examData.questions.length).fill(null);
+    totalSeconds = examData.timeMinutes * 60;
+    alertShownAt2min = false;
+    alertShownAt1min = false;
+    examFinished = false;
+    correctCount = 0;
+    incorrectCount = 0;
+    streak = 0;
+    bestStreak = 0;
+    
+    // Reset UI counters
+    document.getElementById('scoreCorrect').textContent = '0';
+    document.getElementById('scoreIncorrect').textContent = '0';
+    document.getElementById('streakCount').textContent = '0';
 }
 
 // ===== RENDER =====
@@ -111,8 +156,14 @@ function renderQuestion() {
     list.innerHTML = q.options.map((opt, i) => {
         let cls = 'option-btn', fb = '';
         if (locked) {
-            if (i === q.correct) { cls += ' correct'; fb = '<span class="option-feedback"><i class="fas fa-check-circle" style="color:var(--accent-green)"></i></span>'; }
-            else if (i === answers[currentQuestion]) { cls += ' incorrect'; fb = '<span class="option-feedback"><i class="fas fa-times-circle" style="color:var(--accent-red)"></i></span>'; }
+            if (i === q.correct) { 
+                cls += ' correct'; 
+                fb = '<span class="option-feedback"><i class="fas fa-check-circle" style="color:var(--accent-green)"></i></span>'; 
+            }
+            else if (i === answers[currentQuestion]) { 
+                cls += ' incorrect'; 
+                fb = '<span class="option-feedback"><i class="fas fa-times-circle" style="color:var(--accent-red)"></i></span>'; 
+            }
             else { cls += ' disabled-opt'; }
         } else if (answers[currentQuestion] === i) { cls += ' selected'; }
         return `<button class="${cls}" ${locked ? '' : `onclick="selectOption(${i})"`}><span class="option-letter">${letters[i]}</span><span class="option-text">${opt}</span>${fb}</button>`;
@@ -144,8 +195,17 @@ function selectOption(index) {
     answers[currentQuestion] = index;
     questionLocked[currentQuestion] = true;
     const q = examData.questions[currentQuestion];
-    if (index === q.correct) { correctCount++; streak++; if (streak > bestStreak) bestStreak = streak; questionResults[currentQuestion] = 'correct'; }
-    else { incorrectCount++; streak = 0; questionResults[currentQuestion] = 'incorrect'; }
+    if (index === q.correct) { 
+        correctCount++; 
+        streak++; 
+        if (streak > bestStreak) bestStreak = streak; 
+        questionResults[currentQuestion] = 'correct'; 
+    }
+    else { 
+        incorrectCount++; 
+        streak = 0; 
+        questionResults[currentQuestion] = 'incorrect'; 
+    }
     document.getElementById('scoreCorrect').textContent = correctCount;
     document.getElementById('scoreIncorrect').textContent = incorrectCount;
     document.getElementById('streakCount').textContent = streak;
@@ -175,12 +235,59 @@ function nextQuestion() {
 }
 
 // ===== TIMER =====
-function startTimer() { updateTimerDisplay(); timerInterval = setInterval(() => { totalSeconds--; if(totalSeconds<=0){totalSeconds=0;clearInterval(timerInterval);timeUp();} updateTimerDisplay();updateTimerState(); },1000); }
-function updateTimerDisplay() { const m=Math.floor(totalSeconds/60),s=totalSeconds%60; document.getElementById('timerValue').textContent=`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
-function updateTimerState() { const t=document.getElementById('timer');t.classList.remove('warning','danger'); if(totalSeconds<=60){t.classList.add('danger');if(!alertShownAt1min){alertShownAt1min=true;showTimerAlert('Último minuto','Te queda menos de 1 minuto.');}} else if(totalSeconds<=120){t.classList.add('warning');if(!alertShownAt2min){alertShownAt2min=true;showTimerAlert('Queda poco tiempo','Te quedan menos de 2 minutos.');}} }
-function timeUp(){showTimerAlert('Se acabó el tiempo','Vamos a ver tus resultados.');const b=document.querySelector('.btn-alert-ok');b.textContent='Ver resultados';b.onclick=function(){closeTimerAlert();finishExam();};}
-function showTimerAlert(t,m){document.getElementById('alertTitle').textContent=t;document.getElementById('alertMessage').textContent=m;document.getElementById('timerAlert').classList.add('show');}
-function closeTimerAlert(){document.getElementById('timerAlert').classList.remove('show');}
+function startTimer() { 
+    updateTimerDisplay(); 
+    timerInterval = setInterval(() => { 
+        totalSeconds--; 
+        if(totalSeconds<=0){
+            totalSeconds=0;
+            clearInterval(timerInterval);
+            timeUp();
+        } 
+        updateTimerDisplay();
+        updateTimerState(); 
+    },1000); 
+}
+
+function updateTimerDisplay() { 
+    const m=Math.floor(totalSeconds/60),s=totalSeconds%60; 
+    document.getElementById('timerValue').textContent=`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; 
+}
+
+function updateTimerState() { 
+    const t=document.getElementById('timer');
+    t.classList.remove('warning','danger'); 
+    if(totalSeconds<=60){
+        t.classList.add('danger');
+        if(!alertShownAt1min){
+            alertShownAt1min=true;
+            showTimerAlert('Último minuto','Te queda menos de 1 minuto.');
+        }
+    } else if(totalSeconds<=120){
+        t.classList.add('warning');
+        if(!alertShownAt2min){
+            alertShownAt2min=true;
+            showTimerAlert('Queda poco tiempo','Te quedan menos de 2 minutos.');
+        }
+    } 
+}
+
+function timeUp(){
+    showTimerAlert('Se acabó el tiempo','Vamos a ver tus resultados.');
+    const b=document.querySelector('.btn-alert-ok');
+    b.textContent='Ver resultados';
+    b.onclick=function(){closeTimerAlert();finishExam();};
+}
+
+function showTimerAlert(t,m){
+    document.getElementById('alertTitle').textContent=t;
+    document.getElementById('alertMessage').textContent=m;
+    document.getElementById('timerAlert').classList.add('show');
+}
+
+function closeTimerAlert(){
+    document.getElementById('timerAlert').classList.remove('show');
+}
 
 // ===== EXIT =====
 function showExitModal(){document.getElementById('exitModal').classList.add('show');}
@@ -263,6 +370,9 @@ function finishExam() {
         </div>`;
     }).join('');
 
+    // CORREGIDO: Mostrar/ocultar botón de repasar errores
+    updateReviewButton();
+
     if (grade >= 70) launchConfetti();
 
     // ── GAMIFICACIÓN: enviar resultado al servidor ──
@@ -278,6 +388,15 @@ function finishExam() {
         .catch(() => {
             setTimeout(() => showXpToast(correctCount * 10), 1500);
         });
+}
+
+// CORREGIDO: Actualizar visibilidad del botón de repasar
+function updateReviewButton() {
+    const reviewBtn = document.querySelector('.btn-result.btn-review');
+    if (reviewBtn) {
+        const hasErrors = questionResults.some(r => r === 'incorrect');
+        reviewBtn.style.display = hasErrors ? 'inline-flex' : 'none';
+    }
 }
 
 // ===== HELPERS =====
@@ -320,22 +439,65 @@ function showXpToast(amount) {
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
+// CORREGIDO: Reintentar con todas las preguntas originales
 function retryExam() {
-    currentQuestion = 0;
-    answers = new Array(examData.questions.length).fill(null);
-    questionLocked = new Array(examData.questions.length).fill(false);
-    questionResults = new Array(examData.questions.length).fill(null);
-    totalSeconds = examData.timeMinutes * 60;
-    alertShownAt2min = false; alertShownAt1min = false; examFinished = false;
-    correctCount = 0; incorrectCount = 0; streak = 0; bestStreak = 0;
-    document.getElementById('scoreCorrect').textContent = '0';
-    document.getElementById('scoreIncorrect').textContent = '0';
-    document.getElementById('streakCount').textContent = '0';
+    // Restaurar preguntas originales (limitadas por config)
+    const flow = JSON.parse(sessionStorage.getItem('modoEstudioFlow') || 'null');
+    const cfg = flow?.configs?.examenes || {};
+    const numPreguntas = cfg.numPreguntas || originalQuestions.length;
+    
+    examData.questions = originalQuestions.slice(0, Math.min(numPreguntas, originalQuestions.length));
+    
+    // Reset visual
     document.getElementById('gradeFill').style.strokeDashoffset = '471.24';
     document.getElementById('gradeNumber').textContent = '0%';
     document.getElementById('resultsScreen').classList.remove('active');
     document.getElementById('examScreen').classList.remove('hidden');
-    renderQuestion(); renderDots();
+    document.getElementById('totalQ').textContent = examData.questions.length;
+    
+    // Reset state
+    resetState();
+    
+    // Render
+    renderQuestion(); 
+    renderDots();
+    
+    if (examData.hasTimer) startTimer();
+}
+
+// NUEVO: Repasar solo errores (como flashcards)
+function reviewMistakes() {
+    // Filtrar solo las preguntas que se respondieron incorrectamente
+    const mistakeQuestions = [];
+    examData.questions.forEach((q, i) => {
+        if (questionResults[i] === 'incorrect') {
+            mistakeQuestions.push(q);
+        }
+    });
+    
+    if (mistakeQuestions.length === 0) {
+        // No hay errores que repasar
+        return;
+    }
+    
+    // Actualizar preguntas a solo los errores
+    examData.questions = mistakeQuestions;
+    
+    // Reset visual
+    document.getElementById('gradeFill').style.strokeDashoffset = '471.24';
+    document.getElementById('gradeNumber').textContent = '0%';
+    document.getElementById('resultsScreen').classList.remove('active');
+    document.getElementById('examScreen').classList.remove('hidden');
+    document.getElementById('totalQ').textContent = examData.questions.length;
+    document.getElementById('examTitleBar').textContent = 'Repaso de errores 🔄';
+    
+    // Reset state
+    resetState();
+    
+    // Render
+    renderQuestion(); 
+    renderDots();
+    
     if (examData.hasTimer) startTimer();
 }
 
