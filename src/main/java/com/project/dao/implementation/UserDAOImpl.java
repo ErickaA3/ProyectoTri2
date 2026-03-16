@@ -72,7 +72,7 @@ public class UserDAOImpl implements IUserDAO {
                 RETURNING id, username, email, password_hash, full_name, language, country, birthdate, created_at
                 """;
 
-        try (PreparedStatement ps = conn().prepareStatement(sqlUser)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sqlUser)) {
             ps.setString(1, user.getUsername());
             ps.setString(2, user.getEmail());
             ps.setString(3, user.getPasswordHash());
@@ -85,7 +85,7 @@ public class UserDAOImpl implements IUserDAO {
             User created = mapUser(rs);
 
             String sqlStats = "INSERT INTO user_stats (user_id) VALUES (?)";
-            try (PreparedStatement ps2 = conn().prepareStatement(sqlStats)) {
+            try (PreparedStatement ps2 = c.prepareStatement(sqlStats)) {
                 ps2.setObject(1, created.getId());
                 ps2.executeUpdate();
             }
@@ -97,7 +97,7 @@ public class UserDAOImpl implements IUserDAO {
     @Override
     public Optional<User> findByEmail(String email) throws SQLException {
         String sql = "SELECT * FROM users WHERE email = ?";
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, email);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return Optional.of(mapUser(rs));
@@ -108,7 +108,7 @@ public class UserDAOImpl implements IUserDAO {
     @Override
     public Optional<User> findById(UUID id) throws SQLException {
         String sql = "SELECT * FROM users WHERE id = ?";
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setObject(1, id);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return Optional.of(mapUser(rs));
@@ -119,7 +119,7 @@ public class UserDAOImpl implements IUserDAO {
     @Override
     public Optional<Statistics> getStatsByUserId(UUID userId) throws SQLException {
         String sql = "SELECT * FROM user_stats WHERE user_id = ?";
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return Optional.of(mapStats(rs));
@@ -136,7 +136,7 @@ public class UserDAOImpl implements IUserDAO {
                        streak_last_activity = ?, has_streak_shield = ?
                  WHERE user_id = ?
                 """;
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, stats.getXp());
             ps.setInt(2, stats.getLevel());
             ps.setInt(3, stats.getCoins());
@@ -155,7 +155,7 @@ public class UserDAOImpl implements IUserDAO {
     @Override
     public boolean emailExists(String email) throws SQLException {
         String sql = "SELECT 1 FROM users WHERE email = ?";
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, email);
             return ps.executeQuery().next();
         }
@@ -164,7 +164,7 @@ public class UserDAOImpl implements IUserDAO {
     @Override
     public boolean usernameExists(String username) throws SQLException {
         String sql = "SELECT 1 FROM users WHERE username = ?";
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, username);
             return ps.executeQuery().next();
         }
@@ -177,7 +177,7 @@ public class UserDAOImpl implements IUserDAO {
                    SET full_name = ?, country = ?, language = ?, birthdate = ?
                  WHERE id = ?
                 """;
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, user.getFullName());
             ps.setString(2, user.getCountry());
             ps.setString(3, user.getLanguage());
@@ -198,7 +198,7 @@ public class UserDAOImpl implements IUserDAO {
                  ORDER BY completed ASC
                 """;
         List<WeeklyObjective> list = new ArrayList<>();
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ps.setObject(2, weekStart);
             ResultSet rs = ps.executeQuery();
@@ -230,7 +230,7 @@ public class UserDAOImpl implements IUserDAO {
                  ORDER BY udm.completed ASC
                 """;
         List<DailyMission> list = new ArrayList<>();
-        try (PreparedStatement ps = conn().prepareStatement(sql)) {
+        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ps.setObject(2, Date.valueOf(LocalDate.now()));
             ResultSet rs = ps.executeQuery();

@@ -41,7 +41,7 @@ async function loadProfile() {
 // ─── Render de todos los datos ───────────────────────────────
 function renderProfile(profile) {
     // Profile card
-    document.getElementById('profile-username').textContent = profile.username ?? '—';
+    document.getElementById('profile-username').textContent = profile.fullName || profile.username || '—';
     document.getElementById('profile-email').textContent    = profile.email    ?? '—';
     document.getElementById('profile-level').textContent    = profile.stats?.level ?? '—';
 
@@ -54,8 +54,10 @@ function renderProfile(profile) {
     // Info personal
     document.getElementById('info-fullname').textContent  = profile.fullName  || '—';
     document.getElementById('info-birthdate').textContent = formatDate(profile.birthdate);
+    document.getElementById('info-birthdate').dataset.raw = profile.birthdate || '';
     document.getElementById('info-country').textContent   = profile.country   || '—';
     document.getElementById('info-language').textContent  = formatLanguage(profile.language);
+    document.getElementById('info-language').dataset.raw  = profile.language || 'es';
     document.getElementById('info-createdat').textContent = formatDate(profile.createdAt);
 
     // Objetivos semanales
@@ -197,6 +199,7 @@ async function saveProfile() {
 
         // Actualizar vista sin recargar
         document.getElementById('info-fullname').textContent  = fullName;
+        document.getElementById('profile-username').textContent = fullName;
         document.getElementById('info-country').textContent   = country || '—';
         document.getElementById('info-language').textContent  = formatLanguage(language);
         document.getElementById('info-language').dataset.raw  = language;
@@ -204,6 +207,21 @@ async function saveProfile() {
             document.getElementById('info-birthdate').textContent = formatDate(birthdate);
             document.getElementById('info-birthdate').dataset.raw = birthdate;
         }
+
+        // Actualizar sidebar y localStorage
+        const sidebarName = document.querySelector('.user-name');
+        if (sidebarName) sidebarName.textContent = fullName;
+
+        try {
+            const stored = JSON.parse(localStorage.getItem('user'));
+            if (stored) {
+                stored.fullName = fullName;
+                stored.country  = country;
+                stored.language = language;
+                if (birthdate) stored.birthdate = birthdate;
+                localStorage.setItem('user', JSON.stringify(stored));
+            }
+        } catch(_) {}
 
         closeEditModal();
 
