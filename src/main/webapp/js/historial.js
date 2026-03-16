@@ -103,12 +103,15 @@ function renderHistory() {
     document.getElementById('btnClearDate').classList.toggle('visible', dateFilter !== '');
 
     const filtered = allItems.filter(item => {
+        // Excluir contenido de duelos (se maneja desde la sección Duelos)
+        if (item.type === 'duel_quiz') return false;
+
         const cfg         = TYPE_CONFIG[item.type];
         const matchSearch = !search
             || item.title.toLowerCase().includes(search)
             || (cfg?.label || item.type).toLowerCase().includes(search);
         const matchDate   = !dateFilter
-            || getLocalDateStr(new Date(item.createdAt)) === dateFilter;
+            || getLocalDateStr(parseCreatedAt(item.createdAt)) === dateFilter;
         return matchSearch && matchDate;
     });
 
@@ -480,17 +483,36 @@ function createSparkles(btn) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UTILIDADES DE FECHA
-// El servidor manda epoch en milisegundos (número).
-// new Date(ms) siempre convierte a hora LOCAL correctamente.
+// El servidor puede mandar epoch ms (número) O un string tipo Postgres
+// ("2026-03-15 19:49:58.716"). Esta función normaliza ambos formatos.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Convierte createdAt (number o string) a Date en hora local.
+ * - Si es número → new Date(ms) funciona directo.
+ * - Si es string sin 'T' (Postgres) → reemplaza espacio por 'T' y forza
+ *   interpretación LOCAL (no UTC) añadiendo offset del navegador.
+ */
+function parseCreatedAt(value) {
+    if (typeof value === 'number') return new Date(value);
+    if (!value) return new Date();
+    const str = String(value).trim();
+    // Si ya tiene 'T' o '+' o 'Z' → formato ISO, parsea normal
+    if (str.includes('T') || str.includes('+') || str.endsWith('Z')) {
+        return new Date(str);
+    }
+    // Postgres sin timezone: "2026-03-15 19:49:58.716"
+    // Reemplazar espacio por T y NO agregar Z → el navegador lo trata como local
+    return new Date(str.replace(' ', 'T'));
+}
 
 /** "YYYY-MM-DD" en hora local del navegador */
 function getLocalDateStr(date) {
     return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
 }
 
-function getDateLabel(createdAtMs) {
-    const d    = new Date(createdAtMs);  // ms → hora local automáticamente
+function getDateLabel(createdAt) {
+    const d    = parseCreatedAt(createdAt);
     const hoy  = new Date();
     const ayer = new Date(); ayer.setDate(hoy.getDate() - 1);
 
@@ -499,8 +521,8 @@ function getDateLabel(createdAtMs) {
     return d.toLocaleDateString('es-ES', { day:'2-digit', month:'long', year:'numeric' });
 }
 
-function formatTime(createdAtMs) {
-    return new Date(createdAtMs).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit', hour12:true });
+function formatTime(createdAt) {
+    return parseCreatedAt(createdAt).toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit', hour12:true });
 }
 
 function escapeHtml(str) {
