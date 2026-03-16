@@ -1,6 +1,7 @@
 // ============================================================
 // examen-experto.js
-// Lógica del Modo Experto — evaluativo, sin feedback inmediato
+// Lógica del Examen Experto — evaluativo, sin feedback inmediato
+// CORREGIDO: Usa configuraciones, XP correcto, repasar errores
 // ============================================================
 
 // ===== STARS CANVAS =====
@@ -28,8 +29,12 @@ function initStars() {
             if (s.opacity <= 0.05 || s.opacity >= 0.6) s.opacityChange *= -1;
             if (s.x < 0) s.x = canvas.width; if (s.x > canvas.width) s.x = 0;
             if (s.y < 0) s.y = canvas.height; if (s.y > canvas.height) s.y = 0;
-            ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-            ctx.fillStyle = s.color; ctx.globalAlpha = s.opacity; ctx.fill(); ctx.globalAlpha = 1;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+            ctx.fillStyle = s.color;
+            ctx.globalAlpha = s.opacity;
+            ctx.fill();
+            ctx.globalAlpha = 1;
         });
         requestAnimationFrame(animate);
     }
@@ -49,51 +54,81 @@ function loadExamData() {
                     <p style="font-size:1.1rem">No se encontraron preguntas del examen.</p>
                     <p style="font-size:0.9rem">Vuelve al modo estudio y genera el contenido primero.</p>
                     <button onclick="window.location.href='../pages/modo-estudio.html'"
-                        style="margin-top:0.5rem;padding:0.75rem 2rem;border-radius:12px;background:linear-gradient(135deg,var(--accent-orange),#ea580c);color:white;border:none;cursor:pointer;font-family:inherit;font-size:1rem">
+                        style="margin-top:0.5rem;padding:0.75rem 2rem;border-radius:12px;background:linear-gradient(135deg,var(--accent-cyan),#14b8a6);color:#0f0f23;border:none;cursor:pointer;font-family:inherit;font-size:1rem">
                         Ir al Modo Estudio
                     </button>
                 </div>`;
             return null;
         }
 
-        const cfg  = flow?.configs?.examenes || {};
-        const numQ = results.examenes.questions.length;
+        const cfg = flow?.configs?.examenes || {};
+        
+        // ══════════════════════════════════════════════════════════════
+        // FIX: Aplicar número de preguntas de la configuración
+        // ══════════════════════════════════════════════════════════════
+        let allQuestions = results.examenes.questions;
+        const numPreguntas = cfg.numPreguntas || allQuestions.length;
+        
+        // Limitar al número configurado (mezclar y tomar las primeras N)
+        if (numPreguntas < allQuestions.length) {
+            allQuestions = shuffleArray([...allQuestions]);
+            allQuestions = allQuestions.slice(0, numPreguntas);
+        }
+        
         return {
             id:          results.examenes.id,
             title:       results.examenes.title || 'Examen Experto',
-            timeMinutes: cfg.timerMinutos ?? 20,
-            xpReward:    numQ * 10,
-            xpPenalty:   (cfg.penalty ?? true) ? 25 : 0,
-            questions:   results.examenes.questions
+            // ══════════════════════════════════════════════════════════════
+            // FIX: Usar timerMinutos de la configuración (siempre tiene timer)
+            // ══════════════════════════════════════════════════════════════
+            timeMinutes: cfg.timerMinutos ?? 15,
+            questions:   allQuestions,
+            // Guardar preguntas originales para reinicio completo
+            originalQuestions: results.examenes.questions
         };
     } catch(e) {
-        console.error('Error cargando datos del examen experto:', e);
+        console.error('Error cargando datos del examen:', e);
         return null;
     }
 }
 
-const examData = loadExamData();
+// Función para mezclar array (Fisher-Yates)
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+let examData = loadExamData();
 
 // ===== STATE =====
-let highScore = null;
 let currentQuestion = 0;
-let answers      = examData ? new Array(examData.questions.length).fill(null) : [];
-let totalSeconds = examData ? examData.timeMinutes * 60 : 0;
-let timerInterval = null;
-let examStartTime = null;
+let answers         = examData ? new Array(examData.questions.length).fill(null) : [];
+let totalSeconds    = examData ? examData.timeMinutes * 60 : 0;
+let timerInterval   = null;
 let alertShownAt2min = false, alertShownAt1min = false, examFinished = false;
 const letters = ['A','B','C','D'];
+
+// Para repasar errores
+let isReviewMode = false;
+let originalExamData = null;
+let correctCount = 0, incorrectCount = 0;
 
 // ===== INIT =====
 function initExam() {
     if (!examData) return;
+    
+    // Guardar datos originales para reinicio completo
+    originalExamData = JSON.parse(JSON.stringify(examData));
+    
     initStars();
     document.getElementById('examTitleBar').textContent = examData.title;
     document.getElementById('totalQ').textContent = examData.questions.length;
-    document.getElementById('xpValue').textContent = `+${examData.xpReward} XP`;
-    document.getElementById('highscoreValue').textContent = highScore !== null ? `Best: ${highScore}` : 'Best: --';
-    examStartTime = Date.now();
-    renderQuestion(); renderDots(); startTimer();
+    startTimer();
+    renderQuestion();
+    renderDots();
 }
 
 // ===== RENDER =====
@@ -105,19 +140,18 @@ function renderQuestion() {
     document.getElementById('progressFill').style.width = ((currentQuestion+1)/examData.questions.length*100)+'%';
 
     const list = document.getElementById('optionsList');
-    list.innerHTML = q.options.map((opt, i) => `
-        <button class="option-btn ${answers[currentQuestion]===i?'selected':''}" onclick="selectOption(${i})">
-            <span class="option-letter">${letters[i]}</span>
-            <span class="option-text">${opt}</span>
-        </button>`).join('');
+    list.innerHTML = q.options.map((opt, i) => {
+        let cls = 'option-btn';
+        if (answers[currentQuestion] === i) cls += ' selected';
+        return `<button class="${cls}" onclick="selectOption(${i})"><span class="option-letter">${letters[i]}</span><span class="option-text">${opt}</span></button>`;
+    }).join('');
 
-    document.getElementById('btnAnterior').disabled = currentQuestion === 0;
-
+    // Botón siguiente/entregar
     const btn = document.getElementById('btnSiguiente');
     if (currentQuestion === examData.questions.length - 1) {
-        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Entregar';
+        btn.innerHTML = '<i class="fas fa-paper-plane"></i> Entregar examen';
         btn.className = 'btn-nav btn-entregar';
-        btn.onclick = showSubmitModal;
+        btn.onclick = function(){ showSubmitModal(); };
     } else {
         btn.innerHTML = 'Siguiente <i class="fas fa-chevron-right"></i>';
         btn.className = 'btn-nav btn-siguiente';
@@ -128,20 +162,25 @@ function renderQuestion() {
 
 function selectOption(index) {
     answers[currentQuestion] = index;
-    document.querySelectorAll('.option-btn').forEach((b,i) => b.classList.toggle('selected', i===index));
-    updateDots();
+    renderQuestion();
 }
 
 function renderDots() {
-    document.getElementById('questionDots').innerHTML = examData.questions.map((_,i) => `<div class="q-dot" data-index="${i}"></div>`).join('');
+    document.getElementById('questionDots').innerHTML = examData.questions.map((_,i) => `<div class="q-dot" data-index="${i}" onclick="goToQuestion(${i})"></div>`).join('');
 }
 
 function updateDots() {
     document.querySelectorAll('.q-dot').forEach((dot, i) => {
         dot.className = 'q-dot';
-        if (i === currentQuestion) dot.classList.add('current');
-        else if (answers[i] !== null) dot.classList.add('answered');
+        if (i === currentQuestion) { dot.classList.add('current'); }
+        else if (answers[i] !== null) { dot.classList.add('answered'); }
     });
+}
+
+function goToQuestion(index) {
+    const card = document.getElementById('questionCard');
+    card.classList.add('exit');
+    setTimeout(() => { currentQuestion = index; renderQuestion(); card.classList.remove('exit'); }, 200);
 }
 
 function nextQuestion() {
@@ -161,71 +200,93 @@ function prevQuestion() {
 }
 
 // ===== TIMER =====
-function startTimer() {
-    updateTimerDisplay();
-    timerInterval = setInterval(() => {
-        totalSeconds--;
-        if (totalSeconds <= 0) { totalSeconds = 0; clearInterval(timerInterval); timeUp(); }
-        updateTimerDisplay(); updateTimerState();
-    }, 1000);
+function startTimer() { 
+    updateTimerDisplay(); 
+    timerInterval = setInterval(() => { 
+        totalSeconds--; 
+        if(totalSeconds<=0){
+            totalSeconds=0;
+            clearInterval(timerInterval);
+            timeUp();
+        } 
+        updateTimerDisplay();
+        updateTimerState(); 
+    },1000); 
 }
-function updateTimerDisplay() { const m=Math.floor(totalSeconds/60),s=totalSeconds%60; document.getElementById('timerValue').textContent=`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; }
-function updateTimerState() {
-    const t=document.getElementById('timer'); t.classList.remove('warning','danger');
-    if(totalSeconds<=60){t.classList.add('danger');if(!alertShownAt1min){alertShownAt1min=true;showTimerAlert('Último minuto','Te queda menos de 1 minuto. Las preguntas sin responder se enviarán vacías.');}}
-    else if(totalSeconds<=120){t.classList.add('warning');if(!alertShownAt2min){alertShownAt2min=true;showTimerAlert('Tiempo casi agotado','Te quedan menos de 2 minutos. Revisa tus respuestas.');}}
-}
-function timeUp(){showTimerAlert('Se acabó el tiempo','El examen se entregará automáticamente.');const b=document.querySelector('.btn-alert-ok');b.textContent='Ver resultados';b.onclick=function(){closeTimerAlert();finishExam();};}
-function showTimerAlert(t,m){document.getElementById('alertTitle').textContent=t;document.getElementById('alertMessage').textContent=m;document.getElementById('timerAlert').classList.add('show');}
-function closeTimerAlert(){document.getElementById('timerAlert').classList.remove('show');}
 
-// ===== SUBMIT / EXIT =====
-function showSubmitModal(){
-    const answered=answers.filter(a=>a!==null).length;
-    const unanswered=examData.questions.length-answered;
-    const msg=document.getElementById('submitMessage');
-    if(unanswered>0) msg.innerHTML=`Has respondido <span class="highlight">${answered}</span> de <span class="highlight">${examData.questions.length}</span> preguntas. Tienes <span class="highlight">${unanswered}</span> sin responder.`;
-    else msg.innerHTML=`Has respondido <span class="highlight">todas las preguntas</span>. No podrás cambiar nada después.`;
-    document.getElementById('submitModal').classList.add('show');
+function updateTimerDisplay() { 
+    const m=Math.floor(totalSeconds/60),s=totalSeconds%60; 
+    document.getElementById('timerValue').textContent=`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`; 
 }
-function closeSubmitModal(){document.getElementById('submitModal').classList.remove('show');}
-function submitExam(){closeSubmitModal();finishExam();}
 
+function updateTimerState() { 
+    const t=document.getElementById('timer');
+    t.classList.remove('warning','danger'); 
+    if(totalSeconds<=60){
+        t.classList.add('danger');
+        if(!alertShownAt1min){
+            alertShownAt1min=true;
+            showTimerAlert('¡Último minuto!','Te queda menos de 1 minuto para terminar.');
+        }
+    } else if(totalSeconds<=120){
+        t.classList.add('warning');
+        if(!alertShownAt2min){
+            alertShownAt2min=true;
+            showTimerAlert('Queda poco tiempo','Te quedan menos de 2 minutos.');
+        }
+    } 
+}
+
+function timeUp(){
+    showTimerAlert('Se acabó el tiempo','Vamos a calificar tu examen.');
+    const b=document.querySelector('.btn-alert-ok');
+    b.textContent='Ver resultados';
+    b.onclick=function(){closeTimerAlert();finishExam();};
+}
+
+function showTimerAlert(t,m){
+    document.getElementById('alertTitle').textContent=t;
+    document.getElementById('alertMessage').textContent=m;
+    document.getElementById('timerAlert').classList.add('show');
+}
+
+function closeTimerAlert(){
+    document.getElementById('timerAlert').classList.remove('show');
+}
+
+// ===== EXIT =====
 function showExitModal(){document.getElementById('exitModal').classList.add('show');}
 function closeExitModal(){document.getElementById('exitModal').classList.remove('show');}
-function exitWithPenalty() {
-    clearInterval(timerInterval);
-    closeExitModal();
-    // ── GAMIFICACIÓN: penalización por abandono ──
-    sendReward('abandon_exam', 0, examData?.id, 0, 0)
-        .finally(() => { window.history.back(); });
+function exitExam(){clearInterval(timerInterval);closeExitModal();window.history.back();}
+
+// ===== SUBMIT MODAL =====
+function showSubmitModal() {
+    const unanswered = answers.filter(a => a === null).length;
+    document.getElementById('submitMessage').textContent = unanswered > 0 
+        ? `Tienes ${unanswered} pregunta${unanswered > 1 ? 's' : ''} sin responder.`
+        : '¡Has respondido todas las preguntas!';
+    document.getElementById('submitModal').classList.add('show');
 }
-function exitExam(){clearInterval(timerInterval);window.history.back();}
+function closeSubmitModal() { document.getElementById('submitModal').classList.remove('show'); }
 
 // ===== FINISH =====
 function finishExam() {
     if (examFinished) return;
     examFinished = true;
     clearInterval(timerInterval);
+    closeSubmitModal();
 
-    let correctCount=0, incorrectCount=0, unansweredCount=0;
-    examData.questions.forEach((q,i) => {
-        if(answers[i]===null) unansweredCount++;
-        else if(answers[i]===q.correct) correctCount++;
-        else incorrectCount++;
+    // Calcular resultados
+    correctCount = 0;
+    incorrectCount = 0;
+    examData.questions.forEach((q, i) => {
+        if (answers[i] === q.correct) correctCount++;
+        else if (answers[i] !== null) incorrectCount++;
     });
 
-    const total    = examData.questions.length;
-    const grade    = Math.round((correctCount/total)*100);
-    const xpEarned = Math.round((grade/100)*examData.xpReward);
-
-    const timeUsed = (examData.timeMinutes * 60) - totalSeconds;
-    const minsUsed = Math.floor(timeUsed/60);
-    const secsUsed = timeUsed%60;
-    const timeStr  = `${minsUsed}:${secsUsed.toString().padStart(2,'0')}`;
-
-    let isNewHighScore = false;
-    if (highScore === null || grade > highScore) { highScore = grade; isNewHighScore = true; }
+    const unanswered = answers.filter(a => a === null).length;
+    const total = examData.questions.length;
+    const grade = Math.round((correctCount / total) * 100);
 
     document.getElementById('examScreen').classList.add('hidden');
     document.getElementById('resultsScreen').classList.add('active');
@@ -233,23 +294,22 @@ function finishExam() {
     const emoji    = document.getElementById('resultsEmoji');
     const title    = document.getElementById('resultsMainTitle');
     const subtitle = document.getElementById('resultsMainSubtitle');
-    if (grade >= 90)      { emoji.src='giphy.gif';               title.textContent='¡Increíble, eres un crack!'; subtitle.textContent='Dominas este tema a la perfección'; }
-    else if (grade >= 70) { emoji.src='giphy.gif';               title.textContent='¡Aprobado!';                  subtitle.textContent='Buen desempeño, sigue así'; }
-    else if (grade >= 50) { emoji.src='flexed-biceps_1f4aa.gif'; title.textContent='Necesitas mejorar';            subtitle.textContent='Repasa los temas e intenta de nuevo'; }
-    else                  { emoji.src='WZ6R8rSOyG.gif';          title.textContent='No aprobado';                  subtitle.textContent='Estudia y vuelve a intentar'; }
-
-    if (isNewHighScore) document.getElementById('newHighscore').classList.add('show');
-    else document.getElementById('newHighscore').classList.remove('show');
+    
+    // ══════════════════════════════════════════════════════════════
+    // FIX: Rutas correctas para imágenes
+    // ══════════════════════════════════════════════════════════════
+    if (grade >= 90)      { emoji.src='../images/modo-estudio/giphy.gif';               title.textContent='¡Excelente dominio!';        subtitle.textContent='Eres un verdadero experto en este tema'; }
+    else if (grade >= 70) { emoji.src='../images/modo-estudio/giphy.gif';               title.textContent='¡Muy buen resultado!';       subtitle.textContent='Tienes un sólido conocimiento del tema'; }
+    else if (grade >= 50) { emoji.src='../images/modo-estudio/flexed-biceps_1f4aa.gif'; title.textContent='Resultado aceptable';        subtitle.textContent='Hay espacio para mejorar'; }
+    else                  { emoji.src='../images/modo-estudio/WZ6R8rSOyG.gif';          title.textContent='Necesitas más práctica';     subtitle.textContent='Repasa el material e inténtalo de nuevo'; }
 
     animateGrade(grade);
 
-    document.getElementById('xpEarned').innerHTML = `<i class="fas fa-bolt"></i> <span>+${xpEarned} XP ganados</span>`;
-
     const msgEl = document.getElementById('gradeMessage');
-    if (grade >= 90)      msgEl.innerHTML = '<i class="fas fa-trophy" style="color:var(--accent-green);margin-right:8px"></i><span style="color:var(--accent-green)">Sobresaliente</span> — Eres un experto';
-    else if (grade >= 70) msgEl.innerHTML = '<i class="fas fa-star" style="color:var(--accent-cyan);margin-right:8px"></i><span style="color:var(--accent-cyan)">Aprobado</span> — Buen desempeño';
-    else if (grade >= 50) msgEl.innerHTML = '<i class="fas fa-clipboard-list" style="color:var(--accent-yellow);margin-right:8px"></i><span style="color:var(--accent-yellow)">Puedes mejorar</span> — Repasa los temas';
-    else                  msgEl.innerHTML = '<i class="fas fa-times-circle" style="color:var(--accent-red);margin-right:8px"></i><span style="color:var(--accent-red)">No aprobado</span> — Estudia y vuelve a intentar';
+    if (grade >= 90)      msgEl.innerHTML = '<i class="fas fa-crown" style="color:var(--accent-green);margin-right:8px"></i><span style="color:var(--accent-green)">Nivel Experto</span> — Dominas este tema';
+    else if (grade >= 70) msgEl.innerHTML = '<i class="fas fa-medal" style="color:var(--accent-cyan);margin-right:8px"></i><span style="color:var(--accent-cyan)">Buen nivel</span> — Sigue practicando';
+    else if (grade >= 50) msgEl.innerHTML = '<i class="fas fa-book-open" style="color:var(--accent-yellow);margin-right:8px"></i><span style="color:var(--accent-yellow)">En progreso</span> — Repasa los errores';
+    else                  msgEl.innerHTML = '<i class="fas fa-rotate-right" style="color:var(--accent-red);margin-right:8px"></i><span style="color:var(--accent-red)">A seguir estudiando</span> — No te desanimes';
 
     document.getElementById('resultsStats').innerHTML = `
         <div class="stat-card">
@@ -264,12 +324,12 @@ function finishExam() {
         </div>
         <div class="stat-card">
             <div class="stat-card-icon" style="background:rgba(160,160,192,0.15);color:var(--text-secondary)"><i class="fas fa-minus-circle"></i></div>
-            <div class="stat-card-value">${unansweredCount}</div>
+            <div class="stat-card-value">${unanswered}</div>
             <div class="stat-card-label">Sin responder</div>
         </div>
         <div class="stat-card">
-            <div class="stat-card-icon" style="background:rgba(45,212,191,0.15);color:var(--accent-cyan)"><i class="fas fa-clock"></i></div>
-            <div class="stat-card-value" style="color:var(--accent-cyan);font-size:1.2rem">${timeStr}</div>
+            <div class="stat-card-icon" style="background:rgba(139,92,246,0.15);color:var(--accent-purple)"><i class="fas fa-clock"></i></div>
+            <div class="stat-card-value" style="color:var(--accent-purple)">${formatTime(examData.timeMinutes * 60 - totalSeconds)}</div>
             <div class="stat-card-label">Tiempo usado</div>
         </div>`;
 
@@ -283,11 +343,11 @@ function finishExam() {
         const ua = answers[i] !== null ? q.options[answers[i]] : null;
         let answerRow = '';
         if (st === 'correct') {
-            answerRow = `<div class="review-a-text"><span style="opacity:0.45">→</span><span style="color:var(--accent-green)">${ca}</span></div>`;
+            answerRow = `<div class="review-a-text"><span class="arrow">→</span><span style="color:var(--accent-green)">${ca}</span></div>`;
         } else if (st === 'incorrect') {
-            answerRow = `<div class="review-a-text"><span style="color:var(--accent-red)">${ua}</span><span style="opacity:0.45;margin:0 0.3rem">→</span><span style="color:var(--accent-green)">${ca}</span></div>`;
+            answerRow = `<div class="review-a-text"><span style="color:var(--accent-red)">${ua}</span><span class="arrow" style="margin:0 0.3rem">→</span><span style="color:var(--accent-green)">${ca}</span></div>`;
         } else {
-            answerRow = `<div class="review-a-text"><span style="opacity:0.45">→</span><span style="color:var(--accent-green)">${ca}</span></div>`;
+            answerRow = `<div class="review-a-text"><span class="arrow">→</span><span style="color:var(--accent-green)">${ca}</span></div>`;
         }
         return `<div class="review-item ${st}">
             <div class="review-icon"><i class="${ic}"></i></div>
@@ -298,26 +358,195 @@ function finishExam() {
         </div>`;
     }).join('');
 
+    // ══════════════════════════════════════════════════════════════
+    // FIX: Actualizar botones según modo (repasar errores, etc.)
+    // ══════════════════════════════════════════════════════════════
+    updateResultButtons();
+
     if (grade >= 70) launchConfetti();
 
-    // ── GAMIFICACIÓN: enviar resultado al servidor ──
-    const timeUsedSecs = (examData.timeMinutes * 60) - totalSeconds;
-    sendReward('expert_exam', grade, examData.id, timeUsedSecs, examData.questions.length)
-        .then(result => {
-            if (result.success) {
-                setTimeout(() => showXpToast(result.xpEarned), 1500);
-                document.getElementById('xpEarned').innerHTML =
-                    `<i class="fas fa-bolt"></i> <span>+${result.xpEarned} XP ganados</span>`;
-            } else {
-                setTimeout(() => showXpToast(xpEarned), 1500);
-            }
-        })
-        .catch(() => {
-            setTimeout(() => showXpToast(xpEarned), 1500);
-        });
+    // ══════════════════════════════════════════════════════════════
+    // FIX: Cálculo correcto de XP para examen experto
+    // Examen experto da más XP que quiz normal (multiplicador 1.5x)
+    // ══════════════════════════════════════════════════════════════
+    const timeUsed = examData.timeMinutes * 60 - totalSeconds;
+    const baseXP = correctCount * 15; // 15 XP por correcta (vs 10 en quiz)
+    const bonusXP = grade >= 90 ? 50 : (grade >= 70 ? 25 : 0); // Bonus por buen rendimiento
+    const totalXP = baseXP + bonusXP;
+    
+    if (typeof sendReward === 'function') {
+        sendReward('expert_exam', grade, examData.id, timeUsed, examData.questions.length)
+            .then(result => {
+                if (result.success) {
+                    setTimeout(() => showXpToast(result.xpEarned), 1500);
+                } else {
+                    setTimeout(() => showXpToast(totalXP), 1500);
+                }
+            })
+            .catch(() => {
+                setTimeout(() => showXpToast(totalXP), 1500);
+            });
+    } else {
+        setTimeout(() => showXpToast(totalXP), 1500);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// FIX: Actualizar botones de resultados según modo
+// ══════════════════════════════════════════════════════════════
+function updateResultButtons() {
+    const actionsContainer = document.querySelector('.results-actions');
+    if (!actionsContainer) return;
+    
+    const hasErrors = examData.questions.some((q, i) => answers[i] !== q.correct);
+    
+    let buttonsHTML = `
+        <button class="btn-result btn-retry" onclick="retryExam()">
+            <i class="fas fa-redo"></i> ${isReviewMode ? 'Repasar de nuevo' : 'Intentar de nuevo'}
+        </button>
+    `;
+    
+    // Solo mostrar "Repasar errores" si hay errores y NO estamos ya en modo repaso
+    if (hasErrors && !isReviewMode) {
+        buttonsHTML += `
+            <button class="btn-result btn-review" onclick="reviewMistakes()">
+                <i class="fas fa-search"></i> Repasar errores (${incorrectCount + answers.filter(a => a === null).length})
+            </button>
+        `;
+    }
+    
+    // Si estamos en modo repaso, mostrar opción de volver al examen completo
+    if (isReviewMode) {
+        buttonsHTML += `
+            <button class="btn-result btn-full" onclick="restartFullExam()">
+                <i class="fas fa-list"></i> Examen completo
+            </button>
+        `;
+    }
+    
+    buttonsHTML += `
+        <button class="btn-result btn-exit" onclick="exitExam()">
+            <i class="fas fa-home"></i> Volver al inicio
+        </button>
+    `;
+    
+    actionsContainer.innerHTML = buttonsHTML;
+}
+
+// ══════════════════════════════════════════════════════════════
+// FIX: Función para repasar solo los errores (como flashcards)
+// ══════════════════════════════════════════════════════════════
+function reviewMistakes() {
+    // Filtrar solo las preguntas que se respondieron mal o no se respondieron
+    const wrongQuestions = [];
+    examData.questions.forEach((q, i) => {
+        if (answers[i] === null || answers[i] !== q.correct) {
+            wrongQuestions.push(q);
+        }
+    });
+    
+    if (wrongQuestions.length === 0) {
+        alert('¡No tienes errores que repasar!');
+        return;
+    }
+    
+    // Activar modo repaso
+    isReviewMode = true;
+    
+    // Actualizar examData con solo las preguntas incorrectas
+    examData.questions = wrongQuestions;
+    
+    // Resetear estado
+    currentQuestion = 0;
+    answers = new Array(examData.questions.length).fill(null);
+    totalSeconds = examData.timeMinutes * 60;
+    alertShownAt2min = false; 
+    alertShownAt1min = false; 
+    examFinished = false;
+    correctCount = 0; 
+    incorrectCount = 0;
+    
+    // Actualizar UI
+    document.getElementById('gradeFill').style.strokeDashoffset = '471.24';
+    document.getElementById('gradeNumber').textContent = '0%';
+    document.getElementById('resultsScreen').classList.remove('active');
+    document.getElementById('examScreen').classList.remove('hidden');
+    
+    // Actualizar título para indicar modo repaso
+    document.getElementById('examTitleBar').textContent = `${originalExamData.title} — Repaso de errores 🔄`;
+    document.getElementById('totalQ').textContent = examData.questions.length;
+    
+    renderQuestion(); 
+    renderDots();
+    startTimer();
+}
+
+// ══════════════════════════════════════════════════════════════
+// FIX: Función para reiniciar el examen actual (mismo set de preguntas)
+// ══════════════════════════════════════════════════════════════
+function retryExam() {
+    currentQuestion = 0;
+    answers = new Array(examData.questions.length).fill(null);
+    totalSeconds = examData.timeMinutes * 60;
+    alertShownAt2min = false; 
+    alertShownAt1min = false; 
+    examFinished = false;
+    correctCount = 0; 
+    incorrectCount = 0;
+    
+    document.getElementById('gradeFill').style.strokeDashoffset = '471.24';
+    document.getElementById('gradeNumber').textContent = '0%';
+    document.getElementById('resultsScreen').classList.remove('active');
+    document.getElementById('examScreen').classList.remove('hidden');
+    
+    // Mantener título según modo
+    if (isReviewMode) {
+        document.getElementById('examTitleBar').textContent = `${originalExamData.title} — Repaso de errores 🔄`;
+    } else {
+        document.getElementById('examTitleBar').textContent = examData.title;
+    }
+    
+    renderQuestion(); 
+    renderDots();
+    startTimer();
+}
+
+// ══════════════════════════════════════════════════════════════
+// FIX: Función para reiniciar examen completo desde modo repaso
+// ══════════════════════════════════════════════════════════════
+function restartFullExam() {
+    // Restaurar datos originales
+    isReviewMode = false;
+    examData = JSON.parse(JSON.stringify(originalExamData));
+    
+    currentQuestion = 0;
+    answers = new Array(examData.questions.length).fill(null);
+    totalSeconds = examData.timeMinutes * 60;
+    alertShownAt2min = false; 
+    alertShownAt1min = false; 
+    examFinished = false;
+    correctCount = 0; 
+    incorrectCount = 0;
+    
+    document.getElementById('gradeFill').style.strokeDashoffset = '471.24';
+    document.getElementById('gradeNumber').textContent = '0%';
+    document.getElementById('resultsScreen').classList.remove('active');
+    document.getElementById('examScreen').classList.remove('hidden');
+    document.getElementById('examTitleBar').textContent = examData.title;
+    document.getElementById('totalQ').textContent = examData.questions.length;
+    
+    renderQuestion(); 
+    renderDots();
+    startTimer();
 }
 
 // ===== HELPERS =====
+function formatTime(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 function animateGrade(target) {
     const fillEl = document.getElementById('gradeFill');
     const numEl  = document.getElementById('gradeNumber');
@@ -352,29 +581,17 @@ function launchConfetti() {
 
 function showXpToast(amount) {
     const toast = document.getElementById('xpToast');
-    document.getElementById('xpToastAmount').textContent = `+${amount} XP`;
+    document.getElementById('xpToastAmount').textContent = `${amount} XP`;
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 3000);
 }
 
-function retryExam() {
-    currentQuestion = 0;
-    answers = new Array(examData.questions.length).fill(null);
-    totalSeconds = examData.timeMinutes * 60;
-    alertShownAt2min = false; alertShownAt1min = false; examFinished = false;
-    document.getElementById('highscoreValue').textContent = highScore !== null ? `Best: ${highScore}%` : 'Best: --';
-    document.getElementById('newHighscore').classList.remove('show');
-    document.getElementById('gradeFill').style.strokeDashoffset = '471.24';
-    document.getElementById('gradeNumber').textContent = '0%';
-    document.getElementById('resultsScreen').classList.remove('active');
-    document.getElementById('examScreen').classList.remove('hidden');
-    renderQuestion(); renderDots(); startTimer();
-}
-
 // ===== KEYBOARD =====
+document.getElementById('exitModal').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('show'); });
+document.getElementById('submitModal').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('show'); });
 document.addEventListener('keydown', function(e) {
     if (examFinished) return;
-    if (e.key === 'Escape') { closeExitModal(); closeTimerAlert(); closeSubmitModal(); }
+    if (e.key === 'Escape') { closeExitModal(); closeSubmitModal(); closeTimerAlert(); }
     if (e.key === 'ArrowRight') nextQuestion();
     if (e.key === 'ArrowLeft') prevQuestion();
     const km = {'a':0,'b':1,'c':2,'d':3};
