@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -72,7 +73,8 @@ public class UserDAOImpl implements IUserDAO {
                 RETURNING id, username, email, password_hash, full_name, language, country, birthdate, created_at
                 """;
 
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sqlUser)) {
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sqlUser)) {
             ps.setString(1, user.getUsername());
             ps.setString(2, user.getEmail());
             ps.setString(3, user.getPasswordHash());
@@ -84,9 +86,9 @@ public class UserDAOImpl implements IUserDAO {
 
             User created = mapUser(rs);
 
-            String sqlStats = "INSERT INTO user_stats (user_id) VALUES (?)";
+            String sqlStats = "INSERT INTO user_stats (user_id) VALUES (?::uuid)";
             try (PreparedStatement ps2 = c.prepareStatement(sqlStats)) {
-                ps2.setObject(1, created.getId());
+                ps2.setString(1, created.getId().toString());
                 ps2.executeUpdate();
             }
 
@@ -97,7 +99,8 @@ public class UserDAOImpl implements IUserDAO {
     @Override
     public Optional<User> findByEmail(String email) throws SQLException {
         String sql = "SELECT * FROM users WHERE email = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, email);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return Optional.of(mapUser(rs));
@@ -107,9 +110,10 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public Optional<User> findById(UUID id) throws SQLException {
-        String sql = "SELECT * FROM users WHERE id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, id);
+        String sql = "SELECT * FROM users WHERE id = ?::uuid";
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, id.toString());
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return Optional.of(mapUser(rs));
             return Optional.empty();
@@ -118,9 +122,10 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public Optional<Statistics> getStatsByUserId(UUID userId) throws SQLException {
-        String sql = "SELECT * FROM user_stats WHERE user_id = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, userId);
+        String sql = "SELECT * FROM user_stats WHERE user_id = ?::uuid";
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, userId.toString());
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return Optional.of(mapStats(rs));
             return Optional.empty();
@@ -134,9 +139,10 @@ public class UserDAOImpl implements IUserDAO {
                    SET xp = ?, level = ?, coins = ?,
                        streak_current = ?, streak_record = ?,
                        streak_last_activity = ?, has_streak_shield = ?
-                 WHERE user_id = ?
+                 WHERE user_id = ?::uuid
                 """;
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, stats.getXp());
             ps.setInt(2, stats.getLevel());
             ps.setInt(3, stats.getCoins());
@@ -147,7 +153,7 @@ public class UserDAOImpl implements IUserDAO {
             ps.setDate(6, last != null ? Date.valueOf(last) : null);
 
             ps.setBoolean(7, stats.isHasStreakShield());
-            ps.setObject(8, stats.getUserId());
+            ps.setString(8, stats.getUserId().toString());
             ps.executeUpdate();
         }
     }
@@ -155,7 +161,8 @@ public class UserDAOImpl implements IUserDAO {
     @Override
     public boolean emailExists(String email) throws SQLException {
         String sql = "SELECT 1 FROM users WHERE email = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, email);
             return ps.executeQuery().next();
         }
@@ -164,7 +171,8 @@ public class UserDAOImpl implements IUserDAO {
     @Override
     public boolean usernameExists(String username) throws SQLException {
         String sql = "SELECT 1 FROM users WHERE username = ?";
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, username);
             return ps.executeQuery().next();
         }
@@ -175,15 +183,78 @@ public class UserDAOImpl implements IUserDAO {
         String sql = """
                 UPDATE users
                    SET full_name = ?, country = ?, language = ?, birthdate = ?
-                 WHERE id = ?
+                 WHERE id = ?::uuid
                 """;
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, user.getFullName());
             ps.setString(2, user.getCountry());
             ps.setString(3, user.getLanguage());
             ps.setObject(4, user.getBirthdate() != null ? Date.valueOf(user.getBirthdate()) : null);
-            ps.setObject(5, user.getId());
+            ps.setString(5, user.getId().toString());
             ps.executeUpdate();
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // WEEKLY OBJECTIVES — auto-generate 4 if none exist for current week
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Override
+    public void ensureWeeklyObjectives(UUID userId) throws SQLException {
+        LocalDate weekStart = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+
+        // ¿Ya existen para esta semana?
+        String checkSql = "SELECT COUNT(*) FROM user_weekly_objectives WHERE user_id = ?::uuid AND week_start = ?";
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(checkSql)) {
+            ps.setString(1, userId.toString());
+            ps.setDate(2, Date.valueOf(weekStart));
+            ResultSet rs = ps.executeQuery();
+            rs.next();
+            if (rs.getInt(1) > 0) return; // ya hay objetivos esta semana
+        }
+
+        // Pool: {type, description, requiredCount, xpReward, coinReward}
+        String[][] pool = {
+            {"streak_days",        "Mantener racha por 3 d\u00edas",       "3",  "25", "20"},
+            {"streak_days",        "Mantener racha por 5 d\u00edas",       "5",  "50", "40"},
+            {"activities",         "Completar 5 actividades",         "5",  "30", "25"},
+            {"activities",         "Completar 10 actividades",       "10",  "60", "50"},
+            {"duels_won",          "Ganar 2 duelos",                  "2",  "40", "30"},
+            {"perfect_exam",       "Obtener 100% en un examen",       "1",  "35", "25"},
+            {"complete_flashcard", "Estudiar 3 sets de flashcards",   "3",  "30", "20"},
+            {"complete_quiz",      "Completar 3 quizzes",             "3",  "30", "25"},
+            {"complete_summary",   "Generar 3 res\u00famenes",             "3",  "25", "20"},
+            {"win_duel",           "Ganar 3 duelos",                  "3",  "55", "40"},
+        };
+
+        // Shuffle y tomar 4
+        List<Integer> indices = new ArrayList<>();
+        for (int i = 0; i < pool.length; i++) indices.add(i);
+        Collections.shuffle(indices);
+
+        String insertSql = """
+                INSERT INTO user_weekly_objectives
+                    (user_id, type, week_start, objective_description,
+                     required_count, progress, completed, xp_reward, coin_reward)
+                VALUES (?::uuid, ?, ?, ?, ?, 0, false, ?, ?)
+                """;
+
+        try (Connection c = conn()) {
+            for (int i = 0; i < 4; i++) {
+                String[] obj = pool[indices.get(i)];
+                try (PreparedStatement ps = c.prepareStatement(insertSql)) {
+                    ps.setString(1, userId.toString());
+                    ps.setString(2, obj[0]);
+                    ps.setDate(3, Date.valueOf(weekStart));
+                    ps.setString(4, obj[1]);
+                    ps.setInt(5, Integer.parseInt(obj[2]));
+                    ps.setInt(6, Integer.parseInt(obj[3]));
+                    ps.setInt(7, Integer.parseInt(obj[4]));
+                    ps.executeUpdate();
+                }
+            }
         }
     }
 
@@ -194,13 +265,14 @@ public class UserDAOImpl implements IUserDAO {
                 SELECT user_id, type, week_start, objective_description,
                        required_count, progress, completed, xp_reward, coin_reward
                   FROM user_weekly_objectives
-                 WHERE user_id = ? AND week_start = ?
+                 WHERE user_id = ?::uuid AND week_start = ?
                  ORDER BY completed ASC
                 """;
         List<WeeklyObjective> list = new ArrayList<>();
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, userId);
-            ps.setObject(2, weekStart);
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, userId.toString());
+            ps.setDate(2, Date.valueOf(weekStart));
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 WeeklyObjective obj = new WeeklyObjective();
@@ -219,6 +291,58 @@ public class UserDAOImpl implements IUserDAO {
         return list;
     }
 
+    // ══════════════════════════════════════════════════════════════════════════
+    // DAILY MISSIONS — auto-generate 3 from missions catalog if none for today
+    // ══════════════════════════════════════════════════════════════════════════
+
+    @Override
+    public void ensureDailyMissions(UUID userId) throws SQLException {
+        LocalDate today = LocalDate.now();
+
+        // ¿Ya existen para hoy?
+        String checkSql = "SELECT COUNT(*) FROM user_daily_missions WHERE user_id = ?::uuid AND date = ?";
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(checkSql)) {
+            ps.setString(1, userId.toString());
+            ps.setDate(2, Date.valueOf(today));
+            ResultSet rs = ps.executeQuery();
+            rs.next();
+            if (rs.getInt(1) > 0) return; // ya hay misiones hoy
+        }
+
+        // Tomar 3 misiones aleatorias del catálogo (missions table)
+        String selectSql = "SELECT id FROM missions ORDER BY RANDOM() LIMIT 3";
+        List<Integer> missionIds = new ArrayList<>();
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(selectSql)) {
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                missionIds.add(rs.getInt("id"));
+            }
+        }
+
+        if (missionIds.isEmpty()) {
+            System.err.println("[ensureDailyMissions] Tabla missions vacía. No se pueden generar misiones.");
+            return;
+        }
+
+        // Insertar para el usuario
+        String insertSql = """
+                INSERT INTO user_daily_missions (user_id, mission_id, date, progress, completed)
+                VALUES (?::uuid, ?, ?, 0, false)
+                """;
+        try (Connection c = conn()) {
+            for (int missionId : missionIds) {
+                try (PreparedStatement ps = c.prepareStatement(insertSql)) {
+                    ps.setString(1, userId.toString());
+                    ps.setInt(2, missionId);
+                    ps.setDate(3, Date.valueOf(today));
+                    ps.executeUpdate();
+                }
+            }
+        }
+    }
+
     @Override
     public List<DailyMission> getDailyMissions(UUID userId) throws SQLException {
         String sql = """
@@ -226,13 +350,14 @@ public class UserDAOImpl implements IUserDAO {
                        m.description, m.type, m.required_count, m.xp_reward, m.coin_reward
                   FROM user_daily_missions udm
                   JOIN missions m ON udm.mission_id = m.id
-                 WHERE udm.user_id = ? AND udm.date = ?
+                 WHERE udm.user_id = ?::uuid AND udm.date = ?
                  ORDER BY udm.completed ASC
                 """;
         List<DailyMission> list = new ArrayList<>();
-        try (Connection c = conn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setObject(1, userId);
-            ps.setObject(2, Date.valueOf(LocalDate.now()));
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, userId.toString());
+            ps.setDate(2, Date.valueOf(LocalDate.now()));
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 DailyMission dm = new DailyMission();
