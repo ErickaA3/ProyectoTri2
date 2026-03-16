@@ -23,4 +23,8 @@ public interface IUserDAO {
     void updateUser(User user) throws SQLException;
     List<WeeklyObjective> getWeeklyObjectives(UUID userId) throws SQLException;
     List<DailyMission> getDailyMissions(UUID userId) throws SQLException;
+
+    // Auto-creación de misiones/objetivos si no existen
+    void ensureWeeklyObjectives(UUID userId) throws SQLException;
+    void ensureDailyMissions(UUID userId) throws SQLException;
 }
