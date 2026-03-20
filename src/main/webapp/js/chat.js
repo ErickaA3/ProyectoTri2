@@ -39,6 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Cargar sesiones del historial
     loadSessions();
+
+    // Cargar fondo equipado desde la tienda
+    loadEquippedBackground();
 });
 
 // ─── Enviar mensaje ──────────────────────────────────────────
@@ -268,4 +271,48 @@ function formatReply(txt) {
 
 function esc(t) {
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// ─── Cargar fondo equipado ───────────────────────────────────
+// Mapeo nombre BD → clase CSS
+const BG_CLASS_MAP = {
+    'Noche Oscura':   'bg-default',
+    'Galaxia':        'bg-galaxy',
+    'Volcán':         'bg-volcano',
+    'Océano':         'bg-ocean',
+    'Amazonas':       'bg-forest',
+    'Cielo Nocturno': 'bg-sky',
+    'Lluvia Digital': 'bg-rain',
+    'Aurora Boreal':  'bg-aurora'
+};
+
+async function loadEquippedBackground() {
+    const userId = getUserId();
+    if (!userId) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/shop`, {
+            credentials: 'include',
+            headers: { 'X-User-Id': userId }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.success || !data.equippedBackgroundId) return;
+
+        // Buscar el item equipado en la lista
+        const item = (data.items || []).find(i => i.id === data.equippedBackgroundId);
+        if (!item) return;
+
+        const bgClass = BG_CLASS_MAP[item.name];
+        if (!bgClass || bgClass === 'bg-default') return;
+
+        // Aplicar al .content (padre de sidebar + chat-main)
+        const content = document.querySelector('.content');
+        if (content) {
+            content.classList.add(bgClass);
+        }
+        console.log('[Chat] Fondo equipado:', item.name, '→', bgClass);
+    } catch (e) {
+        console.error('[Chat] Error cargando fondo equipado:', e);
+    }
 }

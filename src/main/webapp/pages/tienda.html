@@ -68,7 +68,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Galaxia</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 500</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 500</div>
                     </div>
                 </div>
 
@@ -79,7 +79,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Océano</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 550</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 550</div>
                     </div>
                 </div>
 
@@ -90,7 +90,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Volcán</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 600</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 600</div>
                     </div>
                 </div>
 
@@ -101,7 +101,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Amazonas</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 650</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 650</div>
                     </div>
                 </div>
 
@@ -112,7 +112,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Cielo Nocturno</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 700</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 700</div>
                     </div>
                 </div>
 
@@ -123,7 +123,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Lluvia Digital</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 750</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 750</div>
                     </div>
                 </div>
 
@@ -134,7 +134,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Aurora Boreal</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 800</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 800</div>
                     </div>
                 </div>
             </div>
@@ -157,7 +157,7 @@
                 </div>
                 <div class="streak-action">
                     <div class="product-card" data-price="300" style="display:contents;">
-                        <span class="streak-price"><i class="fas fa-coins"></i> 300</span>
+                        <span class="streak-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 300</span>
                         <button class="product-buy-btn" onclick="buyProduct('Streak Protector', 300, this)">
                             <i class="fas fa-shield-alt"></i> Obtener
                         </button>
@@ -197,6 +197,19 @@
             <div class="modal-buttons">
                 <button class="modal-btn" onclick="equipNow()">Equipar Ahora</button>
                 <button class="modal-btn modal-btn-secondary" onclick="equipLater()">Más Tarde</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Confirmar equipar fondo -->
+    <div class="modal" id="equipConfirmModal">
+        <div class="modal-content">
+            <div class="modal-icon"> <i class="fa-solid fa-images"></i> </div>  
+            <h2 class="modal-title">Cambiar fondo</h2>
+            <p class="modal-message">¿Deseas equipar <strong class="equip-confirm-name"></strong>?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn" onclick="confirmEquip()">Equipar</button>
+                <button class="modal-btn modal-btn-secondary" onclick="closeEquipModal()">Cancelar</button>
             </div>
         </div>
     </div>
