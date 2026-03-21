@@ -17,10 +17,11 @@ function getBasePath() {
 
 // ── HTML del Navbar ──
 function getNavbarHTML(base) {
-    const user    = getUserData();
-    const racha   = user?.stats?.streakCurrent ?? 0;
-    const xp      = user?.stats?.xp            ?? 0;
-    const monedas = user?.stats?.coins          ?? 0;
+    const user      = getUserData();
+    const racha     = user?.stats?.streakCurrent  ?? 0;
+    const xp        = user?.stats?.xp             ?? 0;
+    const monedas   = user?.stats?.coins           ?? 0;
+    const hasShield = user?.stats?.hasStreakShield ?? false;
 
     return `
     <nav class="main-navbar">
@@ -33,11 +34,34 @@ function getNavbarHTML(base) {
             </div>
         </div>
         <div class="navbar-stats">
-            <div class="stat-pill">
+
+            <!-- Racha con tooltip interactivo -->
+            <div class="stat-pill stat-pill-streak" id="streakPill">
                 <img src="${base}images/gifs/fire.gif" alt="🔥" class="fire-gif" onerror="this.outerHTML='<i class=\\'fas fa-fire\\' style=\\'color:#ff6b6b\\'></i>'">
                 <span class="stat-value">${racha} Días</span>
                 <span class="stat-label">Racha</span>
+                ${hasShield ? '<span class="streak-shield-badge"><i class="fas fa-shield-alt"></i></span>' : ''}
+                <div class="streak-tooltip">
+                    <div class="streak-tooltip-inner">
+                        <div class="streak-tooltip-header">
+                            <i class="fas fa-fire" style="color:#ff6b6b"></i>
+                            <span>Tu Racha</span>
+                        </div>
+                        <div class="streak-tooltip-days" id="streakTooltipDays">${racha}</div>
+                        <div class="streak-tooltip-label">días consecutivos</div>
+                        <div class="streak-tooltip-divider"></div>
+                        <div class="streak-tooltip-timer" id="streakTooltipTimer">
+                            <i class="fas fa-clock"></i>
+                            <span id="streakCountdown">calculando...</span>
+                        </div>
+                        ${hasShield
+                            ? '<div class="streak-shield-row"><i class="fas fa-shield-alt"></i><span>Protector activo — un fallo perdonado</span></div>'
+                            : '<div class="streak-noshield-row"><i class="fas fa-shield-alt"></i><span>Sin protector de racha</span></div>'
+                        }
+                    </div>
+                </div>
             </div>
+
             <div class="stat-pill">
                 <img src="${base}images/gifs/star.gif" alt="⭐" class="star-gif" onerror="this.outerHTML='<i class=\\'fas fa-star\\' style=\\'color:#ffd93d\\'></i>'">
                 <span class="stat-value">${xp.toLocaleString()}</span>
@@ -405,6 +429,9 @@ function initComponents() {
     // Sincronización reactiva
     listenForUserUpdates();
 
+    // Countdown del tooltip de racha
+    initStreakTooltip();
+
     // Transición suave entre páginas
     initPageTransitions();
 
@@ -543,6 +570,33 @@ function refreshNavbarStats() {
         if (xpEl)    xpEl.textContent    = xp.toLocaleString();
         if (coinEl)  coinEl.textContent  = monedas.toLocaleString();
     }
+
+    // Sincronizar tooltip
+    const ttDays = document.getElementById('streakTooltipDays');
+    if (ttDays) ttDays.textContent = racha;
+
+    // Sincronizar badge del escudo
+    const hasShield = user.stats?.hasStreakShield ?? false;
+    const pill = document.getElementById('streakPill');
+    if (pill) {
+        let badge = pill.querySelector('.streak-shield-badge');
+        if (hasShield && !badge) {
+            badge = document.createElement('span');
+            badge.className = 'streak-shield-badge';
+            badge.innerHTML = '<i class="fas fa-shield-alt"></i>';
+            pill.querySelector('.stat-label').after(badge);
+        } else if (!hasShield && badge) {
+            badge.remove();
+        }
+        // Actualizar fila del escudo en el tooltip
+        const shieldRow   = pill.querySelector('.streak-shield-row');
+        const noshieldRow = pill.querySelector('.streak-noshield-row');
+        if (hasShield && noshieldRow) {
+            noshieldRow.outerHTML = '<div class="streak-shield-row"><i class="fas fa-shield-alt"></i><span>Protector activo — un fallo perdonado</span></div>';
+        } else if (!hasShield && shieldRow) {
+            shieldRow.outerHTML = '<div class="streak-noshield-row"><i class="fas fa-shield-alt"></i><span>Sin protector de racha</span></div>';
+        }
+    }
 }
 
 // Refrescar sidebar (nombre, nivel, marco)
@@ -594,6 +648,32 @@ function initPageTransitions() {
             window.location.href = target;
         }
     });
+}
+
+// ══════════════════════════════════════════════════
+// STREAK TOOLTIP — countdown hasta medianoche
+// ══════════════════════════════════════════════════
+function initStreakTooltip() {
+    function updateCountdown() {
+        const el = document.getElementById('streakCountdown');
+        if (!el) return;
+        const now      = new Date();
+        const midnight = new Date();
+        midnight.setHours(24, 0, 0, 0);
+        const diff = midnight - now;
+        if (diff <= 0) { el.textContent = '¡Registra actividad hoy!'; return; }
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        const pad = n => String(n).padStart(2, '0');
+        el.textContent = h > 0
+            ? `${pad(h)}:${pad(m)}:${pad(s)} para el corte`
+            : `${pad(m)}:${pad(s)} — ¡apúrate!`;
+        const timer = document.getElementById('streakTooltipTimer');
+        if (timer) timer.classList.toggle('streak-timer-urgent', h < 2);
+    }
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
 }
 
 // ══════════════════════════════════════════════════
