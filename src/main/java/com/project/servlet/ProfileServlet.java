@@ -64,6 +64,12 @@ public class ProfileServlet extends HttpServlet {
             User user                       = optUser.get();
             Optional<Statistics> optStats  = userDAO.getStatsByUserId(userId);
             Statistics stats               = optStats.orElse(null);
+
+            // ── AUTO-CREAR misiones/objetivos si no existen para hoy/esta semana ──
+            userDAO.ensureWeeklyObjectives(userId);
+            userDAO.ensureDailyMissions(userId);
+
+            // ── Ahora sí leer (ya garantizado que hay filas) ──
             List<WeeklyObjective> weekly   = userDAO.getWeeklyObjectives(userId);
             List<DailyMission> daily       = userDAO.getDailyMissions(userId);
 
@@ -112,9 +118,15 @@ public class ProfileServlet extends HttpServlet {
 
             User user = optUser.get();
             if (fullName  != null && !fullName.isBlank())  user.setFullName(fullName);
-            if (country   != null) user.setCountry(country.isBlank() ? null : country);
+            if (country   != null && !country.isBlank())   user.setCountry(country);
             if (language  != null && !language.isBlank())  user.setLanguage(language);
-            if (birthdate != null && !birthdate.isBlank()) user.setBirthdate(java.time.LocalDate.parse(birthdate));
+            if (birthdate != null && !birthdate.isBlank()) {
+                try {
+                    user.setBirthdate(java.time.LocalDate.parse(birthdate));
+                } catch (java.time.format.DateTimeParseException ex) {
+                    // Formato inválido, ignorar campo
+                }
+            }
 
             userDAO.updateUser(user);
             JsonUtil.sendSuccess(response, "{\"message\": \"Perfil actualizado correctamente.\"}");
@@ -122,9 +134,6 @@ public class ProfileServlet extends HttpServlet {
         } catch (SQLException e) {
             e.printStackTrace();
             JsonUtil.sendError(response, 500, "Error interno del servidor.");
-        } catch (Exception e) {
-            e.printStackTrace();
-            JsonUtil.sendError(response, 400, "Datos inválidos: " + e.getMessage());
         }
     }
 
@@ -135,9 +144,9 @@ public class ProfileServlet extends HttpServlet {
     }
 
     private void setCorsHeaders(HttpServletResponse response) {
-        response.setHeader("Access-Control-Allow-Origin", "http://localhost:8080");
+        response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
         response.setHeader("Access-Control-Allow-Methods", "GET, PUT, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+        response.setHeader("Access-Control-Allow-Headers", "Content-Type, X-User-Id");
         response.setHeader("Access-Control-Allow-Credentials", "true");
     }
 

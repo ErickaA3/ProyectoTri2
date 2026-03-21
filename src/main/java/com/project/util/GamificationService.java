@@ -135,21 +135,42 @@ public class GamificationService {
             resultId = dao.saveActivityResult(userId, contentId, score, maxScore, timeTakenSecs);
         }
 
-        // 10. Misiones y objetivos
+        // ══════════════════════════════════════════════════════════════════════
+        // 10. MISIONES DIARIAS — tipos alineados con missions.type en la DB
+        //     DB types: complete_flashcard, complete_quiz, complete_summary,
+        //               complete_expert_exam, win_duel, maintain_streak
+        // ══════════════════════════════════════════════════════════════════════
         String missionType = mapToMissionType(activityType);
         if (missionType != null) {
             dao.advanceDailyMissions(userId, missionType);
-            if (!"actividad".equals(missionType)) {
-                dao.advanceDailyMissions(userId, "actividad");
-            }
         }
-        String objectiveType = mapToObjectiveType(activityType);
+
+        // Si la racha subió, avanzar misiones de tipo maintain_streak
+        if (streak.newStreak > streakCurrent) {
+            dao.advanceDailyMissions(userId, "maintain_streak");
+        }
+
+        // ══════════════════════════════════════════════════════════════════════
+        // 11. OBJETIVOS SEMANALES — tipos alineados con user_weekly_objectives.type
+        //     Types: streak_days, activities, duels_won, perfect_exam,
+        //            complete_flashcard, complete_quiz, complete_summary, win_duel
+        // ══════════════════════════════════════════════════════════════════════
+        String objectiveType = mapToObjectiveType(activityType, scorePercent);
         if (objectiveType != null) {
             dao.advanceWeeklyObjectives(userId, objectiveType);
         }
-        dao.advanceWeeklyObjectives(userId, "actividades");
 
-        // 11. Check completados
+        // "activities" cuenta CUALQUIER actividad positiva (no abandon)
+        if (!"abandon_exam".equals(activityType)) {
+            dao.advanceWeeklyObjectives(userId, "activities");
+        }
+
+        // Si la racha subió, avanzar objetivo de streak_days
+        if (streak.newStreak > streakCurrent) {
+            dao.advanceWeeklyObjectives(userId, "streak_days");
+        }
+
+        // 12. Check completados
         JsonObject missionRewards   = dao.checkCompletedMissions(userId);
         JsonObject objectiveRewards = dao.checkCompletedObjectives(userId);
 
@@ -168,7 +189,7 @@ public class GamificationService {
                 today.toString(), streak.shieldUsed ? false : hasShield);
         }
 
-        // 12. Respuesta
+        // 13. Respuesta
         JsonObject r = new JsonObject();
         r.addProperty("success",          true);
         r.addProperty("activityType",     activityType);
@@ -259,20 +280,48 @@ public class GamificationService {
         return 1;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // MAPEOS DE TIPO — alineados con los valores reales en la BD
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Mapea activityType del frontend → missions.type en la BD.
+     *
+     * Tabla missions tiene:
+     *   complete_flashcard, complete_quiz, complete_summary,
+     *   complete_expert_exam, win_duel, maintain_streak
+     */
     private static String mapToMissionType(String activityType) {
         return switch (activityType) {
-            case "quiz", "expert_exam" -> "evaluacion";
-            case "flashcards"          -> "flashcard";
-            case "generar"             -> "contenido";
-            case "duelo_ganado", "duelo_perdido", "duelo_empate" -> "duelo";
-            default -> "actividad";
+            case "quiz"         -> "complete_quiz";
+            case "expert_exam"  -> "complete_expert_exam";
+            case "flashcards"   -> "complete_flashcard";
+            case "resumen"      -> "complete_summary";
+            case "generar"      -> "complete_summary";   // generar también cuenta
+            case "duelo_ganado" -> "win_duel";
+            default -> null;  // abandon_exam, duelo_perdido, duelo_empate → no avanzan misión
         };
     }
 
-    private static String mapToObjectiveType(String activityType) {
+    /**
+     * Mapea activityType del frontend → user_weekly_objectives.type en la BD.
+     *
+     * Tabla user_weekly_objectives tiene:
+     *   streak_days, activities, duels_won, perfect_exam,
+     *   complete_flashcard, complete_quiz, complete_summary, win_duel
+     *
+     * NOTA: "activities" y "streak_days" se avanzan por separado en processActivity,
+     *       no pasan por este mapeo.
+     */
+    private static String mapToObjectiveType(String activityType, double scorePercent) {
         return switch (activityType) {
-            case "duelo_ganado" -> "duelos";
-            case "expert_exam"  -> "examen_perfecto";
+            case "duelo_ganado" -> "win_duel";
+            case "flashcards"   -> "complete_flashcard";
+            case "quiz"         -> "complete_quiz";
+            case "resumen"      -> "complete_summary";
+            case "generar"      -> "complete_summary";
+            // Solo cuenta como perfect_exam si sacó 100%
+            case "expert_exam"  -> scorePercent >= 100.0 ? "perfect_exam" : null;
             default -> null;
         };
     }
