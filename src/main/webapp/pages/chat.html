@@ -16,6 +16,22 @@
   <div id="sidebar-container"></div>
 
   <main class="content">
+        <!-- Pantalla de carga Polaris -->
+        <div class="polaris-loading" id="chatLoading">
+            <canvas class="polaris-loading-stars"></canvas>
+            <div class="polaris-loading-content">
+                <div class="polaris-loading-orb">
+                    <div class="polaris-orb-ring r1"></div>
+                    <div class="polaris-orb-ring r2"></div>
+                    <div class="polaris-orb-ring r3"></div>
+                    <div class="polaris-orb-core">
+                        <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
+                    </div>
+                </div>
+                <div class="polaris-loading-title">Cargando</div>
+                <div class="polaris-loading-subtitle" id="chatLoadingSub">Obteniendo datos...</div>
+            </div>
+        </div>
 
     <!-- ══ CHAT SIDEBAR (búho + historial) ══ -->
     <aside class="chat-sidebar">
@@ -190,5 +206,15 @@
   <script src="../js/components.js"></script>
   <script src="../js/chat.js"></script>
   <script src="../js/backgrounds-fx.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof PolarisLoading !== 'undefined')
+            PolarisLoading.initStars(document.querySelector('#chatLoading .polaris-loading-stars'));
+    });
+    setTimeout(function() {
+        var el = document.getElementById('chatLoading');
+        if (el) { el.style.opacity='0'; el.style.pointerEvents='none'; setTimeout(function(){el.remove()},500); }
+    }, 8000);
+    </script>
 </body>
 </html>

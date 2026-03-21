@@ -23,7 +23,6 @@ const CTX = window.location.pathname.split('/pages')[0];
 
 // ── Arranque ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
-    loadShop();
     initGalaxyCanvas();
     initForestCanvas();
     initVolcanoCanvas();
@@ -31,6 +30,10 @@ document.addEventListener('DOMContentLoaded', function () {
     initSkyCanvas();
     initRainCanvas();
     initAuroraCanvas();
+
+    const _tt = PolarisLoading.rotateMessages('tiendaLoadingSub',
+        ['Cargando la tienda...', 'Obteniendo tu inventario...', 'Casi listo...']);
+    loadShop().finally(() => { clearInterval(_tt); PolarisLoading.hide('tiendaLoading'); });
 });
 
 // ============================================================

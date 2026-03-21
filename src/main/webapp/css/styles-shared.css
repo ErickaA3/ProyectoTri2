@@ -539,40 +539,16 @@ html *:active {
     cursor: url('../images/flashcards/cursor-star-silver.png') 16 16, auto !important;
 }
 
+
 /* ===== PANTALLA DE CARGA GLOBAL (Polaris Loading) ===== */
-/*
-    position:absolute — cubre solo el .content, navbar y sidebar se mantienen.
-    El .content ya tiene position:relative declarado al final de este bloque.
-
-    HTML mínimo (dentro de <main class="content">):
-        <div class="polaris-loading" id="myLoading">
-            <canvas class="polaris-loading-stars"></canvas>
-            <div class="polaris-loading-content">
-                <div class="polaris-loading-orb">
-                    <div class="polaris-orb-ring r1"></div>
-                    <div class="polaris-orb-ring r2"></div>
-                    <div class="polaris-orb-ring r3"></div>
-                    <div class="polaris-orb-core">
-                        <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
-                    </div>
-                </div>
-                <div class="polaris-loading-title">Cargando</div>
-                <div class="polaris-loading-subtitle" id="mySub">Un momento...</div>
-            </div>
-        </div>
-
-    JS (components.js debe estar cargado):
-        PolarisLoading.initStars(document.querySelector('#myLoading .polaris-loading-stars'));
-        const t = PolarisLoading.rotateMessages('mySub', ['Msg 1','Msg 2','Msg 3']);
-        // Al terminar:
-        clearInterval(t);
-        PolarisLoading.hide('myLoading');
-*/
-
+/* position:fixed + !important para que ningún CSS de página lo pueda override */
 .polaris-loading {
-    position: absolute;
-    inset: 0;
-    z-index: 500;
+    position: fixed !important;
+    top: var(--navbar-height) !important;
+    left: var(--sidebar-width) !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 900 !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -581,75 +557,34 @@ html *:active {
     -webkit-backdrop-filter: blur(14px);
     transition: opacity 0.4s ease;
 }
-
-.polaris-loading--hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.polaris-loading-stars {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-}
-
+.polaris-loading--hidden { opacity: 0 !important; pointer-events: none !important; }
+.polaris-loading-stars   { position: absolute; inset: 0; pointer-events: none; }
 .polaris-loading-content {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.4rem;
-    text-align: center;
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 1.4rem; text-align: center;
 }
-
 .polaris-loading-orb {
-    position: relative;
-    width: 110px;
-    height: 110px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative; width: 110px; height: 110px;
+    display: flex; align-items: center; justify-content: center;
 }
-
-.polaris-orb-ring {
-    position: absolute;
-    border-radius: 50%;
-    border: 2px solid transparent;
-    animation: polarisOrbSpin linear infinite;
-}
-
+.polaris-orb-ring { position: absolute; border-radius: 50%; border: 2px solid transparent; animation: polarisOrbSpin linear infinite; }
 .polaris-orb-ring.r1 { inset: 0;    border-top-color: var(--accent-cyan);   border-right-color: rgba(45,212,191,.15); animation-duration: 1.8s; }
-.polaris-orb-ring.r2 { inset: 12px; border-top-color: var(--accent-purple); border-left-color:  rgba(139,92,246,.15); animation-duration: 2.4s; animation-direction: reverse; }
-.polaris-orb-ring.r3 { inset: 24px; border-bottom-color: #38bdf8;           border-right-color: rgba(56,189,248,.15); animation-duration: 3.2s; }
-
+.polaris-orb-ring.r2 { inset: 12px; border-top-color: var(--accent-purple); border-left-color: rgba(139,92,246,.15);  animation-duration: 2.4s; animation-direction: reverse; }
+.polaris-orb-ring.r3 { inset: 24px; border-bottom-color: #38bdf8; border-right-color: rgba(56,189,248,.15); animation-duration: 3.2s; }
 .polaris-orb-core {
-    position: relative;
-    width: 48px; height: 48px;
-    border-radius: 50%;
+    position: relative; width: 48px; height: 48px; border-radius: 50%;
     background: linear-gradient(135deg, rgba(45,212,191,.12), rgba(139,92,246,.18));
     border: 1px solid rgba(45,212,191,.3);
     display: flex; align-items: center; justify-content: center;
     animation: polarisOrbPulse 2s ease-in-out infinite;
 }
-
-.polaris-orb-star {
-    width: 26px; height: 26px;
-    object-fit: contain;
-    animation: polarisStarSpin 6s linear infinite;
-    filter: drop-shadow(0 0 4px rgba(45,212,191,.6));
-}
-
+.polaris-orb-star { width: 26px; height: 26px; object-fit: contain; animation: polarisStarSpin 6s linear infinite; filter: drop-shadow(0 0 4px rgba(45,212,191,.6)); }
 @keyframes polarisOrbSpin  { to { transform: rotate(360deg); } }
-@keyframes polarisStarSpin { 0% { transform: rotate(0deg) scale(1); } 50% { transform: rotate(180deg) scale(1.15); } 100% { transform: rotate(360deg) scale(1); } }
-@keyframes polarisOrbPulse {
-    0%,100% { box-shadow: 0 0 18px rgba(45,212,191,.2), 0 0 36px rgba(139,92,246,.1); }
-    50%      { box-shadow: 0 0 32px rgba(45,212,191,.45), 0 0 56px rgba(139,92,246,.22); }
-}
-
+@keyframes polarisStarSpin { 0%{transform:rotate(0deg) scale(1);} 50%{transform:rotate(180deg) scale(1.15);} 100%{transform:rotate(360deg) scale(1);} }
+@keyframes polarisOrbPulse { 0%,100%{box-shadow:0 0 18px rgba(45,212,191,.2),0 0 36px rgba(139,92,246,.1);} 50%{box-shadow:0 0 32px rgba(45,212,191,.45),0 0 56px rgba(139,92,246,.22);} }
 .polaris-loading-title    { font-size: 1.1rem; font-weight: 600; color: var(--text-primary); letter-spacing: .02em; }
 .polaris-loading-subtitle { font-size: .8rem; color: var(--text-secondary); animation: polarisSubPulse 1.8s ease-in-out infinite; }
-@keyframes polarisSubPulse { 0%,100% { opacity: .5; } 50% { opacity: 1; } }
-
-/* El .content necesita position:relative para contener el loading */
+@keyframes polarisSubPulse { 0%,100%{opacity:.5;} 50%{opacity:1;} }
+@media (max-width: 768px) { .polaris-loading { left: 0 !important; } }
 .content { position: relative; }
