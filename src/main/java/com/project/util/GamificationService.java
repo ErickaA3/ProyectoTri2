@@ -202,6 +202,8 @@ public class GamificationService {
         r.addProperty("newCoins",         newCoins);
         r.addProperty("newStreak",        streak.newStreak);
         r.addProperty("streakRecord",     newStreakRecord);
+        r.addProperty("shieldUsed",       streak.shieldUsed);
+        r.addProperty("hasStreakShield",  streak.shieldUsed ? false : hasShield);
         r.addProperty("leveledUp",        leveledUp);
         r.addProperty("oldLevel",         currentLevel);
 
@@ -267,9 +269,22 @@ public class GamificationService {
     private static StreakResult calculateStreak(int currentStreak, LocalDate lastActivity,
                                                 LocalDate today, boolean hasShield) {
         long days = java.time.temporal.ChronoUnit.DAYS.between(lastActivity, today);
+
+        // Actividad repetida hoy — no cambiar nada
         if (days == 0) return new StreakResult(currentStreak, false);
+
+        // Día consecutivo — racha sube
         if (days == 1) return new StreakResult(currentStreak + 1, false);
-        if (hasShield) return new StreakResult(currentStreak + 1, true);
+
+        // Se saltó al menos un día
+        if (hasShield) {
+            // El escudo cubre exactamente UN día perdido.
+            // La racha se mantiene (no sube — el día faltante queda perdonado).
+            // shieldUsed = true → el DAO consumirá el shield (hasStreakShield → false).
+            return new StreakResult(currentStreak, true);
+        }
+
+        // Sin escudo: racha rota, empieza desde 1
         return new StreakResult(1, false);
     }
 
