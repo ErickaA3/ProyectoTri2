@@ -173,6 +173,20 @@
     </div><!-- /chat-main -->
   </main>
 
+  <!-- Modal: Confirmar eliminar chat -->
+  <div class="modal" id="deleteConfirmModal">
+    <div class="modal-content">
+      <div class="modal-icon">🗑️</div>
+      <h2 class="modal-title">Eliminar chat</h2>
+      <p class="modal-message">¿Deseas eliminar "<strong class="delete-chat-name"></strong>"?</p>
+      <p class="modal-sub">Esta acción no se puede deshacer.</p>
+      <div class="modal-buttons">
+        <button class="modal-btn modal-btn-danger" onclick="confirmDeleteChat()">Eliminar</button>
+        <button class="modal-btn modal-btn-secondary" onclick="closeDeleteModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../js/components.js"></script>
   <script src="../js/chat.js"></script>
   <script src="../js/backgrounds-fx.js"></script>
