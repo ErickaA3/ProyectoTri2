@@ -178,16 +178,17 @@
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
+    padding-right: 32px;
     border-radius: 10px;
     border: 1px solid transparent;
     cursor: pointer;
     transition: all 0.18s;
     margin-bottom: 3px;
+    position: relative;
 }
 .chat-item:hover {
     background: rgba(139, 92, 246, 0.1);
     border-color: rgba(139, 92, 246, 0.22);
-    transform: translateX(2px);
 }
 .chat-item.active {
     background: rgba(139, 92, 246, 0.14);
@@ -218,6 +219,96 @@
     color: var(--text-secondary);
     font-family: "Space Mono", monospace;
     margin-top: 1px;
+}
+
+/* Botón eliminar chat — aparece al pasar cursor sobre el chat */
+.chat-item-delete {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.15s ease;
+}
+.chat-item:hover .chat-item-delete {
+    opacity: 0.6;
+    pointer-events: auto;
+}
+.chat-item-delete:hover {
+    opacity: 1 !important;
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    transform: translateY(-50%) scale(1.15);
+}
+
+/* ── Modal (chat) ───────────────────────────────────────────*/
+.modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+.modal.show {
+    display: flex;
+    animation: modalFadeIn 0.25s ease;
+}
+@keyframes modalFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.modal-content {
+    background: var(--secondary-bg);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 380px;
+    text-align: center;
+    animation: modalSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes modalSlideUp {
+    from { transform: translateY(15px) scale(0.96); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+.modal-icon    { font-size: 40px; margin-bottom: 12px; }
+.modal-title   { font-size: 1.1rem; font-weight: 800; margin-bottom: 8px; color: var(--text-primary); }
+.modal-message { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 6px; }
+.modal-sub     { color: var(--text-secondary); font-size: 0.72rem; opacity: 0.6; margin-bottom: 18px; }
+.modal-buttons { display: flex; justify-content: center; gap: 10px; }
+.modal-btn {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.modal-btn:hover { transform: translateY(-1px); }
+.modal-btn-danger {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: white;
+    box-shadow: 0 3px 12px rgba(239, 68, 68, 0.3);
+}
+.modal-btn-secondary {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    color: var(--text-primary);
 }
 
 /* Perfil del chat sidebar */

@@ -72,15 +72,12 @@
     <div class="loading-screen" id="loadingScreen">
         <canvas id="loadingStars"></canvas>
         <div class="loading-content">
-            <div class="loading-logo">
-                <img src="../images/modo-estudio/modo-estudio-logo.png" alt="Modo Estudio">
-            </div>
-            <div class="loading-orb">
-                <div class="loading-orb-ring r1"></div>
-                <div class="loading-orb-ring r2"></div>
-                <div class="loading-orb-ring r3"></div>
-                <div class="loading-orb-core">
-                    <i class="fas fa-brain"></i>
+            <div class="polaris-loading-orb">
+                <div class="polaris-orb-ring r1"></div>
+                <div class="polaris-orb-ring r2"></div>
+                <div class="polaris-orb-ring r3"></div>
+                <div class="polaris-orb-core">
+                    <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
                 </div>
             </div>
             <div class="loading-title">Generando tu sesión de estudio</div>
@@ -459,7 +456,7 @@
             <div class="se-panel-inner">
                 <div class="se-panel-stats">
                     <div class="se-stat"><span class="se-stat-val">${cards.length}</span><span class="se-stat-lbl">tarjetas</span></div>
-                    <div class="se-stat"><span class="se-stat-val">${data.title ? '✓' : '—'}</span><span class="se-stat-lbl">tema</span></div>
+                    <div class="se-stat"><span class="se-stat-val">${data.title || '—'}</span><span class="se-stat-lbl">tema</span></div>
                 </div>
                 <div class="se-fc-preview">${preview}</div>
                 ${cards.length > 3 ? `<div class="se-more-badge">+${cards.length - 3} tarjetas más</div>` : ''}
@@ -875,7 +872,6 @@
             <div class="se-panel-inner">
                 <div class="se-panel-stats">
                     <div class="se-stat"><span class="se-stat-val">${tipoLabels[tipo] || tipo}</span><span class="se-stat-lbl">tipo</span></div>
-                    <div class="se-stat"><span class="se-stat-val">${countNodes(root)}</span><span class="se-stat-lbl">nodos</span></div>
                 </div>
                 <div class="se-tree-container">
                     ${root ? schemaHTML : '<p style="color:rgba(255,255,255,0.4)">Sin datos</p>'}
@@ -907,7 +903,6 @@
             <div class="se-panel-inner">
                 <div class="se-panel-stats">
                     <div class="se-stat"><span class="se-stat-val">${questions.length}</span><span class="se-stat-lbl">preguntas</span></div>
-                    <div class="se-stat"><span class="se-stat-val">${diff[config?.dificultad] || '—'}</span><span class="se-stat-lbl">dificultad</span></div>
                     ${config?.tipo === 'expert_exam' ? `<div class="se-stat"><span class="se-stat-val">${config.tiempoPorPregunta}s</span><span class="se-stat-lbl">/ pregunta</span></div>` : ''}
                 </div>
                 <div class="se-exam-preview">
