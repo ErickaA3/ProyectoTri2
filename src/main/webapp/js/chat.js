@@ -170,9 +170,83 @@ function addSessionToSidebar(firstMessage, sessionId) {
             <div class="chat-item-label">${esc(firstMessage.substring(0, 35))}${firstMessage.length > 35 ? '...' : ''}</div>
             <div class="chat-item-date">Hoy</div>
         </div>
+        <button class="chat-item-delete" title="Eliminar chat">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        </button>
     `;
-    item.addEventListener('click', () => selectSession(item, sessionId));
+    // Click en el item → cargar chat
+    item.addEventListener('click', (e) => {
+        // No cargar si clickearon el botón de borrar
+        if (e.target.closest('.chat-item-delete')) return;
+        selectSession(item, sessionId);
+    });
+    // Click en la X → mostrar confirmación
+    item.querySelector('.chat-item-delete').addEventListener('click', (e) => {
+        e.stopPropagation();
+        showDeleteConfirm(sessionId, item);
+    });
     container.appendChild(item);
+}
+
+// ─── Eliminar sesión ─────────────────────────────────────────
+let pendingDeleteSessionId = null;
+let pendingDeleteElement   = null;
+
+function showDeleteConfirm(sessionId, el) {
+    pendingDeleteSessionId = sessionId;
+    pendingDeleteElement   = el;
+    const label = el.querySelector('.chat-item-label').textContent;
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.querySelector('.delete-chat-name').textContent = label;
+    modal.classList.add('show');
+}
+
+function closeDeleteModal() {
+    document.getElementById('deleteConfirmModal').classList.remove('show');
+    pendingDeleteSessionId = null;
+    pendingDeleteElement   = null;
+}
+
+async function confirmDeleteChat() {
+    if (!pendingDeleteSessionId) return;
+
+    const userId = getUserId();
+    if (!userId) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/chat?sessionId=${pendingDeleteSessionId}&userId=${userId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            // Quitar del sidebar
+            if (pendingDeleteElement) pendingDeleteElement.remove();
+
+            // Si era el chat activo, limpiar
+            if (currentSession === pendingDeleteSessionId) {
+                newChat();
+            }
+
+            // Si no quedan chats, mostrar mensaje vacío
+            const remaining = document.querySelectorAll('.chat-item');
+            if (remaining.length === 0) {
+                const container = document.querySelector('.recents');
+                const empty = document.createElement('div');
+                empty.className = 'empty-sessions';
+                empty.textContent = 'No hay chats recientes.';
+                empty.style.cssText = 'color:var(--text-secondary);font-size:0.8rem;padding:1rem 0;text-align:center;';
+                container.appendChild(empty);
+            }
+        }
+    } catch (e) {
+        console.error('Error eliminando chat:', e);
+    }
+
+    closeDeleteModal();
 }
 
 // ─── Seleccionar sesión del historial ────────────────────────
@@ -316,3 +390,8 @@ async function loadEquippedBackground() {
         console.error('[Chat] Error cargando fondo equipado:', e);
     }
 }
+
+// ─── Backdrop click para cerrar modales ──────────────────────
+document.addEventListener('click', function(e) {
+    if (e.target.id === 'deleteConfirmModal') closeDeleteModal();
+});
