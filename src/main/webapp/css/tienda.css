@@ -52,7 +52,7 @@
 .content.bg-rain    #rainCanvas    { opacity: 1; }
 .content.bg-aurora  #auroraCanvas  { opacity: 1; }
 
-.content > *:not(canvas) {
+.content > *:not(canvas):not(.polaris-loading) {
     position: relative;
     z-index: 1;
 }

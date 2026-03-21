@@ -32,16 +32,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Verificar que el usuario está logueado
     if (!getUserId()) {
+        PolarisLoading.hide('chatLoading');
         addBotMsg('No se detectó sesión activa. <a href="../index.html" style="color:#2dd4bf;">Inicia sesión</a> para usar el chat.');
         document.getElementById('sendBtn').disabled = true;
         return;
     }
 
-    // Cargar sesiones del historial
-    loadSessions();
-
-    // Cargar fondo equipado desde la tienda
-    loadEquippedBackground();
+    const _ct = PolarisLoading.rotateMessages('chatLoadingSub',
+        ['Iniciando chat...', 'Cargando historial...', 'Conectando con el búho...']);
+    Promise.allSettled([loadSessions(), loadEquippedBackground()])
+        .finally(() => { clearInterval(_ct); PolarisLoading.hide('chatLoading'); });
 });
 
 // ─── Enviar mensaje ──────────────────────────────────────────
