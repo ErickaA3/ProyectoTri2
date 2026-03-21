@@ -4,7 +4,16 @@ const API_BASE = 'http://localhost:8080/project-1.0-SNAPSHOT';
 
 // ─── Init ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    loadProfile();
+    const msgTimer = PolarisLoading.rotateMessages(
+        'perfilLoadingSub',
+        ['Cargando tu perfil...', 'Obteniendo estadísticas...', 'Casi listo...']
+    );
+
+    loadProfile().finally(() => {
+        clearInterval(msgTimer);
+        PolarisLoading.hide('perfilLoading');
+    });
+
     document.getElementById('btn-edit-profile').addEventListener('click', openEditModal);
     document.getElementById('btn-modal-close').addEventListener('click', closeEditModal);
     document.getElementById('btn-modal-cancel').addEventListener('click', closeEditModal);
@@ -41,9 +50,10 @@ async function loadProfile() {
 // ─── Render de todos los datos ───────────────────────────────
 function renderProfile(profile) {
     // Profile card
-    document.getElementById('profile-username').textContent = profile.fullName || profile.username || '—';
-    document.getElementById('profile-email').textContent    = profile.email    ?? '—';
-    document.getElementById('profile-level').textContent    = profile.stats?.level ?? '—';
+    document.getElementById('profile-username').textContent  = profile.username  || '—';
+    document.getElementById('profile-fullname').textContent  = profile.fullName  || '';
+    document.getElementById('profile-email').textContent     = profile.email     ?? '—';
+    document.getElementById('profile-level').textContent     = profile.stats?.level ?? '—';
 
     // Stats
     document.getElementById('stat-streak').textContent        = profile.stats?.streakCurrent ?? 0;
@@ -149,7 +159,7 @@ function renderDailyMissions(missions) {
 
 // ─── Modal Editar ────────────────────────────────────────────
 function openEditModal() {
-    // Pre-llenar con valores actuales
+    document.getElementById('edit-username').value  = document.getElementById('profile-username').textContent.replace('—', '');
     document.getElementById('edit-fullname').value  = document.getElementById('info-fullname').textContent.replace('—', '');
     document.getElementById('edit-country').value   = document.getElementById('info-country').textContent.replace('—', '');
     document.getElementById('edit-birthdate').value = getRawBirthdate();
@@ -167,6 +177,7 @@ function closeEditModal() {
 }
 
 async function saveProfile() {
+    const username  = document.getElementById('edit-username').value.trim();
     const fullName  = document.getElementById('edit-fullname').value.trim();
     const country   = document.getElementById('edit-country').value.trim();
     const language  = document.getElementById('edit-language').value;
@@ -175,8 +186,8 @@ async function saveProfile() {
     const errorEl = document.getElementById('modal-error-msg');
     errorEl.style.display = 'none';
 
-    if (!fullName) {
-        errorEl.textContent = 'El nombre no puede estar vacío.';
+    if (!username) {
+        errorEl.textContent = 'El nombre de usuario no puede estar vacío.';
         errorEl.style.display = 'block';
         return;
     }
@@ -186,7 +197,7 @@ async function saveProfile() {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ fullName, country, language, birthdate })
+            body: JSON.stringify({ username, fullName, country, language, birthdate })
         });
 
         const data = await res.json();
@@ -197,31 +208,30 @@ async function saveProfile() {
             return;
         }
 
-        // Actualizar vista sin recargar
-        document.getElementById('info-fullname').textContent  = fullName;
-        document.getElementById('profile-username').textContent = fullName;
-        document.getElementById('info-country').textContent   = country || '—';
-        document.getElementById('info-language').textContent  = formatLanguage(language);
-        document.getElementById('info-language').dataset.raw  = language;
+        // ── Actualizar vista de la página ──
+        document.getElementById('profile-username').textContent = username;
+        document.getElementById('profile-fullname').textContent = fullName;
+        document.getElementById('info-fullname').textContent    = fullName || '—';
+        document.getElementById('info-country').textContent     = country  || '—';
+        document.getElementById('info-language').textContent    = formatLanguage(language);
+        document.getElementById('info-language').dataset.raw    = language;
         if (birthdate) {
             document.getElementById('info-birthdate').textContent = formatDate(birthdate);
             document.getElementById('info-birthdate').dataset.raw = birthdate;
         }
 
-        // Actualizar sidebar y localStorage
-        const sidebarName = document.querySelector('.user-name');
-        if (sidebarName) sidebarName.textContent = fullName;
-
+        // ── Actualizar localStorage y notificar a navbar/sidebar ──
         try {
-            const stored = JSON.parse(localStorage.getItem('user'));
-            if (stored) {
-                stored.fullName = fullName;
-                stored.country  = country;
-                stored.language = language;
-                if (birthdate) stored.birthdate = birthdate;
-                localStorage.setItem('user', JSON.stringify(stored));
-            }
-        } catch(_) {}
+            const stored = JSON.parse(localStorage.getItem('user')) ?? {};
+            stored.username = username;
+            stored.fullName = fullName;
+            stored.country  = country;
+            stored.language = language;
+            if (birthdate) stored.birthdate = birthdate;
+            localStorage.setItem('user', JSON.stringify(stored));
+            // Dispara refreshNavbarStats() + refreshSidebarInfo() en components.js
+            if (typeof notifyUserUpdate === 'function') notifyUserUpdate();
+        } catch (_) {}
 
         closeEditModal();
 

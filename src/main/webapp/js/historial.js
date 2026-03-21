@@ -49,7 +49,9 @@ function authHeaders() {
 // ─────────────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     setupListeners();
-    loadHistory();
+    const _ht = PolarisLoading.rotateMessages('historialLoadingSub',
+        ['Cargando historial...', 'Obteniendo tu actividad...', 'Casi listo...']);
+    loadHistory().finally(() => { clearInterval(_ht); PolarisLoading.hide('historialLoading'); });
 });
 
 function setupListeners() {
@@ -440,11 +442,7 @@ async function clearAllHistory() {
 // ─────────────────────────────────────────────────────────────────────────────
 // UI HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
-function showLoadingState(loading) {
-    const c = document.getElementById('historyContainer');
-    if (loading) c.innerHTML = `<div class="loading-state"><i class="fas fa-circle-notch fa-spin"></i><p>Cargando historial...</p></div>`;
-    else c.querySelector('.loading-state')?.remove();
-}
+function showLoadingState(_) { /* Reemplazado por PolarisLoading */ }
 
 function showToast(message, type = 'toast-success', iconClass = 'fas fa-check-circle') {
     const toast = document.getElementById('toast');

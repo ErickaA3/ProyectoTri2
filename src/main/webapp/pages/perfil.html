@@ -17,6 +17,22 @@
 
     <!-- Content -->
     <main class="content">
+        <!-- Pantalla de carga Polaris -->
+        <div class="polaris-loading" id="perfilLoading">
+            <canvas class="polaris-loading-stars"></canvas>
+            <div class="polaris-loading-content">
+                <div class="polaris-loading-orb">
+                    <div class="polaris-orb-ring r1"></div>
+                    <div class="polaris-orb-ring r2"></div>
+                    <div class="polaris-orb-ring r3"></div>
+                    <div class="polaris-orb-core">
+                        <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="Polaris">
+                    </div>
+                </div>
+                <div class="polaris-loading-title">Cargando</div>
+                <div class="polaris-loading-subtitle" id="perfilLoadingSub">Obteniendo datos...</div>
+            </div>
+        </div>
         <div class="page-header">
             <h2 class="page-title">
                 <i class="fas fa-user-circle"></i>
@@ -32,6 +48,7 @@
             </div>
             <div class="profile-info">
                 <h2 class="profile-name" id="profile-username">—</h2>
+                <p class="profile-fullname" id="profile-fullname" style="color:rgba(255,255,255,0.5);font-size:0.85rem;margin-top:0.1rem;margin-bottom:0.25rem;"></p>
                 <p class="profile-email" id="profile-email">—</p>
                 <div class="profile-badges">
                     <span class="badge badge-level">
@@ -42,7 +59,7 @@
             </div>
             <button class="btn-edit" id="btn-edit-profile">
                 <i class="fas fa-pen"></i>
-                Editar Perfil
+                Editar mis datos
             </button>
         </section>
 
@@ -155,12 +172,16 @@
     <div class="modal-overlay" id="modal-edit" style="display:none;">
         <div class="modal-card">
             <div class="modal-header">
-                <h3><i class="fas fa-pen"></i> Editar Perfil</h3>
+                <h3><i class="fas fa-pen"></i> Editar mis datos</h3>
                 <button class="modal-close" id="btn-modal-close">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body">
+                <div class="form-group">
+                    <label>Nombre de usuario</label>
+                    <input type="text" id="edit-username" placeholder="Tu nombre de usuario">
+                </div>
                 <div class="form-group">
                     <label>Nombre completo</label>
                     <input type="text" id="edit-fullname" placeholder="Tu nombre completo">
@@ -196,9 +217,15 @@
     <script src="../js/marcos.js"></script>
     <script src="../js/perfil.js"></script>
     <script>
-    // Renderizar marco con foto de perfil
+    // ── Marco del perfil ─────────────────────────────────────────
+    // Renderiza el marco con foto de perfil dado un nivel
     function renderProfileFrame(lvl) {
+        // Limpiar marco anterior antes de re-renderizar
+        const frameEl = document.getElementById('profileFrame');
+        if (frameEl) frameEl.innerHTML = '';
+
         renderFrame(lvl, 'profileFrame', null, 0.52);
+
         const av = document.querySelector('#profileFrame .av');
         if (av) {
             const img = document.createElement('img');
@@ -209,27 +236,34 @@
         }
     }
 
-    // Esperar a que perfil.js ponga el nivel en el DOM
-    const _poll = setInterval(() => {
-        const el = document.getElementById('profile-level');
-        const lvl = parseInt(el?.textContent);
-        if (lvl >= 1 && lvl <= 10) {
-            clearInterval(_poll);
-            renderProfileFrame(lvl);
-        }
-    }, 200);
-    // Tope: después de 5s renderiza con localStorage
-    setTimeout(() => {
-        clearInterval(_poll);
-        const el = document.getElementById('profileFrame');
-        if (el && !el.querySelector('.marco-container')) {
-            try {
-                const lvl = JSON.parse(localStorage.getItem('user'))?.stats?.level || 1;
-                renderProfileFrame(lvl);
-            } catch(_) { renderProfileFrame(1); }
-        }
-    }, 5000);
-    </script>
+    // Helper: leer nivel actual del localStorage
+    function getLevelFromStorage() {
+        try {
+            return JSON.parse(localStorage.getItem('user'))?.stats?.level ?? 1;
+        } catch(_) { return 1; }
+    }
 
+    // Render inicial: usar lo que haya en localStorage (rápido, sin esperar fetch)
+    document.addEventListener('DOMContentLoaded', () => {
+        renderProfileFrame(getLevelFromStorage());
+    });
+
+    // Re-render reactivo: cuando perfil.js guarda datos frescos del backend
+    // y llama notifyUserUpdate(), este listener recibe el nivel correcto
+    window.addEventListener('userDataUpdated', () => {
+        renderProfileFrame(getLevelFromStorage());
+    });
+    </script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof PolarisLoading !== 'undefined')
+            PolarisLoading.initStars(document.querySelector('#perfilLoading .polaris-loading-stars'));
+    });
+    // Fallback: si el JS de la página falla, ocultar loading después de 8s
+    setTimeout(function() {
+        var el = document.getElementById('perfilLoading');
+        if (el) { el.style.opacity='0'; el.style.pointerEvents='none'; setTimeout(function(){el.remove()},500); }
+    }, 8000);
+    </script>
 </body>
 </html>

@@ -27,13 +27,11 @@ let friends = [], invitations = [], activeDuels = [], notifications = [];
 // ═══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('headerStars').innerHTML = generateStars(12);
-    // Limpiar datos de duelo en sesión para evitar loops con duelo-play.html
     sessionStorage.removeItem('duelData');
-
-    loadFriends();
-    loadPendingRequests();
-    loadActiveDuels();
-    loadNotifications();
+    const _dt = PolarisLoading.rotateMessages('duelLoadingSub',
+        ['Obteniendo tus datos...', 'Cargando amigos...', 'Buscando retos activos...']);
+    Promise.allSettled([loadFriends(), loadPendingRequests(), loadActiveDuels(), loadNotifications()])
+        .finally(() => { clearInterval(_dt); PolarisLoading.hide('duelLoadingScreen'); });
 });
 
 // ═══════════════════════════════════════════════════════════
