@@ -24,14 +24,14 @@
 
                 <!-- Opciones de Estudio -->
                 <div class="study-options">
-                    <div class="study-option selected" onclick="toggleOption(this)" data-type="esquemas">
+                    <div class="study-option" onclick="toggleOption(this)" data-type="esquemas">
                         <div class="study-option-icon"><i class="fas fa-project-diagram"></i></div>
                         <div class="study-option-label">
                             <div class="study-checkbox"><i class="fas fa-check"></i></div>
                             Esquemas
                         </div>
                     </div>
-                    <div class="study-option selected" onclick="toggleOption(this)" data-type="flashcards">
+                    <div class="study-option" onclick="toggleOption(this)" data-type="flashcards">
                         <div class="study-option-icon"><i class="fas fa-layer-group"></i></div>
                         <div class="study-option-label">
                             <div class="study-checkbox"><i class="fas fa-check"></i></div>
@@ -39,14 +39,14 @@
                         </div>
                     </div>
                     <!-- "Quizzes" renombrado a "Examen" -->
-                    <div class="study-option selected" onclick="toggleOption(this)" data-type="examenes">
+                    <div class="study-option" onclick="toggleOption(this)" data-type="examenes">
                         <div class="study-option-icon"><i class="fas fa-file-signature"></i></div>
                         <div class="study-option-label">
                             <div class="study-checkbox"><i class="fas fa-check"></i></div>
                             Examen
                         </div>
                     </div>
-                    <div class="study-option selected" onclick="toggleOption(this)" data-type="resumenes">
+                    <div class="study-option" onclick="toggleOption(this)" data-type="resumenes">
                         <div class="study-option-icon"><i class="fas fa-file-alt"></i></div>
                         <div class="study-option-label">
                             <div class="study-checkbox"><i class="fas fa-check"></i></div>
@@ -90,7 +90,7 @@
                 </div>
 
                 <!-- Botón Siguiente -->
-                <button class="generate-btn" onclick="goToNextStep()" id="generateBtn">
+                <button class="generate-btn" onclick="goToNextStep()" id="generateBtn" disabled style="margin-top:1.5rem;">
                     <span class="generate-btn-text">
                         Siguiente &nbsp;<i class="fas fa-arrow-right" style="font-size:0.85em"></i>
                     </span>
@@ -109,7 +109,7 @@
         // ================================================================
         // ESTADO
         // ================================================================
-        let selectedOptions  = ['esquemas', 'flashcards', 'examenes', 'resumenes'];
+        let selectedOptions  = [];
         let selectedDataType = null;
         let uploadedFile     = null;
         let userText         = '';
@@ -346,7 +346,7 @@
     <style>
         .steps-preview {
             display: flex; flex-direction: column; gap: 10px;
-            margin: 16px 0 4px; padding: 14px 16px;
+            margin: 16px 0 0; padding: 14px 16px;
             background: rgba(139,92,246,0.08);
             border: 1px solid rgba(139,92,246,0.2);
             border-radius: 12px;

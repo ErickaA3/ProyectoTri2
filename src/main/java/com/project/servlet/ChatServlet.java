@@ -175,6 +175,50 @@ public class ChatServlet extends HttpServlet {
         res.setStatus(HttpServletResponse.SC_OK);
     }
 
+    @Override
+    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+
+        setCorsHeaders(response);
+
+        UUID userId = getUserIdFromSession(request);
+        if (userId == null) {
+            String userIdStr = request.getParameter("userId");
+            if (userIdStr != null && !userIdStr.isBlank()) {
+                try { userId = UUID.fromString(userIdStr); }
+                catch (IllegalArgumentException e) {
+                    JsonUtil.sendError(response, 400, "ID de usuario inválido.");
+                    return;
+                }
+            }
+        }
+
+        if (userId == null) {
+            JsonUtil.sendError(response, 401, "No autenticado.");
+            return;
+        }
+
+        String sessionId = request.getParameter("sessionId");
+        if (sessionId == null || sessionId.isBlank()) {
+            JsonUtil.sendError(response, 400, "Se requiere sessionId.");
+            return;
+        }
+
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            String sql = "DELETE FROM chat_history WHERE user_id = ? AND session_id = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setObject(1, userId);
+                ps.setObject(2, UUID.fromString(sessionId));
+                int deleted = ps.executeUpdate();
+                String json = "{\"deleted\":" + deleted + "}";
+                JsonUtil.sendSuccess(response, json);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            JsonUtil.sendError(response, 500, "Error al eliminar el chat.");
+        }
+    }
+
     // ── Helper: obtener userId de la sesión HTTP ──────────────────────────────
 
     private UUID getUserIdFromSession(HttpServletRequest request) {
@@ -316,7 +360,7 @@ public class ChatServlet extends HttpServlet {
 
     private void setCorsHeaders(HttpServletResponse response) {
         response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "Content-Type");
         response.setHeader("Access-Control-Allow-Credentials", "true");
     }
