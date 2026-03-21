@@ -405,6 +405,9 @@ function initComponents() {
     // Sincronización reactiva
     listenForUserUpdates();
 
+    // Transición suave entre páginas
+    initPageTransitions();
+
     // Modal: cerrar con Escape o click fuera
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') cerrarModalLogout();
@@ -416,12 +419,12 @@ function initComponents() {
 
 // Marcar la página activa en el menú
 function setActivePage() {
+    // Limpiar activo anterior
+    document.querySelectorAll('.nav-card.active').forEach(el => el.classList.remove('active'));
     const currentPage = document.body.dataset.page;
     if (currentPage) {
         const activeLink = document.querySelector(`.nav-card[data-page="${currentPage}"]`);
-        if (activeLink) {
-            activeLink.classList.add('active');
-        }
+        if (activeLink) activeLink.classList.add('active');
     }
 }
 
@@ -556,6 +559,104 @@ function refreshSidebarInfo() {
 
     renderSidebarFrame();
 }
+
+
+
+// ══════════════════════════════════════════════════
+// TRANSICIÓN SUAVE ENTRE PÁGINAS
+// Fade out del content al hacer click en nav links.
+// El navbar y sidebar ya están cacheados por el browser
+// desde la segunda visita — visualmente no parpadean.
+// ══════════════════════════════════════════════════
+function initPageTransitions() {
+    // Fade in al entrar a la página
+    const main = document.querySelector('main.content');
+    if (main) {
+        main.style.opacity = '0';
+        main.style.transition = 'opacity 0.18s ease';
+        requestAnimationFrame(() => { main.style.opacity = '1'; });
+    }
+
+    // Fade out al salir
+    document.addEventListener('click', e => {
+        const link = e.target.closest('a.nav-card[href]');
+        if (!link || !link.href || link.href === location.href) return;
+        // No interceptar excluidas
+        if (link.href.includes('index.html')) return;
+        e.preventDefault();
+        const target = link.href;
+        const m = document.querySelector('main.content');
+        if (m) {
+            m.style.transition = 'opacity 0.15s ease';
+            m.style.opacity = '0';
+            setTimeout(() => { window.location.href = target; }, 150);
+        } else {
+            window.location.href = target;
+        }
+    });
+}
+
+// ══════════════════════════════════════════════════
+// POLARIS LOADING — utilidad global reutilizable
+// ══════════════════════════════════════════════════
+const PolarisLoading = {
+    initStars(canvas) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const resize = () => {
+            const p = canvas.parentElement;
+            canvas.width  = p ? p.offsetWidth  : window.innerWidth;
+            canvas.height = p ? p.offsetHeight : window.innerHeight;
+        };
+        resize();
+        const stars = Array.from({ length: 180 }, () => ({
+            x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+            size: Math.random() * 2 + 0.2,
+            speedX: (Math.random() - 0.5) * 0.08, speedY: (Math.random() - 0.5) * 0.08,
+            opacity: Math.random() * 0.5 + 0.1, opacityChange: (Math.random() - 0.5) * 0.01,
+            color: ['#ffffff','#ffe9c4','#d4f1ff','#c4b5fd'][Math.floor(Math.random() * 4)]
+        }));
+        const animate = () => {
+            if (!canvas.isConnected) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stars.forEach(s => {
+                s.x += s.speedX; s.y += s.speedY;
+                if (s.x < 0) s.x = canvas.width;  if (s.x > canvas.width)  s.x = 0;
+                if (s.y < 0) s.y = canvas.height; if (s.y > canvas.height) s.y = 0;
+                s.opacity += s.opacityChange;
+                if (s.opacity <= 0.05 || s.opacity >= 0.7) s.opacityChange *= -1;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fillStyle = s.color; ctx.globalAlpha = s.opacity; ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            requestAnimationFrame(animate);
+        };
+        animate();
+        window.addEventListener('resize', resize);
+    },
+
+    show(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('polaris-loading--hidden');
+    },
+
+    hide(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('polaris-loading--hidden');
+        setTimeout(() => el.remove(), 500);
+    },
+
+    rotateMessages(subtitleId, messages, intervalMs = 1400) {
+        const el = document.getElementById(subtitleId);
+        if (!el || !messages.length) return null;
+        let i = 0;
+        return setInterval(() => {
+            i = (i + 1) % messages.length;
+            el.textContent = messages[i];
+        }, intervalMs);
+    }
+};
 
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initComponents);

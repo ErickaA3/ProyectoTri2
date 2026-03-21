@@ -301,4 +301,7 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeRemoveModal();
 });
 
-loadFavorites();
+(function() {
+    const t = PolarisLoading.rotateMessages('favoritosLoadingSub', ['Cargando favoritos...', 'Buscando tu contenido...', 'Casi listo...']);
+    loadFavorites().finally(() => { clearInterval(t); PolarisLoading.hide('favoritosLoading'); });
+})();
