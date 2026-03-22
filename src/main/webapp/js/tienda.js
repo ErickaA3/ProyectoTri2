@@ -215,6 +215,34 @@ async function buyProduct(productName, price, btn) {
             updateBalance(result.remainingCoins);
             sessionStorage.setItem('userCoins', result.remainingCoins);
             showPurchaseModal(productName, price, result.remainingCoins);
+
+            // Activar countdown del escudo si es Streak Protector
+            if (productName === 'Streak Protector') {
+                localStorage.setItem('shieldActivatedAt', Date.now().toString());
+                try {
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    if (user.stats) { user.stats.hasStreakShield = true; localStorage.setItem('user', JSON.stringify(user)); }
+                } catch(_) {}
+
+                // Crear el pill en el navbar inmediatamente
+                if (!document.getElementById('shieldPill')) {
+                    const stats = document.querySelector('.navbar-stats');
+                    const streakPill = document.getElementById('streakPill');
+                    if (stats && streakPill) {
+                        const sp = document.createElement('div');
+                        sp.className = 'shield-pill';
+                        sp.id = 'shieldPill';
+                        sp.innerHTML = `
+                            <div class="shield-icon-wrap"><i class="fas fa-shield-alt"></i></div>
+                            <div class="shield-expand">
+                                <i class="fas fa-clock"></i>
+                                <span class="shield-timer" id="shieldCountdown">24:00:00</span>
+                            </div>`;
+                        stats.insertBefore(sp, streakPill);
+                        if (typeof initShieldCountdown === 'function') initShieldCountdown();
+                    }
+                }
+            }
         } else {
             showErrorModal(result.message || 'No se pudo completar la compra.');
             console.error('[Tienda] Compra fallida:', result.message);
