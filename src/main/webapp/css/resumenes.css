@@ -134,7 +134,7 @@
 .resumen-card {
     background: var(--card-bg);
     border-radius: 24px;
-    border: 1px solid rgba(236, 72, 153, 0.25);
+    border: 1px solid rgba(45, 212, 191, 0.2);
     overflow: hidden;
     position: relative;
     z-index: 1;
@@ -160,20 +160,20 @@
     /* Franja de color temático tipo favoritos — rosa/resumen */
     background: linear-gradient(
         180deg,
-        rgba(236, 72, 153, 0.14) 0%,
-        rgba(190, 24, 93, 0.06) 60%,
+        rgba(45, 212, 191, 0.1) 0%,
+        rgba(13, 148, 136, 0.04) 60%,
         transparent 100%
     );
 
     /* Línea sutil en la parte inferior */
-    border-bottom: 1px solid rgba(236, 72, 153, 0.12);
+    border-bottom: 1px solid rgba(45, 212, 191, 0.1);
 }
 
 /* Halo muy sutil detrás del ícono */
 .title-icon {
     width: 84px; height: 84px;
-    background: rgba(236, 72, 153, 0.15);
-    border: 1px solid rgba(236, 72, 153, 0.3);
+    background: rgba(45, 212, 191, 0.12);
+    border: 1px solid rgba(45, 212, 191, 0.25);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -181,21 +181,21 @@
     margin: 0 auto 1.5rem;
     font-size: 2.2rem;
     position: relative;
-    box-shadow: 0 0 40px rgba(236, 72, 153, 0.2);
+    box-shadow: 0 0 40px rgba(45, 212, 191, 0.18);
     transition: box-shadow 0.4s ease;
 }
 
 .title-icon:hover {
-    box-shadow: 0 0 55px rgba(236, 72, 153, 0.35);
+    box-shadow: 0 0 55px rgba(45, 212, 191, 0.32);
 }
 
-.title-icon i { color: #ec4899; }
+.title-icon i { color: #2dd4bf; }
 
 .icon-glow {
     position: absolute;
     inset: -8px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(236, 72, 153, 0.18) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(45, 212, 191, 0.14) 0%, transparent 70%);
     animation: pulse 2.5s ease-in-out infinite;
 }
 
@@ -227,7 +227,7 @@
     gap: 0.4rem;
 }
 
-.resumen-meta i { color: #ec4899; opacity: 0.8; }
+.resumen-meta i { color: #2dd4bf; opacity: 0.8; }
 
 /* ── Contenido del resumen ───────────────────────────────────── */
 .resumen-content {
@@ -247,11 +247,11 @@
     margin-bottom: 1rem;
     color: var(--text-primary);
     padding-left: 1rem;
-    border-left: 3px solid rgba(236, 72, 153, 0.7);
+    border-left: 3px solid rgba(139, 92, 246, 0.7);
 }
 
 .section-number {
-    color: #ec4899;
+    color: #8b5cf6;
     font-size: 0.78rem;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -330,7 +330,9 @@
 
 /* ── Sección de palabras clave ───────────────────────────────── */
 .keywords-section {
-    padding: 1.5rem;
+    padding: 1.5rem 2.5rem 2rem;
+    border-top: 1px solid rgba(139, 92, 246, 0.12);
+    background: linear-gradient(180deg, rgba(139, 92, 246, 0.04) 0%, transparent 100%);
     background: var(--secondary-bg);
     border-radius: 16px;
     border: 1px solid var(--border-color);
@@ -358,7 +360,7 @@
 .keyword-tag {
     padding: 0.45rem 1rem;
     background: rgba(236, 72, 153, 0.1);
-    border: 1px solid rgba(236, 72, 153, 0.25);
+    border: 1px solid rgba(45, 212, 191, 0.2);
     border-radius: 20px;
     font-size: 0.83rem;
     color: #ec4899;
@@ -412,14 +414,14 @@
 }
 
 .download-btn {
-    background: linear-gradient(135deg, #ec4899, #be185d);
+    background: linear-gradient(135deg, #2dd4bf, #0d9488);
     color: white;
-    box-shadow: 0 4px 18px rgba(236, 72, 153, 0.25);
+    box-shadow: 0 4px 18px rgba(45, 212, 191, 0.2);
 }
 
 .download-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 24px rgba(236, 72, 153, 0.4);
+    box-shadow: 0 6px 24px rgba(45, 212, 191, 0.35);
 }
 
 /* ── Modal de Notas ──────────────────────────────────────────── */
@@ -629,7 +631,7 @@
 .download-icon {
     width: 80px; height: 80px;
     background: rgba(236, 72, 153, 0.12);
-    border: 1px solid rgba(236, 72, 153, 0.25);
+    border: 1px solid rgba(45, 212, 191, 0.2);
     border-radius: 50%;
     margin: 0 auto 1.5rem;
     position: relative;
@@ -638,13 +640,13 @@
     justify-content: center;
 }
 
-.download-icon i { font-size: 2.2rem; color: #ec4899; }
+.download-icon i { font-size: 2.2rem; color: #2dd4bf; }
 
 .download-spinner {
     position: absolute;
     inset: -3px;
-    border: 2px solid rgba(236, 72, 153, 0.4);
-    border-top-color: #ec4899;
+    border: 2px solid rgba(45, 212, 191, 0.35);
+    border-top-color: #2dd4bf;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -671,7 +673,7 @@
 
 .download-bar-fill {
     height: 100%;
-    background: linear-gradient(90deg, #ec4899, #8b5cf6);
+    background: linear-gradient(90deg, #2dd4bf, #8b5cf6);
     border-radius: 10px;
     transition: width 0.2s ease;
     width: 0%;
@@ -682,7 +684,7 @@
     position: fixed;
     bottom: 2rem; right: 2rem;
     background: var(--card-bg);
-    border: 1px solid rgba(236, 72, 153, 0.4);
+    border: 1px solid rgba(45, 212, 191, 0.3);
     border-radius: 14px;
     padding: 0.9rem 1.4rem;
     display: flex;
@@ -698,7 +700,7 @@
 
 .toast.show { transform: translateX(0); }
 
-.toast i { color: #ec4899; font-size: 1.15rem; }
+.toast i { color: #2dd4bf; font-size: 1.15rem; }
 
 /* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -729,4 +731,149 @@
     .highlight-box { flex-direction: column; text-align: center; }
 
     .toast { left: 1rem; right: 1rem; bottom: 1rem; }
+}
+/* ── Mejoras adicionales ──────────────────────────────────────── */
+.keyword-tag {
+    display: inline-block;
+    padding: 0.3rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 500;
+    margin: 0.25rem;
+    transition: all 0.2s ease;
+}
+
+.keyword-tag:nth-child(3n+1) {
+    background: rgba(45, 212, 191, 0.12);
+    border: 1px solid rgba(45, 212, 191, 0.25);
+    color: #2dd4bf;
+}
+.keyword-tag:nth-child(3n+2) {
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    color: #a78bfa;
+}
+.keyword-tag:nth-child(3n) {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.22);
+    color: #fbbf24;
+}
+
+.keyword-tag:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Sección de palabras clave posicionada mejor */
+.keywords-section {
+    order: 1;
+}
+
+.actions-bar {
+    order: 2;
+}
+
+.highlight-box {
+    background: linear-gradient(135deg, rgba(26,26,53,0.8), rgba(15,15,35,0.9));
+    box-shadow: 0 4px 20px rgba(45, 212, 191, 0.08);
+}
+
+/* Hacer la card del resumen más ancha y cómoda */
+.resumen-card {
+    max-width: 860px;
+    margin: 0 auto;
+}
+
+/* Acciones centradas y full-width en mobile */
+.actions-bar {
+    display: flex;
+    justify-content: center;
+    padding: 1.5rem 2.5rem 2rem;
+    gap: 1rem;
+    border-top: 1px solid var(--border-color);
+    background: rgba(255,255,255,0.01);
+}
+
+.action-main-btn {
+    min-width: 200px;
+}
+
+/* ── Resumenes: override de padding del .content global ── */
+body[data-page="resumenes"] .content {
+    padding: 2rem 2.5rem;
+}
+
+body[data-page="resumenes"] .resumen-card {
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+/* ── Keywords: más padding y mejor spacing ── */
+body[data-page="resumenes"] .keywords-section {
+    padding: 2rem 2.5rem 2.25rem;
+}
+
+body[data-page="resumenes"] .keywords-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+body[data-page="resumenes"] .keyword-tag {
+    margin: 0;
+}
+
+/* ── Secciones: mejor respiración ── */
+body[data-page="resumenes"] .resumen-content {
+    padding: 2.5rem 3rem;
+}
+
+body[data-page="resumenes"] .resumen-section {
+    margin-bottom: 2.75rem;
+}
+
+body[data-page="resumenes"] .resumen-title-section {
+    padding: 3rem 3rem 2.5rem;
+}
+
+/* ── Highlight box: más espacio ── */
+body[data-page="resumenes"] .highlight-box {
+    margin-top: 1.75rem;
+    margin-left: 0;
+    padding: 1.35rem 1.75rem;
+}
+
+/* ── Acciones: más centradas ── */
+body[data-page="resumenes"] .actions-bar {
+    padding: 1.75rem 3rem 2.25rem;
+    justify-content: center;
+}
+
+body[data-page="resumenes"] .action-main-btn {
+    min-width: 240px;
+    max-width: 340px;
+}
+
+@media (max-width: 768px) {
+    body[data-page="resumenes"] .content {
+        padding: 1rem 1rem;
+    }
+    body[data-page="resumenes"] .resumen-content {
+        padding: 1.75rem 1.5rem;
+    }
+    body[data-page="resumenes"] .resumen-title-section {
+        padding: 2rem 1.5rem 1.75rem;
+    }
+    body[data-page="resumenes"] .keywords-section {
+        padding: 1.5rem 1.5rem 1.75rem;
+    }
+    body[data-page="resumenes"] .actions-bar {
+        padding: 1.25rem 1.5rem 1.75rem;
+        flex-direction: column;
+        align-items: stretch;
+    }
+    body[data-page="resumenes"] .action-main-btn {
+        max-width: 100%;
+    }
 }

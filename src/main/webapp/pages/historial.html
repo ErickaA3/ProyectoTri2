@@ -39,9 +39,6 @@
                 </h2>
                 <p class="page-subtitle">Revisa tu actividad reciente</p>
             </div>
-            <button class="btn-limpiar" onclick="showClearModal()">
-                Limpiar historial
-            </button>
         </div>
 
         <div class="controls-bar">
@@ -74,21 +71,6 @@
         </div>
 
     </main>
-
-    <!-- Modal: limpiar todo -->
-    <div class="modal-overlay" id="clearModal">
-        <div class="modal">
-            <div class="modal-icon warning">
-                <i class="fas fa-exclamation-triangle"></i>
-            </div>
-            <h3>¿Limpiar todo el historial?</h3>
-            <p>Se eliminarán todos los registros de actividad. Esta acción no se puede deshacer.</p>
-            <div class="modal-actions">
-                <button class="modal-btn cancel" onclick="closeClearModal()">Cancelar</button>
-                <button class="modal-btn confirm" onclick="clearAllHistory()">Limpiar todo</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Modal: eliminar un ítem -->
     <div class="modal-overlay" id="deleteModal">

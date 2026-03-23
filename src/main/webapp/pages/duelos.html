@@ -283,10 +283,10 @@
         if (typeof PolarisLoading !== 'undefined')
             PolarisLoading.initStars(document.querySelector('#duelLoadingScreen .polaris-loading-stars'));
     });
-    // Fallback: si el JS de la página falla, ocultar loading después de 8s
+    // Fallback: si el JS de la página falla, ocultar loading después de 8s (sin eliminar el DOM)
     setTimeout(function() {
         var el = document.getElementById('duelLoadingScreen');
-        if (el) { el.style.opacity='0'; el.style.pointerEvents='none'; setTimeout(function(){el.remove()},500); }
+        if (el && el.style.opacity !== '0') { el.style.opacity='0'; el.style.pointerEvents='none'; }
     }, 8000);
     </script>
 </body>

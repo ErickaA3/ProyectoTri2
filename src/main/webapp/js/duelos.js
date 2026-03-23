@@ -137,25 +137,31 @@ async function createDuel() {
     const mode = document.getElementById('topicUploadMode').style.display === 'none' ? 'text' : 'upload';
     const topic = mode === 'text' ? document.getElementById('duelTopic').value.trim() : document.getElementById('fileName').textContent;
     const questionCount = parseInt(document.getElementById('numQuestions').value) || 10;
+    const timePerQuestion = parseInt(document.getElementById('timePerQuestion').value) || 30;
 
     if (!opponentId) { showToast('Selecciona un oponente', 'info'); return; }
     if (!topic) { showToast('Ingresa un tema', 'info'); return; }
 
-    const btn = document.querySelector('#createDuelModal .modal-btn.confirm');
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
-    btn.disabled = true;
+    // Cerrar modal y mostrar Polaris loading
+    closeCreateDuelModal();
+    const loadingEl = document.getElementById('duelLoadingScreen');
+    if (loadingEl) {
+        document.getElementById('duelLoadingSub').textContent = 'Generando preguntas con IA...';
+        loadingEl.style.opacity = '1';
+        loadingEl.style.pointerEvents = 'auto';
+        loadingEl.style.display = 'flex';
+    }
+    const _lt = PolarisLoading.rotateMessages('duelLoadingSub',
+        ['Generando preguntas con IA...', 'Creando el duelo...', 'Casi listo...']);
 
     try {
         const res = await fetch(CTX + '/api/duels/create', {
             method: 'POST', headers: duelHeaders(),
-            body: JSON.stringify({ opponentId, topic, questionCount, text: topic })
+            body: JSON.stringify({ opponentId, topic, questionCount, timePerQuestion, text: topic })
         });
         const data = await res.json();
         if (data.success) {
-            closeCreateDuelModal();
             showToast('¡Duelo creado! Juega cuando quieras desde Retos Activos.', 'success');
-            // Recargar retos activos y cambiar a la pestaña de retos
             await loadActiveDuels();
             const retosTab = document.querySelector('.tab-btn:nth-child(3)');
             if (retosTab) switchTab('retos', retosTab);
@@ -165,8 +171,8 @@ async function createDuel() {
     } catch (e) {
         showToast('Error de conexión', 'error');
     } finally {
-        btn.innerHTML = orig;
-        btn.disabled = false;
+        clearInterval(_lt);
+        PolarisLoading.hide('duelLoadingScreen');
     }
 }
 
@@ -181,7 +187,8 @@ async function playChallenge(duelId) {
         if (data.success) {
             sessionStorage.setItem('duelData', JSON.stringify({
                 duelId, title: data.title, questions: data.questions,
-                questionCount: data.questionCount, topic: data.topic
+                questionCount: data.questionCount, topic: data.topic,
+                timePerQuestion: data.timePerQuestion || 30
             }));
             window.location.href = 'duelo-play.html';
         } else {

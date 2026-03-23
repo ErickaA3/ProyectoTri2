@@ -91,8 +91,22 @@ public class GamificationService {
 
         StreakResult streak = calculateStreak(streakCurrent, lastActivity, today, hasShield);
 
-        // 3. Rewards base
-        RewardResult baseReward = getBaseReward(activityType, scorePercent);
+        // 2.5. Guardar resultado + detectar si ya fue recompensado antes
+        //      saveActivityResult devuelve null cuando ya existe el registro (mismo user + content)
+        String resultId = null;
+        boolean alreadyRewarded = false;
+        if (contentId != null && !contentId.isEmpty()) {
+            double score = (scorePercent / 100.0) * maxScore;
+            resultId = dao.saveActivityResult(userId, contentId, score, maxScore, timeTakenSecs);
+            if ("expert_exam".equals(activityType) || "quiz".equals(activityType)) {
+                alreadyRewarded = (resultId == null);
+            }
+        }
+
+        // 3. Rewards base — 0 si ya fue recompensado
+        RewardResult baseReward = alreadyRewarded
+            ? new RewardResult(0, 0)
+            : getBaseReward(activityType, scorePercent);
 
         // 4. Multiplicador (solo positivos)
         double multiplier = getStreakMultiplier(streak.newStreak);
@@ -128,12 +142,7 @@ public class GamificationService {
             streak.newStreak, newStreakRecord,
             today.toString(), streak.shieldUsed ? false : hasShield);
 
-        // 9. Activity result
-        String resultId = null;
-        if (contentId != null && !contentId.isEmpty()) {
-            double score = (scorePercent / 100.0) * maxScore;
-            resultId = dao.saveActivityResult(userId, contentId, score, maxScore, timeTakenSecs);
-        }
+        // 9. Activity result ya fue procesado en el paso 2.5
 
         // ══════════════════════════════════════════════════════════════════════
         // 10. MISIONES DIARIAS — tipos alineados con missions.type en la DB
@@ -141,7 +150,7 @@ public class GamificationService {
         //               complete_expert_exam, win_duel, maintain_streak
         // ══════════════════════════════════════════════════════════════════════
         String missionType = mapToMissionType(activityType);
-        if (missionType != null) {
+        if (missionType != null && !alreadyRewarded) {
             dao.advanceDailyMissions(userId, missionType);
         }
 
@@ -192,6 +201,7 @@ public class GamificationService {
         // 13. Respuesta
         JsonObject r = new JsonObject();
         r.addProperty("success",          true);
+        r.addProperty("alreadyRewarded",  alreadyRewarded);
         r.addProperty("activityType",     activityType);
         r.addProperty("xpEarned",         xpEarned);
         r.addProperty("coinsEarned",      coinsEarned);
@@ -247,8 +257,23 @@ public class GamificationService {
             case "quiz" -> new RewardResult(
                 (int) Math.round(30 * perfMult), (int) Math.round(20 * perfMult));
 
-            case "expert_exam" -> new RewardResult(
-                (int) Math.round(50 * perfMult), (int) Math.round(35 * perfMult));
+            case "expert_exam" -> {
+                // XP proporcional al score: mín 10 XP por intentar, máx 50 XP al 80%+
+                //   0–49%  : escala de 10 a 25 XP  (base × score/100 × 0.5, mín 10)
+                //   50–79% : 30 XP base (perfMult = 1.0)
+                //   80–89% : 50 × 1.3 = 65 XP
+                //   90–100%: 50 × 1.5 = 75 XP
+                int baseXp, baseCoins;
+                if (scorePercent < 50.0) {
+                    // Mínimo 10 XP, sube linealmente hasta 30 al llegar a 50%
+                    baseXp    = Math.max(10, (int) Math.round(10 + (scorePercent / 50.0) * 20));
+                    baseCoins = Math.max(5,  (int) Math.round(5  + (scorePercent / 50.0) * 15));
+                } else {
+                    baseXp    = (int) Math.round(50 * perfMult);
+                    baseCoins = (int) Math.round(35 * perfMult);
+                }
+                yield new RewardResult(baseXp, baseCoins);
+            }
 
             case "abandon_exam"  -> new RewardResult(-25, 0);
             case "duelo_ganado"  -> new RewardResult(40, 40);

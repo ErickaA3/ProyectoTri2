@@ -172,6 +172,7 @@ public class DuelServlet extends HttpServlet {
                     String opponentId    = data.get("opponentId").getAsString();
                     String topic         = data.get("topic").getAsString();
                     int    questionCount = data.has("questionCount") ? data.get("questionCount").getAsInt() : 10;
+                    int    timePerQ      = data.has("timePerQuestion") ? data.get("timePerQuestion").getAsInt() : 30;
                     String text          = data.has("text") && !data.get("text").isJsonNull()
                                            ? data.get("text").getAsString() : topic;
 
@@ -190,7 +191,7 @@ public class DuelServlet extends HttpServlet {
                     String contentId = contentDAO.save(quizContent, aiJson, text);
 
                     // 3. Crear duelo con status 'waiting_opponent'
-                    String duelId = duelDAO.createDuel(userId, opponentId, contentId, topic, questionCount);
+                    String duelId = duelDAO.createDuel(userId, opponentId, contentId, topic, questionCount, timePerQ);
 
                     // 4. Responder solo con metadata (sin preguntas)
                     JsonObject r = new JsonObject();

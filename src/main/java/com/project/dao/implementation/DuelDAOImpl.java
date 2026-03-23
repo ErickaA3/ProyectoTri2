@@ -187,10 +187,10 @@ public class DuelDAOImpl implements IDuelDAO {
 
     @Override
     public String createDuel(String challengerId, String opponentId, String contentId,
-                             String topic, int questionCount) throws Exception {
+                             String topic, int questionCount, int timePerQuestion) throws Exception {
         String sql = """
-            INSERT INTO duels (challenger_id, opponent_id, content_id, topic, question_count, status)
-            VALUES (?::uuid, ?::uuid, ?::uuid, ?, ?, 'waiting_opponent')
+            INSERT INTO duels (challenger_id, opponent_id, content_id, topic, question_count, time_per_question, status)
+            VALUES (?::uuid, ?::uuid, ?::uuid, ?, ?, ?, 'waiting_opponent')
             RETURNING id
             """;
 
@@ -201,6 +201,7 @@ public class DuelDAOImpl implements IDuelDAO {
             ps.setString(3, contentId);
             ps.setString(4, topic);
             ps.setInt(5, questionCount);
+            ps.setInt(6, timePerQuestion);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return rs.getString("id");
             throw new Exception("No se pudo crear el duelo.");
@@ -565,7 +566,7 @@ public class DuelDAOImpl implements IDuelDAO {
 
         // Obtener preguntas
         String sql = """
-            SELECT sc.content::text, sc.title, d.question_count, d.topic
+            SELECT sc.content::text, sc.title, d.question_count, d.topic, d.time_per_question
             FROM duels d
             JOIN study_content sc ON sc.id = d.content_id
             WHERE d.id = ?::uuid
@@ -582,6 +583,7 @@ public class DuelDAOImpl implements IDuelDAO {
             result.addProperty("title", rs.getString("title"));
             result.addProperty("topic", rs.getString("topic"));
             result.addProperty("questionCount", rs.getInt("question_count"));
+            result.addProperty("timePerQuestion", rs.getInt("time_per_question"));
 
             String contentJson = rs.getString("content");
             JsonObject content = JsonParser.parseString(contentJson).getAsJsonObject();

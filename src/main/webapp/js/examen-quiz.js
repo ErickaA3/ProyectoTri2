@@ -96,6 +96,7 @@ let questionResults = [];
 let totalSeconds    = 0;
 let timerInterval = null;
 let alertShownAt2min = false, alertShownAt1min = false, examFinished = false;
+let rewardSent = false; // Solo envía XP en el primer intento
 let correctCount = 0, incorrectCount = 0, streak = 0, bestStreak = 0;
 const letters = ['A','B','C','D'];
 
@@ -141,14 +142,19 @@ function resetState() {
     document.getElementById('scoreCorrect').textContent = '0';
     document.getElementById('scoreIncorrect').textContent = '0';
     document.getElementById('streakCount').textContent = '0';
+    // Reset XP display
+    const xpEl = document.getElementById('xpEarned');
+    if (xpEl) xpEl.classList.remove('show');
 }
 
 // ===== RENDER =====
 function renderQuestion() {
     const q = examData.questions[currentQuestion];
     const locked = questionLocked[currentQuestion];
-    document.getElementById('currentQ').textContent = currentQuestion + 1;
-    document.getElementById('questionNumber').textContent = `Pregunta ${currentQuestion + 1} de ${examData.questions.length}`;
+    const displayNum = Math.min(currentQuestion + 1, examData.questions.length);
+    document.getElementById('currentQ').textContent = displayNum;
+    document.getElementById('totalQ').textContent = examData.questions.length;
+    document.getElementById('questionNumber').textContent = `Pregunta ${displayNum} de ${examData.questions.length}`;
     document.getElementById('questionText').textContent = q.question;
     document.getElementById('progressFill').style.width = ((currentQuestion+1)/examData.questions.length*100)+'%';
 
@@ -178,7 +184,7 @@ function renderQuestion() {
     }
 
     const btn = document.getElementById('btnSiguiente');
-    if (currentQuestion === examData.questions.length - 1 && locked) {
+    if (currentQuestion === examData.questions.length - 1) {
         btn.innerHTML = '<i class="fas fa-chart-bar"></i> Ver resultados';
         btn.className = 'btn-nav btn-entregar';
         btn.onclick = function(){ finishExam(); };
@@ -226,7 +232,8 @@ function updateDots() {
 }
 
 function nextQuestion() {
-    if (!questionLocked[currentQuestion]) return;
+    // Permite avanzar aunque no haya respondido — solo bloquea el botón "Ver resultados"
+    // si la pregunta no está respondida (se puede revisar antes de terminar)
     if (currentQuestion < examData.questions.length - 1) {
         const card = document.getElementById('questionCard');
         card.classList.add('exit');
@@ -310,10 +317,10 @@ function finishExam() {
     const emoji    = document.getElementById('resultsEmoji');
     const title    = document.getElementById('resultsMainTitle');
     const subtitle = document.getElementById('resultsMainSubtitle');
-    if (grade >= 90)      { emoji.src='giphy.gif';               title.textContent='¡Increíble, eres un crack!'; subtitle.textContent='Dominas este tema a la perfección'; }
-    else if (grade >= 70) { emoji.src='giphy.gif';               title.textContent='¡Muy bien hecho!';            subtitle.textContent='Tienes un buen dominio del tema'; }
-    else if (grade >= 50) { emoji.src='flexed-biceps_1f4aa.gif'; title.textContent='¡Buen intento!';              subtitle.textContent='Sigue practicando para mejorar'; }
-    else                  { emoji.src='WZ6R8rSOyG.gif';          title.textContent='A seguir estudiando';          subtitle.textContent='Repasa el material e inténtalo de nuevo'; }
+    if (grade >= 90)      { emoji.src='../images/modo-estudio/giphy.gif';               title.textContent='¡Increíble, eres un crack!'; subtitle.textContent='Dominas este tema a la perfección'; }
+    else if (grade >= 70) { emoji.src='../images/modo-estudio/giphy.gif';               title.textContent='¡Muy bien hecho!';            subtitle.textContent='Tienes un buen dominio del tema'; }
+    else if (grade >= 50) { emoji.src='../images/modo-estudio/flexed-biceps_1f4aa.gif'; title.textContent='¡Buen intento!';              subtitle.textContent='Sigue practicando para mejorar'; }
+    else                  { emoji.src='../images/modo-estudio/WZ6R8rSOyG.gif';          title.textContent='A seguir estudiando';          subtitle.textContent='Repasa el material e inténtalo de nuevo'; }
 
     animateGrade(grade);
 
@@ -323,7 +330,10 @@ function finishExam() {
     else if (grade >= 50) msgEl.innerHTML = '<i class="fas fa-book-open" style="color:var(--accent-yellow);margin-right:8px"></i><span style="color:var(--accent-yellow)">Puedes mejorar</span> — Repasa e intenta de nuevo';
     else                  msgEl.innerHTML = '<i class="fas fa-rotate-right" style="color:var(--accent-red);margin-right:8px"></i><span style="color:var(--accent-red)">A seguir practicando</span> — No te desanimes';
 
-    document.getElementById('resultsStats').innerHTML = `
+    // Construir stats dinámicamente (3 o 4 columnas según timer)
+    const timeUsedForDisplay = examData.hasTimer ? (examData.timeMinutes * 60 - totalSeconds) : 0;
+    const statsEl = document.getElementById('resultsStats');
+    let statsHTML = `
         <div class="stat-card">
             <div class="stat-card-icon" style="background:rgba(34,197,94,0.15);color:var(--accent-green)"><i class="fas fa-check-circle"></i></div>
             <div class="stat-card-value" style="color:var(--accent-green)">${correctCount}</div>
@@ -335,15 +345,24 @@ function finishExam() {
             <div class="stat-card-label">Incorrectas</div>
         </div>
         <div class="stat-card">
-            <div class="stat-card-icon" style="background:rgba(160,160,192,0.15);color:var(--text-secondary)"><i class="fas fa-minus-circle"></i></div>
-            <div class="stat-card-value">${unanswered}</div>
-            <div class="stat-card-label">Sin responder</div>
-        </div>
-        <div class="stat-card">
             <div class="stat-card-icon" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow)"><i class="fas fa-fire"></i></div>
             <div class="stat-card-value" style="color:var(--accent-yellow)">${bestStreak}</div>
             <div class="stat-card-label">Mejor racha</div>
         </div>`;
+    if (examData.hasTimer) {
+        const m = Math.floor(timeUsedForDisplay / 60);
+        const s = timeUsedForDisplay % 60;
+        const timeStr = `${m}:${s.toString().padStart(2, '0')}`;
+        statsHTML += `
+        <div class="stat-card">
+            <div class="stat-card-icon" style="background:rgba(139,92,246,0.15);color:var(--accent-purple)"><i class="fas fa-clock"></i></div>
+            <div class="stat-card-value" style="color:var(--accent-purple)">${timeStr}</div>
+            <div class="stat-card-label">Tiempo usado</div>
+        </div>`;
+    }
+    statsEl.innerHTML = statsHTML;
+    // Ajustar grid: 3 columnas sin timer, 4 con timer
+    statsEl.style.gridTemplateColumns = examData.hasTimer ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)';
 
     const reviewList = document.getElementById('reviewList');
     reviewList.innerHTML = examData.questions.map((q, i) => {
@@ -377,26 +396,44 @@ function finishExam() {
 
     // ── GAMIFICACIÓN: enviar resultado al servidor ──
     const timeUsed = examData.hasTimer ? (examData.timeMinutes * 60 - totalSeconds) : 0;
-    sendReward('quiz', grade, examData.id, timeUsed, examData.questions.length)
-        .then(result => {
-            if (result.success) {
-                setTimeout(() => showXpToast(result.xpEarned), 1500);
-            } else {
-                setTimeout(() => showXpToast(correctCount * 10), 1500);
-            }
-        })
-        .catch(() => {
-            setTimeout(() => showXpToast(correctCount * 10), 1500);
-        });
+    const fallbackXP = correctCount * 10;
+    const xpEl  = document.getElementById('xpEarned');
+    const xpTxt = document.getElementById('xpEarnedText');
+
+    // Solo enviar reward en el primer intento — bloquea XP farming
+    if (!rewardSent) {
+        rewardSent = true;
+        if (typeof sendReward === 'function') {
+            sendReward('quiz', grade, examData.id, timeUsed, examData.questions.length)
+                .then(result => {
+                    const earned = result.success ? result.xpEarned : fallbackXP;
+                    const earnedCoins = result.success ? (result.coinsEarned || 0) : 0;
+                    if (xpTxt) xpTxt.textContent = earnedCoins > 0
+                        ? `+${earned} XP · +${earnedCoins} monedas`
+                        : `+${earned} XP ganados`;
+                    if (xpEl) xpEl.classList.add('show');
+                })
+                .catch(() => {
+                    if (xpTxt) xpTxt.textContent = `+${fallbackXP} XP ganados`;
+                    if (xpEl) xpEl.classList.add('show');
+                });
+        } else {
+            if (xpTxt) xpTxt.textContent = `+${fallbackXP} XP ganados`;
+            if (xpEl) xpEl.classList.add('show');
+        }
+    } else {
+        if (xpTxt) xpTxt.textContent = 'XP ya registrado en el primer intento';
+        if (xpEl) xpEl.classList.add('show');
+    }
 }
 
-// CORREGIDO: Actualizar visibilidad del botón de repasar
+// Actualizar visibilidad del botón de repasar (ahora existe en el HTML)
 function updateReviewButton() {
     const reviewBtn = document.querySelector('.btn-result.btn-review');
-    if (reviewBtn) {
-        const hasErrors = questionResults.some(r => r === 'incorrect');
-        reviewBtn.style.display = hasErrors ? 'inline-flex' : 'none';
-    }
+    if (!reviewBtn) return;
+    const errorCount = questionResults.filter(r => r === 'incorrect' || r === null).length;
+    reviewBtn.style.display = errorCount > 0 ? 'inline-flex' : 'none';
+    if (errorCount > 0) reviewBtn.innerHTML = `<i class="fas fa-search"></i> Repasar errores (${errorCount})`;
 }
 
 // ===== HELPERS =====
@@ -432,15 +469,11 @@ function launchConfetti() {
     setTimeout(() => container.innerHTML = '', 4000);
 }
 
-function showXpToast(amount) {
-    const toast = document.getElementById('xpToast');
-    document.getElementById('xpToastAmount').textContent = `${amount} XP`;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 3000);
-}
 
 // CORREGIDO: Reintentar con todas las preguntas originales
 function retryExam() {
+    clearInterval(timerInterval);
+    
     // Restaurar preguntas originales (limitadas por config)
     const flow = JSON.parse(sessionStorage.getItem('modoEstudioFlow') || 'null');
     const cfg = flow?.configs?.examenes || {};
@@ -454,6 +487,7 @@ function retryExam() {
     document.getElementById('resultsScreen').classList.remove('active');
     document.getElementById('examScreen').classList.remove('hidden');
     document.getElementById('totalQ').textContent = examData.questions.length;
+    document.getElementById('examTitleBar').textContent = examData.title;
     
     // Reset state
     resetState();
@@ -465,20 +499,19 @@ function retryExam() {
     if (examData.hasTimer) startTimer();
 }
 
-// NUEVO: Repasar solo errores (como flashcards)
+// Repasar solo errores (como flashcards)
 function reviewMistakes() {
-    // Filtrar solo las preguntas que se respondieron incorrectamente
+    // Filtrar preguntas incorrectas Y sin responder
     const mistakeQuestions = [];
     examData.questions.forEach((q, i) => {
-        if (questionResults[i] === 'incorrect') {
+        if (questionResults[i] === 'incorrect' || questionResults[i] === null) {
             mistakeQuestions.push(q);
         }
     });
     
-    if (mistakeQuestions.length === 0) {
-        // No hay errores que repasar
-        return;
-    }
+    if (mistakeQuestions.length === 0) return;
+    
+    clearInterval(timerInterval);
     
     // Actualizar preguntas a solo los errores
     examData.questions = mistakeQuestions;
@@ -513,5 +546,64 @@ document.addEventListener('keydown', function(e) {
         if (idx < examData.questions[currentQuestion].options.length) selectOption(idx);
     }
 });
+
+
+// ─── Favorito ─────────────────────────────────────────────────────────────
+let _examIsFavorite = false;
+
+function toggleFavorite() {
+    if (!examData?.id) {
+        console.warn('[Favorito] El examen no tiene ID — no se puede marcar como favorito');
+        return;
+    }
+    const newValue = !_examIsFavorite;
+    const userId   = typeof getGamificationUserId === 'function' ? getGamificationUserId() : null;
+    if (!userId) return;
+
+    fetch('/project-1.0-SNAPSHOT/api/summaries/favorite', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-HTTP-Method-Override': 'PATCH', 'X-User-Id': userId },
+        body:    JSON.stringify({ contentId: examData.id, isFavorite: newValue })
+    })
+    .then(r => r.json())
+    .then(json => {
+        if (!json.success) return;
+        _examIsFavorite = newValue;
+        const btn  = document.getElementById('favoriteBtn');
+        const icon = btn?.querySelector('i');
+        if (!btn || !icon) return;
+        if (newValue) {
+            icon.className = 'fas fa-heart';
+            btn.classList.add('active');
+            createHeartSparkles();
+        } else {
+            icon.className = 'far fa-heart';
+            btn.classList.remove('active');
+        }
+    })
+    .catch(e => console.warn('[Favorito]', e));
+}
+
+function createHeartSparkles() {
+    const c = document.getElementById('sparklesContainer');
+    if (!c) return;
+    c.innerHTML = '';
+    for (let i = 0; i < 10; i++) {
+        const s = document.createElement('div');
+        s.style.cssText = 'position:absolute;top:50%;left:50%;width:6px;height:6px;border-radius:50%;animation:sparkleOut 0.6s ease-out forwards;';
+        const colors = ['#ec4899','#ffd700','#2dd4bf'];
+        s.style.background = colors[i % 3];
+        s.style.boxShadow = `0 0 6px ${colors[i % 3]}`;
+        const angle = (i / 10) * 360;
+        const dist  = 18 + Math.random() * 14;
+        const x = Math.cos(angle * Math.PI / 180) * dist;
+        const y = Math.sin(angle * Math.PI / 180) * dist;
+        s.style.setProperty('--x', `${x}px`);
+        s.style.setProperty('--y', `${y}px`);
+        s.style.animationDelay = `${Math.random() * 0.2}s`;
+        c.appendChild(s);
+    }
+    setTimeout(() => { if (c) c.innerHTML = ''; }, 700);
+}
 
 initExam();

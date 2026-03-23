@@ -24,7 +24,9 @@ public class HistorialDAOImpl implements IHistorialDAO {
             throws Exception {
 
         StringBuilder sql = new StringBuilder("""
-            SELECT id, type, title, is_favorite, created_at
+            SELECT id, type, title, is_favorite,
+                   EXTRACT(EPOCH FROM created_at) * 1000 AS created_at_ms,
+                   content->>'schemaType' AS schema_type
             FROM study_content
             WHERE user_id = ?::uuid
             """);
@@ -53,8 +55,13 @@ public class HistorialDAOImpl implements IHistorialDAO {
                 item.addProperty("type",       rs.getString("type"));
                 item.addProperty("title",      rs.getString("title"));
                 item.addProperty("isFavorite", rs.getBoolean("is_favorite"));
-                // Epoch ms — JS new Date(ms) convierte correctamente a hora local sin importar timezone del servidor
-                item.addProperty("createdAt", rs.getTimestamp("created_at").getTime());
+                // Epoch ms extraído directamente por Postgres — evita desfase de timezone del JVM
+                item.addProperty("createdAt", rs.getLong("created_at_ms"));
+                // Subtipo de esquema (null para otros tipos)
+                String schemaType = rs.getString("schema_type");
+                if (schemaType != null && !schemaType.isBlank()) {
+                    item.addProperty("schemaType", schemaType);
+                }
                 items.add(item);
             }
 
@@ -66,7 +73,9 @@ public class HistorialDAOImpl implements IHistorialDAO {
     public JsonObject getById(String id, String userId) throws Exception {
         String sql = """
             SELECT id, type, title, content::text AS content_json,
-                   is_favorite, created_at, session_id
+                   is_favorite,
+                   EXTRACT(EPOCH FROM created_at) * 1000 AS created_at_ms,
+                   session_id
             FROM study_content
             WHERE id = ?::uuid AND user_id = ?::uuid
             """;
@@ -85,7 +94,7 @@ public class HistorialDAOImpl implements IHistorialDAO {
             item.addProperty("type",       rs.getString("type"));
             item.addProperty("title",      rs.getString("title"));
             item.addProperty("isFavorite", rs.getBoolean("is_favorite"));
-            item.addProperty("createdAt",  rs.getTimestamp("created_at").getTime());
+            item.addProperty("createdAt",  rs.getLong("created_at_ms"));
 
             String sessionId = rs.getString("session_id");
             if (sessionId != null) item.addProperty("sessionId", sessionId);
@@ -108,15 +117,39 @@ public class HistorialDAOImpl implements IHistorialDAO {
         }
     }
 
-    @Override
-    public int deleteAll(String userId) throws Exception {
-        String sql = "DELETE FROM study_content WHERE user_id = ?::uuid";
-
+    /**
+     * Elimina duelos que referencian un contenido específico (evita FK constraint).
+     * Se llama antes de eliminar un item de study_content.
+     */
+    public void deleteDuelsForContent(String contentId) throws Exception {
+        String sql = "DELETE FROM duels WHERE content_id = ?::uuid";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, contentId);
+            stmt.executeUpdate();
+        }
+    }
 
-            stmt.setString(1, userId);
-            return stmt.executeUpdate();
+    @Override
+    public int deleteAll(String userId) throws Exception {
+        // Eliminar duelos que referencian contenido del usuario (FK constraint)
+        String deleteDuels = """
+            DELETE FROM duels
+            WHERE content_id IN (SELECT id FROM study_content WHERE user_id = ?::uuid)
+            """;
+        String deleteContent = "DELETE FROM study_content WHERE user_id = ?::uuid";
+
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            // 1. Borrar duelos asociados
+            try (PreparedStatement stmt = conn.prepareStatement(deleteDuels)) {
+                stmt.setString(1, userId);
+                stmt.executeUpdate();
+            }
+            // 2. Borrar contenido
+            try (PreparedStatement stmt = conn.prepareStatement(deleteContent)) {
+                stmt.setString(1, userId);
+                return stmt.executeUpdate();
+            }
         }
     }
 }

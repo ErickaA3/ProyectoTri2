@@ -118,6 +118,14 @@ function updateLocalStats(data) {
         if (data.newCoins !== undefined)  user.stats.coins         = data.newCoins;
         if (data.newStreak !== undefined) user.stats.streakCurrent = data.newStreak;
 
+        // Streak shield: el servidor devuelve hasStreakShield y shieldUsed tras procesar la actividad
+        if (data.hasStreakShield !== undefined) user.stats.hasStreakShield = data.hasStreakShield;
+        if (data.shieldUsed) {
+            user.stats.hasStreakShield = false;
+            // Notificar para que el tooltip del navbar refleje el cambio inmediatamente
+            console.info('[Gamification] Protector de racha consumido — racha protegida.');
+        }
+
         // También de fetchPlayerStats (campos con nombre diferente)
         if (data.xp !== undefined && data.newXp === undefined)
             user.stats.xp = data.xp;
@@ -127,8 +135,16 @@ function updateLocalStats(data) {
             user.stats.coins = data.coins;
         if (data.streakCurrent !== undefined && data.newStreak === undefined)
             user.stats.streakCurrent = data.streakCurrent;
+        if (data.hasStreakShield !== undefined && data.hasStreakShield === undefined)
+            user.stats.hasStreakShield = data.hasStreakShield;
 
         localStorage.setItem('user', JSON.stringify(user));
+
+        // Refrescar navbar/sidebar reactivamente (components.js lo escucha)
+        if (typeof notifyUserUpdate === 'function') notifyUserUpdate();
+
+        // Si el servidor indicó que ya fue recompensado, el data.xpEarned será 0
+        // pero newXp/newCoins siguen siendo los valores actuales correctos — OK.
 
     } catch (err) {
         console.error('[Gamification] Error updating localStorage:', err);
