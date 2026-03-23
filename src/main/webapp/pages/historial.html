@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles-shared.css">
     <link rel="stylesheet" href="../css/historial.css">
+    <link rel="stylesheet" href="../css/responsive.css">
 </head>
 <body data-page="historial">
 
@@ -14,6 +15,22 @@
     <div id="sidebar-container"></div>
 
     <main class="content">
+        <!-- Pantalla de carga Polaris (solo cubre el content) -->
+        <div class="polaris-loading" id="historialLoading">
+            <canvas class="polaris-loading-stars"></canvas>
+            <div class="polaris-loading-content">
+                <div class="polaris-loading-orb">
+                    <div class="polaris-orb-ring r1"></div>
+                    <div class="polaris-orb-ring r2"></div>
+                    <div class="polaris-orb-ring r3"></div>
+                    <div class="polaris-orb-core">
+                        <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
+                    </div>
+                </div>
+                <div class="polaris-loading-title">Cargando</div>
+                <div class="polaris-loading-subtitle" id="historialLoadingSub">Obteniendo datos...</div>
+            </div>
+        </div>
 
         <div class="page-header">
             <div class="page-header-left">
@@ -23,9 +40,6 @@
                 </h2>
                 <p class="page-subtitle">Revisa tu actividad reciente</p>
             </div>
-            <button class="btn-limpiar" onclick="showClearModal()">
-                Limpiar historial
-            </button>
         </div>
 
         <div class="controls-bar">
@@ -59,21 +73,6 @@
 
     </main>
 
-    <!-- Modal: limpiar todo -->
-    <div class="modal-overlay" id="clearModal">
-        <div class="modal">
-            <div class="modal-icon warning">
-                <i class="fas fa-exclamation-triangle"></i>
-            </div>
-            <h3>¿Limpiar todo el historial?</h3>
-            <p>Se eliminarán todos los registros de actividad. Esta acción no se puede deshacer.</p>
-            <div class="modal-actions">
-                <button class="modal-btn cancel" onclick="closeClearModal()">Cancelar</button>
-                <button class="modal-btn confirm" onclick="clearAllHistory()">Limpiar todo</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal: eliminar un ítem -->
     <div class="modal-overlay" id="deleteModal">
         <div class="modal">
@@ -97,5 +96,16 @@
 
     <script src="../js/components.js"></script>
     <script src="../js/historial.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof PolarisLoading !== 'undefined')
+            PolarisLoading.initStars(document.querySelector('#historialLoading .polaris-loading-stars'));
+    });
+    // Fallback: si el JS de la página falla, ocultar loading después de 8s
+    setTimeout(function() {
+        var el = document.getElementById('historialLoading');
+        if (el) { el.style.opacity='0'; el.style.pointerEvents='none'; setTimeout(function(){el.remove()},500); }
+    }, 8000);
+    </script>
 </body>
 </html>

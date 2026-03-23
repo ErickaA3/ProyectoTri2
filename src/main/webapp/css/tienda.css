@@ -52,7 +52,7 @@
 .content.bg-rain    #rainCanvas    { opacity: 1; }
 .content.bg-aurora  #auroraCanvas  { opacity: 1; }
 
-.content > *:not(canvas) {
+.content > *:not(canvas):not(.polaris-loading) {
     position: relative;
     z-index: 1;
 }
@@ -280,13 +280,19 @@
 .background-price {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     color: var(--gold);
     font-weight: 700;
     font-size: 13px;
 }
-.background-price i { font-size: 11px; }
 .background-price.free { color: var(--accent-cyan); }
+
+.coin-gif {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    vertical-align: middle;
+}
 
 
 /* ── Badges ──────────────────────────────────────────────────*/
@@ -435,7 +441,10 @@
     gap: 6px;
     white-space: nowrap;
 }
-.streak-price i { font-size: 14px; }
+.streak-price .coin-gif {
+    width: 22px;
+    height: 22px;
+}
 
 .product-buy-btn {
     padding: 12px 24px;
@@ -688,6 +697,45 @@
 }
 .content.bg-rain .category-title { color: #5eead4; }
 .content.bg-rain .category-title i { color: #2dd4bf; }
+
+
+/* ============================================================
+   STREAK PROTECTOR — colores por tema
+   ============================================================ */
+.content.bg-galaxy .streak-title { color: #c4b5fd; }
+.content.bg-galaxy .streak-desc, .content.bg-galaxy .section-subtitle { color: #a78bfa; }
+.content.bg-galaxy .streak-price { color: #c4b5fd; }
+.content.bg-galaxy .streak-pulse { background: radial-gradient(circle, rgba(139,92,246,0.25) 0%, transparent 70%); }
+
+.content.bg-volcano .streak-title { color: #fca5a5; }
+.content.bg-volcano .streak-desc, .content.bg-volcano .section-subtitle { color: #f87171; }
+.content.bg-volcano .streak-price { color: #fca5a5; }
+.content.bg-volcano .streak-pulse { background: radial-gradient(circle, rgba(239,68,68,0.25) 0%, transparent 70%); }
+
+.content.bg-ocean .streak-title { color: #7dd3fc; }
+.content.bg-ocean .streak-desc, .content.bg-ocean .section-subtitle { color: #38bdf8; }
+.content.bg-ocean .streak-price { color: #7dd3fc; }
+.content.bg-ocean .streak-pulse { background: radial-gradient(circle, rgba(56,189,248,0.25) 0%, transparent 70%); }
+
+.content.bg-forest .streak-title { color: #86efac; }
+.content.bg-forest .streak-desc, .content.bg-forest .section-subtitle { color: #4ade80; }
+.content.bg-forest .streak-price { color: #86efac; }
+.content.bg-forest .streak-pulse { background: radial-gradient(circle, rgba(74,222,128,0.25) 0%, transparent 70%); }
+
+.content.bg-aurora .streak-title { color: #6ee7b7; }
+.content.bg-aurora .streak-desc, .content.bg-aurora .section-subtitle { color: #34d399; }
+.content.bg-aurora .streak-price { color: #6ee7b7; }
+.content.bg-aurora .streak-pulse { background: radial-gradient(circle, rgba(52,211,153,0.25) 0%, transparent 70%); }
+
+.content.bg-sky .streak-title { color: #cbd5e1; }
+.content.bg-sky .streak-desc, .content.bg-sky .section-subtitle { color: #94a3b8; }
+.content.bg-sky .streak-price { color: #cbd5e1; }
+.content.bg-sky .streak-pulse { background: radial-gradient(circle, rgba(148,163,184,0.2) 0%, transparent 70%); }
+
+.content.bg-rain .streak-title { color: #5eead4; }
+.content.bg-rain .streak-desc, .content.bg-rain .section-subtitle { color: #2dd4bf; }
+.content.bg-rain .streak-price { color: #5eead4; }
+.content.bg-rain .streak-pulse { background: radial-gradient(circle, rgba(45,212,191,0.25) 0%, transparent 70%); }
 
 
 /* ============================================================

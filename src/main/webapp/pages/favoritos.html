@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/favoritos.css">
     <link rel="stylesheet" href="../css/styles-shared.css">
+    <link rel="stylesheet" href="../css/responsive.css">
 </head>
 <body data-page="favoritos">
     <div id="navbar-container"></div>
@@ -14,6 +15,22 @@
 
     <!-- Content -->
     <main class="content">
+        <!-- Pantalla de carga Polaris (solo cubre el content) -->
+        <div class="polaris-loading" id="favoritosLoading">
+            <canvas class="polaris-loading-stars"></canvas>
+            <div class="polaris-loading-content">
+                <div class="polaris-loading-orb">
+                    <div class="polaris-orb-ring r1"></div>
+                    <div class="polaris-orb-ring r2"></div>
+                    <div class="polaris-orb-ring r3"></div>
+                    <div class="polaris-orb-core">
+                        <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
+                    </div>
+                </div>
+                <div class="polaris-loading-title">Cargando</div>
+                <div class="polaris-loading-subtitle" id="favoritosLoadingSub">Obteniendo datos...</div>
+            </div>
+        </div>
         <div class="page-header">
             <h2 class="page-title">
                 <i class="fas fa-heart"></i>
@@ -50,6 +67,10 @@
                 <i class="fas fa-clipboard-list"></i>
                 Quizzes
             </button>
+            <button class="filter-tab" onclick="setFilter('expert_exam', this)">
+                <i class="fas fa-file-signature"></i>
+                Examen Experto
+            </button>
         </div>
 
         <div class="favorites-grid" id="favoritesGrid"></div>
@@ -82,7 +103,18 @@
         <span id="toastMessage">Eliminado de favoritos</span>
     </div>
 
-    <script src="../js/favoritos.js"></script>
     <script src="../js/components.js"></script>
+    <script src="../js/favoritos.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof PolarisLoading !== 'undefined')
+            PolarisLoading.initStars(document.querySelector('#favoritosLoading .polaris-loading-stars'));
+    });
+    // Fallback: si el JS de la página falla, ocultar loading después de 8s
+    setTimeout(function() {
+        var el = document.getElementById('favoritosLoading');
+        if (el) { el.style.opacity='0'; el.style.pointerEvents='none'; setTimeout(function(){el.remove()},500); }
+    }, 8000);
+    </script>
 </body>
 </html>

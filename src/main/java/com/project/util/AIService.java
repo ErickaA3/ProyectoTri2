@@ -35,6 +35,11 @@ public class AIService {
 
     // ── Cargar API key desde properties ──────────────────────────────────────
     private static String loadApiKey() {
+        // 1. Variable de entorno (Railway en producción)
+        String envKey = System.getenv("OPENAI_API_KEY");
+        if (envKey != null && !envKey.isBlank()) return envKey.trim();
+
+        // 2. Archivo local (desarrollo)
         try (InputStream in = AIService.class
                 .getClassLoader()
                 .getResourceAsStream("config/database.properties")) {
@@ -110,7 +115,9 @@ public class AIService {
                             + "- El rootNode.label es el tema principal.\n"
                             + "- Nivel 1 (children directos): subtemas o categorías principales (3-5 nodos).\n"
                             + "- Nivel 2 (children de nivel 1): puntos clave específicos (2-4 por subtema).\n"
-                            + "- Nivel 3 (opcional): detalles o ejemplos si el contenido lo amerita.\n"
+                            + "- Nivel 3 (children de nivel 2): detalles concretos (1-3 por punto clave).\n"
+                            + "- Los nodos del ÚLTIMO nivel (hojas) DEBEN incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
+                            + "- El \"detail\" es un párrafo breve que explica ese concepto específico.\n"
                             + "- Cada label debe ser corto: máximo 4-5 palabras.\n"
                             + "- La estructura debe reflejar la jerarquía lógica del contenido.\n";
                         break;
@@ -118,25 +125,25 @@ public class AIService {
                         instrEsquema = "TIPO DE ESQUEMA: Mapa Conceptual (nodo central con conexiones radiales).\n"
                             + "- El rootNode.label es el concepto central del tema.\n"
                             + "- Los children directos son los conceptos principales relacionados (4-7 nodos).\n"
-                            + "- Cada concepto principal puede tener 1-3 sub-conceptos como children.\n"
-                            + "- Los labels deben ser conceptos concretos, no oraciones.\n"
-                            + "- Piensa en RELACIONES entre ideas, no solo en jerarquía.\n"
-                            + "- Máximo 3-5 palabras por label.\n";
+                            + "- Cada concepto principal DEBE tener 2-4 sub-conceptos como children.\n"
+                            + "- Cada sub-concepto DEBE incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
+                            + "- Los labels deben ser conceptos concretos, máx 3-5 palabras.\n"
+                            + "- Piensa en RELACIONES entre ideas, no solo en jerarquía.\n";
                         break;
                     case "timeline":
                         instrEsquema = "TIPO DE ESQUEMA: Línea del Tiempo (eventos cronológicos).\n"
                             + "- El rootNode.label es el título del período o proceso.\n"
-                            + "- Los children directos son los eventos/etapas EN ORDEN CRONOLÓGICO.\n"
-                            + "- Cada evento tiene un label descriptivo (incluir fecha/período si aplica).\n"
-                            + "- Los sub-children de cada evento son detalles o consecuencias.\n"
-                            + "- Genera entre 4 y 8 eventos principales.\n"
+                            + "- Los children directos son los eventos/etapas EN ORDEN CRONOLÓGICO (4-8 eventos).\n"
+                            + "- Cada evento DEBE tener 2-4 sub-children con detalles o consecuencias.\n"
+                            + "- Cada sub-child DEBE incluir un campo \"detail\" con 1-2 oraciones que expliquen ese punto.\n"
                             + "- Si el texto no tiene fechas, usa orden lógico de pasos/fases.\n";
                         break;
                     case "causa-efecto":
                         instrEsquema = "TIPO DE ESQUEMA: Causa y Efecto (diagrama Ishikawa/espina de pescado).\n"
                             + "- El rootNode.label es el EFECTO o problema central.\n"
                             + "- Los children directos son las CAUSAS principales (3-6 causas).\n"
-                            + "- Los sub-children de cada causa son sub-causas o factores específicos (1-3 por causa).\n"
+                            + "- Cada causa DEBE tener 2-3 sub-causas como children.\n"
+                            + "- Cada sub-causa DEBE incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
                             + "- Distribuye las causas de forma equilibrada.\n"
                             + "- Cada label debe ser conciso: máximo 4-5 palabras.\n"
                             + "- Las causas deben ser categorías distintas, no repeticiones.\n";
@@ -144,10 +151,10 @@ public class AIService {
                     case "ciclico":
                         instrEsquema = "TIPO DE ESQUEMA: Cíclico (proceso que se repite en ciclo).\n"
                             + "- El rootNode.label es el nombre del ciclo/proceso.\n"
-                            + "- Los children directos son las FASES del ciclo EN ORDEN.\n"
-                            + "- Genera entre 3 y 6 fases.\n"
+                            + "- Los children directos son las FASES del ciclo EN ORDEN (3-6 fases).\n"
                             + "- La última fase debe conectar lógicamente con la primera.\n"
-                            + "- Cada fase puede tener 1-2 sub-children con detalles.\n"
+                            + "- Cada fase DEBE tener 2-3 sub-children con detalles del proceso.\n"
+                            + "- Cada sub-child DEBE incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
                             + "- Labels cortos: máximo 4-5 palabras por fase.\n";
                         break;
                     default:
@@ -247,13 +254,16 @@ public class AIService {
                     + "      {\n"
                     + "        \"label\": \"Subtema\",\n"
                     + "        \"children\": [\n"
-                    + "          {\"label\": \"Detalle\", \"children\": []}\n"
+                    + "          {\"label\": \"Detalle\", \"detail\": \"Explicación breve de este punto.\", \"children\": []}\n"
                     + "        ]\n"
                     + "      }\n"
                     + "    ]\n"
                     + "  }\n"
                     + "}\n\n"
-                    + "IMPORTANTE: Todos los nodos DEBEN tener \"label\" (string) y \"children\" (array, puede estar vacío []).\n\n"
+                    + "IMPORTANTE:\n"
+                    + "- Todos los nodos DEBEN tener \"label\" (string) y \"children\" (array, puede estar vacío []).\n"
+                    + "- Los nodos del ÚLTIMO nivel (hojas) DEBEN incluir \"detail\" con 1-2 oraciones explicativas.\n"
+                    + "- El \"detail\" es un párrafo breve, NO un label corto.\n\n"
                     + "CONTENIDO:\n" + t;
             }
 

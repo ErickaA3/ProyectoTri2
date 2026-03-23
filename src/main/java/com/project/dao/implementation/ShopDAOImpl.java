@@ -296,11 +296,6 @@ public class ShopDAOImpl implements IShopDAO {
 
     @Override
     public boolean equipItem(String userId, int itemId) {
-        if (!userOwnsItem(userId, itemId)) {
-            System.err.println("[ShopDAO] equipItem: usuario " + userId + " no posee ítem " + itemId);
-            return false;
-        }
-
         Product item = getItemById(itemId);
         if (item == null) return false;
 
@@ -309,43 +304,40 @@ public class ShopDAOImpl implements IShopDAO {
             return false;
         }
 
-        String unequipSQL = "UPDATE user_inventory ui " +
-                            "SET is_equipped = false " +
-                            "WHERE ui.user_id = ?::uuid " +
-                            "  AND ui.item_id IN (" +
-                            "    SELECT id FROM store_items WHERE type = ?" +
-                            "  )";
-
-        String equipSQL = "UPDATE user_inventory " +
-                          "SET is_equipped = true " +
-                          "WHERE user_id = ?::uuid AND item_id = ?";
-
-        String updateProfessorSQL = "avatar".equals(item.getType())
-            ? "UPDATE professor_config SET avatar_item_id = ?, updated_at = NOW() WHERE user_id = ?::uuid"
-            : "UPDATE professor_config SET background_item_id = ?, updated_at = NOW() WHERE user_id = ?::uuid";
-
         Connection conn = null;
+        PreparedStatement ps = null;
         try {
             conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
 
-            try (PreparedStatement ps = conn.prepareStatement(unequipSQL)) {
-                ps.setString(1, userId);
-                ps.setString(2, item.getType());
-                ps.executeUpdate();
-            }
+            // 1. Auto-insertar en inventario si no lo tiene
+            ps = conn.prepareStatement(
+                "INSERT INTO user_inventory (user_id, item_id, purchased_at, is_equipped) " +
+                "VALUES (?::uuid, ?, NOW(), false) ON CONFLICT (user_id, item_id) DO NOTHING");
+            ps.setString(1, userId);
+            ps.setInt(2, itemId);
+            ps.executeUpdate();
+            ps.close();
 
-            try (PreparedStatement ps = conn.prepareStatement(equipSQL)) {
-                ps.setString(1, userId);
-                ps.setInt(2, itemId);
-                ps.executeUpdate();
-            }
+            // 2. Desequipar todos del mismo tipo
+            ps = conn.prepareStatement(
+                "UPDATE user_inventory SET is_equipped = false " +
+                "WHERE user_id = ?::uuid AND item_id IN " +
+                "(SELECT id FROM store_items WHERE type = ?)");
+            ps.setString(1, userId);
+            ps.setString(2, item.getType());
+            ps.executeUpdate();
+            ps.close();
 
-            try (PreparedStatement ps = conn.prepareStatement(updateProfessorSQL)) {
-                ps.setInt(1, itemId);
-                ps.setString(2, userId);
-                ps.executeUpdate();
-            }
+            // 3. Equipar el nuevo
+            ps = conn.prepareStatement(
+                "UPDATE user_inventory SET is_equipped = true " +
+                "WHERE user_id = ?::uuid AND item_id = ?");
+            ps.setString(1, userId);
+            ps.setInt(2, itemId);
+            ps.executeUpdate();
+            ps.close();
+            ps = null;
 
             conn.commit();
             return true;
@@ -358,11 +350,9 @@ public class ShopDAOImpl implements IShopDAO {
             return false;
 
         } finally {
+            if (ps != null) { try { ps.close(); } catch (SQLException e) { /* ignorar */ } }
             if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) { /* ignorar */ }
+                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { /* ignorar */ }
             }
         }
     }

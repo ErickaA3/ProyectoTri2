@@ -23,7 +23,6 @@ const CTX = window.location.pathname.split('/pages')[0];
 
 // ── Arranque ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
-    loadShop();
     initGalaxyCanvas();
     initForestCanvas();
     initVolcanoCanvas();
@@ -31,6 +30,10 @@ document.addEventListener('DOMContentLoaded', function () {
     initSkyCanvas();
     initRainCanvas();
     initAuroraCanvas();
+
+    const _tt = PolarisLoading.rotateMessages('tiendaLoadingSub',
+        ['Cargando la tienda...', 'Obteniendo tu inventario...', 'Casi listo...']);
+    loadShop().finally(() => { clearInterval(_tt); PolarisLoading.hide('tiendaLoading'); });
 });
 
 // ============================================================
@@ -73,10 +76,10 @@ async function loadShop() {
         ownedItemIds = data.ownedItemIds || [];
         markOwnedItems(ownedItemIds);
 
-        // 4. Equipar el fondo guardado
+        // 4. Restaurar el fondo guardado (solo visual, ya está en BD)
         if (data.equippedBackgroundId) {
             const bgEl = document.querySelector(`[data-db-id="${data.equippedBackgroundId}"]`);
-            if (bgEl) equipBackground(bgEl.dataset.class);
+            if (bgEl) applyEquipVisual(bgEl.dataset.class, bgEl);
         }
 
     } catch (error) {
@@ -212,6 +215,34 @@ async function buyProduct(productName, price, btn) {
             updateBalance(result.remainingCoins);
             sessionStorage.setItem('userCoins', result.remainingCoins);
             showPurchaseModal(productName, price, result.remainingCoins);
+
+            // Activar countdown del escudo si es Streak Protector
+            if (productName === 'Streak Protector') {
+                localStorage.setItem('shieldActivatedAt', Date.now().toString());
+                try {
+                    const user = JSON.parse(localStorage.getItem('user') || '{}');
+                    if (user.stats) { user.stats.hasStreakShield = true; localStorage.setItem('user', JSON.stringify(user)); }
+                } catch(_) {}
+
+                // Crear el pill en el navbar inmediatamente
+                if (!document.getElementById('shieldPill')) {
+                    const stats = document.querySelector('.navbar-stats');
+                    const streakPill = document.getElementById('streakPill');
+                    if (stats && streakPill) {
+                        const sp = document.createElement('div');
+                        sp.className = 'shield-pill';
+                        sp.id = 'shieldPill';
+                        sp.innerHTML = `
+                            <div class="shield-icon-wrap"><i class="fas fa-shield-alt"></i></div>
+                            <div class="shield-expand">
+                                <i class="fas fa-clock"></i>
+                                <span class="shield-timer" id="shieldCountdown">24:00:00</span>
+                            </div>`;
+                        stats.insertBefore(sp, streakPill);
+                        if (typeof initShieldCountdown === 'function') initShieldCountdown();
+                    }
+                }
+            }
         } else {
             showErrorModal(result.message || 'No se pudo completar la compra.');
             console.error('[Tienda] Compra fallida:', result.message);
@@ -229,20 +260,91 @@ async function buyProduct(productName, price, btn) {
 //  SELECCIÓN
 // ============================================================
 function selectBackground(element, price, id, bgClass) {
-    if (ownedBackgrounds.includes(id))              { equipBackground(bgClass); return; }
     document.querySelectorAll('.background-item').forEach(item => item.classList.remove('selected'));
     element.classList.add('selected');
+
+    const buyBtn = document.querySelector('.section-backgrounds .buy-button');
+    const isOwned = ownedBackgrounds.includes(id) || ownedItemIds.includes(parseInt(element.dataset.dbId));
+
+    if (isOwned) {
+        // Fondo ya comprado — mostrar confirmación para equipar
+        selectedBackgroundPrice = 0;
+        selectedBackgroundId    = null;
+        selectedBackgroundDbId  = null;
+        selectedBackgroundClass = null;
+
+        if (buyBtn) {
+            buyBtn.disabled = true;
+            buyBtn.innerHTML = '<i class="fas fa-check-circle"></i> Ya comprado';
+        }
+
+        showEquipConfirmModal(bgClass);
+        return;
+    }
+
+    // Fondo no comprado — seleccionar para compra
     selectedBackgroundPrice = price;
     selectedBackgroundId    = id;
     selectedBackgroundDbId  = parseInt(element.dataset.dbId);
     selectedBackgroundClass = bgClass;
+
+    if (buyBtn) {
+        buyBtn.disabled = false;
+        buyBtn.innerHTML = '<i class="fas fa-shopping-cart"></i> Comprar Fondo';
+    }
 }
 
 // ============================================================
 //  EQUIPAR FONDO — aplica CSS + POST /shop/equip
 // ============================================================
 async function equipBackground(bgClass) {
-    // Aplicar visualmente de inmediato
+    const newBgItem = document.querySelector(`[data-class="${bgClass}"]`);
+    const dbId = newBgItem ? parseInt(newBgItem.dataset.dbId) : null;
+
+    console.log('[Tienda] equipBackground → bgClass:', bgClass, '| dbId:', dbId);
+
+    // bg-default: solo visual (no necesita backend, siempre disponible)
+    if (bgClass === 'bg-default') {
+        applyEquipVisual(bgClass, newBgItem);
+        // Si hay un fondo equipado en BD, desequiparlo
+        if (dbId && !isNaN(dbId)) {
+            fetch(CTX + '/shop/equip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ itemId: dbId })
+            }).catch(() => {});
+        }
+        return;
+    }
+
+    // Fondos comprados: primero backend, luego visual
+    if (!dbId || isNaN(dbId)) {
+        showErrorModal('No se pudo equipar: fondo no encontrado en la tienda.');
+        return;
+    }
+
+    try {
+        const res = await fetch(CTX + '/shop/equip', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ itemId: dbId })
+        });
+        const result = await res.json();
+        console.log('[Tienda] Respuesta equip:', result);
+
+        if (result.success) {
+            applyEquipVisual(bgClass, newBgItem);
+        } else {
+            showErrorModal(result.message || 'No se pudo equipar el fondo.');
+        }
+    } catch (error) {
+        console.error('[Tienda] Error al equipar fondo en BD:', error);
+        showErrorModal('Error de conexión al equipar.');
+    }
+}
+
+// Aplica el cambio visual del fondo (solo llamado si el backend confirmó)
+function applyEquipVisual(bgClass, bgItem) {
     const contentArea = document.querySelector('.content');
     contentArea.classList.remove('bg-galaxy','bg-volcano','bg-ocean','bg-forest','bg-aurora','bg-sky','bg-rain','bg-default');
     if (bgClass !== 'bg-default') contentArea.classList.add(bgClass);
@@ -252,29 +354,14 @@ async function equipBackground(bgClass) {
         if (badge) badge.remove();
     });
 
-    const newBgItem = document.querySelector(`[data-class="${bgClass}"]`);
-    if (newBgItem) {
+    if (bgItem) {
         const badge       = document.createElement('div');
         badge.className   = 'equipped-badge';
         badge.textContent = '★ EQUIPADO';
-        newBgItem.querySelector('.background-preview').appendChild(badge);
+        bgItem.querySelector('.background-preview').appendChild(badge);
     }
 
     currentEquippedBackground = bgClass;
-
-    // Persistir en el backend
-    const dbId = newBgItem ? parseInt(newBgItem.dataset.dbId) : null;
-    if (dbId) {
-        try {
-            await fetch(CTX + '/shop/equip', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ itemId: dbId })
-            });
-        } catch (error) {
-            console.error('[Tienda] Error al equipar fondo en BD:', error);
-        }
-    }
 }
 
 function equipNow() {
@@ -374,6 +461,32 @@ function closePurchaseModal() {
     document.getElementById('purchaseModal').classList.remove('show');
 }
 
+// ── Modal de confirmación para equipar ──────────────────────
+let pendingEquipBgClass = null;
+
+function showEquipConfirmModal(bgClass) {
+    pendingEquipBgClass = bgClass;
+    const modal = document.getElementById('equipConfirmModal');
+    // Buscar nombre del fondo
+    const bgItem = document.querySelector(`[data-class="${bgClass}"]`);
+    const name = bgItem ? bgItem.querySelector('.background-name').textContent : bgClass;
+    modal.querySelector('.equip-confirm-name').textContent = name;
+    modal.classList.add('show');
+}
+
+function closeEquipModal() {
+    document.getElementById('equipConfirmModal').classList.remove('show');
+    pendingEquipBgClass = null;
+}
+
+function confirmEquip() {
+    if (pendingEquipBgClass) {
+        equipBackground(pendingEquipBgClass);
+        pendingEquipBgClass = null;
+    }
+    document.getElementById('equipConfirmModal').classList.remove('show');
+}
+
 // ── Leer balance — userBalance es la fuente de verdad ────────
 // Se sincroniza con el DOM del navbar si existe, pero el valor
 // principal viene del backend (loadShop / remainingCoins).
@@ -405,6 +518,9 @@ document.getElementById('insufficientModal').addEventListener('click', function 
 });
 document.getElementById('purchaseModal').addEventListener('click', function (e) {
     if (e.target === this) equipLater();
+});
+document.getElementById('equipConfirmModal').addEventListener('click', function (e) {
+    if (e.target === this) closeEquipModal();
 });
 
 // ============================================================

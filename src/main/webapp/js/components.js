@@ -1,3 +1,6 @@
+// ── Context path: ROOT.war se despliega en / tanto en local como en Railway ──
+window.API_BASE = '';
+
 /* ===== COMPONENTES JS - Polaris / Mi ProfesorIA ===== */
 
 // ── Datos del usuario ──
@@ -17,10 +20,11 @@ function getBasePath() {
 
 // ── HTML del Navbar ──
 function getNavbarHTML(base) {
-    const user    = getUserData();
-    const racha   = user?.stats?.streakCurrent ?? 0;
-    const xp      = user?.stats?.xp            ?? 0;
-    const monedas = user?.stats?.coins          ?? 0;
+    const user      = getUserData();
+    const racha     = user?.stats?.streakCurrent  ?? 0;
+    const xp        = user?.stats?.xp             ?? 0;
+    const monedas   = user?.stats?.coins           ?? 0;
+    const hasShield = user?.stats?.hasStreakShield ?? false;
 
     return `
     <nav class="main-navbar">
@@ -33,17 +37,33 @@ function getNavbarHTML(base) {
             </div>
         </div>
         <div class="navbar-stats">
-            <div class="stat-pill">
+
+            <!-- Escudo protector (separado de la racha) — solo si tiene shield Y hay countdown activo -->
+            ${(hasShield && localStorage.getItem('shieldActivatedAt')) ? `
+            <div class="shield-pill" id="shieldPill">
+                <div class="shield-icon-wrap">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="shield-expand">
+                    <i class="fas fa-clock"></i>
+                    <span class="shield-timer" id="shieldCountdown">activo</span>
+                </div>
+            </div>
+            ` : ''}
+
+            <!-- Racha -->
+            <div class="stat-pill stat-pill-streak" id="streakPill">
                 <img src="${base}images/gifs/fire.gif" alt="🔥" class="fire-gif" onerror="this.outerHTML='<i class=\\'fas fa-fire\\' style=\\'color:#ff6b6b\\'></i>'">
                 <span class="stat-value">${racha} Días</span>
                 <span class="stat-label">Racha</span>
             </div>
-            <div class="stat-pill">
+
+            <div class="stat-pill" id="xpPill">
                 <img src="${base}images/gifs/star.gif" alt="⭐" class="star-gif" onerror="this.outerHTML='<i class=\\'fas fa-star\\' style=\\'color:#ffd93d\\'></i>'">
                 <span class="stat-value">${xp.toLocaleString()}</span>
                 <span class="stat-label">XP</span>
             </div>
-            <div class="stat-pill">
+            <div class="stat-pill" id="coinsPill">
                 <img src="${base}images/gifs/coin.gif" alt="💵" class="money-gif" onerror="this.outerHTML='<i class=\\'fas fa-coins\\' style=\\'color:#f59e0b\\'></i>'">
                 <span class="stat-value">${monedas.toLocaleString()}</span>
                 <span class="stat-label">Monedas</span>
@@ -405,6 +425,15 @@ function initComponents() {
     // Sincronización reactiva
     listenForUserUpdates();
 
+    // Auto-refrescar stats desde el servidor (no depender solo de localStorage)
+    autoRefreshStats();
+
+    // Countdown del escudo protector
+    initShieldCountdown();
+
+    // Transición suave entre páginas
+    initPageTransitions();
+
     // Modal: cerrar con Escape o click fuera
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') cerrarModalLogout();
@@ -416,12 +445,12 @@ function initComponents() {
 
 // Marcar la página activa en el menú
 function setActivePage() {
+    // Limpiar activo anterior
+    document.querySelectorAll('.nav-card.active').forEach(el => el.classList.remove('active'));
     const currentPage = document.body.dataset.page;
     if (currentPage) {
         const activeLink = document.querySelector(`.nav-card[data-page="${currentPage}"]`);
-        if (activeLink) {
-            activeLink.classList.add('active');
-        }
+        if (activeLink) activeLink.classList.add('active');
     }
 }
 
@@ -531,15 +560,61 @@ function refreshNavbarStats() {
     const monedas = user.stats?.coins          ?? 0;
     const racha   = user.stats?.streakCurrent  ?? 0;
 
-    const pills = document.querySelectorAll('.stat-pill');
-    if (pills.length >= 3) {
-        const rachaEl = pills[0].querySelector('.stat-value');
-        const xpEl    = pills[1].querySelector('.stat-value');
-        const coinEl  = pills[2].querySelector('.stat-value');
-        if (rachaEl) rachaEl.textContent = racha + ' Días';
-        if (xpEl)    xpEl.textContent    = xp.toLocaleString();
-        if (coinEl)  coinEl.textContent  = monedas.toLocaleString();
+    // ── Actualizar por ID (robusto, no depende del orden del DOM) ──
+    animateStatUpdate('streakPill', racha + ' Días');
+    animateStatUpdate('xpPill',     xp.toLocaleString());
+    animateStatUpdate('coinsPill',  monedas.toLocaleString());
+
+    // Sincronizar pill del escudo protector (separado)
+    const hasShield = user.stats?.hasStreakShield ?? false;
+    const hasTimer  = !!localStorage.getItem('shieldActivatedAt');
+    const shieldPill = document.getElementById('shieldPill');
+    if (hasShield && hasTimer && !shieldPill) {
+        const stats = document.querySelector('.navbar-stats');
+        const streakPill = document.getElementById('streakPill');
+        if (stats && streakPill) {
+            const sp = document.createElement('div');
+            sp.className = 'shield-pill';
+            sp.id = 'shieldPill';
+            sp.innerHTML = `
+                <div class="shield-icon-wrap">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="shield-expand">
+                    <i class="fas fa-clock"></i>
+                    <span class="shield-timer" id="shieldCountdown">activo</span>
+                </div>`;
+            stats.insertBefore(sp, streakPill);
+            initShieldCountdown();
+        }
+    } else if ((!hasShield || !hasTimer) && shieldPill) {
+        shieldPill.remove();
     }
+}
+
+/**
+ * Actualiza el .stat-value dentro de un pill por ID.
+ * Si el valor cambió, hace un breve flash visual para que el usuario lo note.
+ */
+function animateStatUpdate(pillId, newValue) {
+    const pill = document.getElementById(pillId);
+    if (!pill) return;
+    const el = pill.querySelector('.stat-value');
+    if (!el) return;
+
+    const oldValue = el.textContent.trim();
+    if (oldValue === String(newValue)) return; // Sin cambio → no animar
+
+    el.textContent = newValue;
+
+    // Flash: scale up brevemente + color highlight
+    pill.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+    pill.style.transform = 'scale(1.12)';
+    pill.style.boxShadow = '0 0 12px rgba(45,212,191,0.35)';
+    setTimeout(() => {
+        pill.style.transform = '';
+        pill.style.boxShadow = '';
+    }, 350);
 }
 
 // Refrescar sidebar (nombre, nivel, marco)
@@ -557,5 +632,212 @@ function refreshSidebarInfo() {
     renderSidebarFrame();
 }
 
+/**
+ * Auto-fetch stats del servidor al cargar cada página.
+ * Así el navbar SIEMPRE muestra datos frescos, incluso si cambiaron
+ * desde otra pestaña, otro dispositivo, o por el backend directamente.
+ * Usa gamification.js si está cargado, sino hace el fetch directo.
+ */
+function autoRefreshStats() {
+    // Solo si hay un usuario logueado
+    const user = getUserData();
+    if (!user?.id) return;
+
+    // Si gamification.js está cargado, usar su función
+    if (typeof fetchPlayerStats === 'function') {
+        fetchPlayerStats().then(() => {
+            refreshNavbarStats();
+            refreshSidebarInfo();
+        }).catch(() => {}); // Silencioso si falla (offline, etc.)
+        return;
+    }
+
+    // Fallback: fetch directo si gamification.js no está en la página
+    const API_BASE = window.API_BASE + '/api/gamification';
+    fetch(`${API_BASE}/stats`, {
+        headers: { 'X-User-Id': user.id }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) return;
+        try {
+            const stored = JSON.parse(localStorage.getItem('user')) || {};
+            if (!stored.stats) stored.stats = {};
+            if (data.xp !== undefined)            stored.stats.xp            = data.xp;
+            if (data.level !== undefined)          stored.stats.level         = data.level;
+            if (data.coins !== undefined)          stored.stats.coins         = data.coins;
+            if (data.streakCurrent !== undefined)  stored.stats.streakCurrent = data.streakCurrent;
+            if (data.streakLongest !== undefined)  stored.stats.streakRecord  = data.streakLongest;
+            if (data.hasStreakShield !== undefined) stored.stats.hasStreakShield = data.hasStreakShield;
+            localStorage.setItem('user', JSON.stringify(stored));
+            refreshNavbarStats();
+            refreshSidebarInfo();
+        } catch (_) {}
+    })
+    .catch(() => {}); // Silencioso — no bloquear la página si falla
+}
+
+
+
+// ══════════════════════════════════════════════════
+// TRANSICIÓN SUAVE ENTRE PÁGINAS
+// Fade out del content al hacer click en nav links.
+// El navbar y sidebar ya están cacheados por el browser
+// desde la segunda visita — visualmente no parpadean.
+// ══════════════════════════════════════════════════
+function initPageTransitions() {
+    // Fade in al entrar a la página
+    const main = document.querySelector('main.content');
+    if (main) {
+        main.style.opacity = '0';
+        main.style.transition = 'opacity 0.18s ease';
+        requestAnimationFrame(() => { main.style.opacity = '1'; });
+    }
+
+    // Fade out al salir
+    document.addEventListener('click', e => {
+        const link = e.target.closest('a.nav-card[href]');
+        if (!link || !link.href || link.href === location.href) return;
+        // No interceptar excluidas
+        if (link.href.includes('index.html')) return;
+        e.preventDefault();
+        const target = link.href;
+        const m = document.querySelector('main.content');
+        if (m) {
+            m.style.transition = 'opacity 0.15s ease';
+            m.style.opacity = '0';
+            setTimeout(() => { window.location.href = target; }, 150);
+        } else {
+            window.location.href = target;
+        }
+    });
+}
+
+// ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// SHIELD PILL — countdown 24h desde activación
+// ══════════════════════════════════════════════════
+function initShieldCountdown() {
+    const pill = document.getElementById('shieldPill');
+    if (!pill) return;
+
+    // Solo iniciar si hay un timestamp de activación (lo pone tienda.js al comprar)
+    if (!localStorage.getItem('shieldActivatedAt')) {
+        pill.remove();
+        return;
+    }
+
+    function updateShieldTimer() {
+        const el = document.getElementById('shieldCountdown');
+        const shieldPill = document.getElementById('shieldPill');
+        if (!el || !shieldPill) return;
+
+        const activatedAt = parseInt(localStorage.getItem('shieldActivatedAt') || '0');
+        const expiresAt = activatedAt + 24 * 60 * 60 * 1000; // 24 horas
+        const diff = expiresAt - Date.now();
+
+        if (diff <= 0) {
+            // Expiró — quitar escudo visual y marcar en localStorage
+            shieldPill.style.opacity = '0';
+            shieldPill.style.pointerEvents = 'none';
+            setTimeout(() => shieldPill.remove(), 400);
+            localStorage.removeItem('shieldActivatedAt');
+            // Actualizar user data
+            try {
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                if (user.stats) { user.stats.hasStreakShield = false; localStorage.setItem('user', JSON.stringify(user)); }
+            } catch(_) {}
+            return;
+        }
+
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        const pad = n => String(n).padStart(2, '0');
+        el.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+
+        // Urgente si queda menos de 2 horas
+        if (h < 2) {
+            shieldPill.style.borderColor = 'rgba(239,68,68,0.5)';
+            el.style.color = '#fca5a5';
+        }
+    }
+
+    updateShieldTimer();
+    setInterval(updateShieldTimer, 1000);
+}
+
+// ══════════════════════════════════════════════════
+// POLARIS LOADING — utilidad global reutilizable
+// ══════════════════════════════════════════════════
+const PolarisLoading = {
+    initStars(canvas) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const resize = () => {
+            const p = canvas.parentElement;
+            canvas.width  = p ? p.offsetWidth  : window.innerWidth;
+            canvas.height = p ? p.offsetHeight : window.innerHeight;
+        };
+        resize();
+        const stars = Array.from({ length: 180 }, () => ({
+            x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+            size: Math.random() * 2 + 0.2,
+            speedX: (Math.random() - 0.5) * 0.08, speedY: (Math.random() - 0.5) * 0.08,
+            opacity: Math.random() * 0.5 + 0.1, opacityChange: (Math.random() - 0.5) * 0.01,
+            color: ['#ffffff','#ffe9c4','#d4f1ff','#c4b5fd'][Math.floor(Math.random() * 4)]
+        }));
+        const animate = () => {
+            if (!canvas.isConnected) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            stars.forEach(s => {
+                s.x += s.speedX; s.y += s.speedY;
+                if (s.x < 0) s.x = canvas.width;  if (s.x > canvas.width)  s.x = 0;
+                if (s.y < 0) s.y = canvas.height; if (s.y > canvas.height) s.y = 0;
+                s.opacity += s.opacityChange;
+                if (s.opacity <= 0.05 || s.opacity >= 0.7) s.opacityChange *= -1;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fillStyle = s.color; ctx.globalAlpha = s.opacity; ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            requestAnimationFrame(animate);
+        };
+        animate();
+        window.addEventListener('resize', resize);
+    },
+
+    show(id) {
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('polaris-loading--hidden');
+    },
+
+    hide(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('polaris-loading--hidden');
+        setTimeout(() => el.remove(), 500);
+    },
+
+    rotateMessages(subtitleId, messages, intervalMs = 1400) {
+        const el = document.getElementById(subtitleId);
+        if (!el || !messages.length) return null;
+        let i = 0;
+        return setInterval(() => {
+            i = (i + 1) % messages.length;
+            el.textContent = messages[i];
+        }, intervalMs);
+    }
+};
+// Shield pill: tap to expand/collapse en mobile
+document.addEventListener('click', function(e) {
+    const pill = e.target.closest('.shield-pill');
+    if (pill) {
+        pill.classList.toggle('expanded');
+    } else {
+        document.querySelectorAll('.shield-pill.expanded').forEach(function(p) {
+            p.classList.remove('expanded');
+        });
+    }
+});
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initComponents);

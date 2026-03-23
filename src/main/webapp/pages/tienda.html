@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mi ProfesorIA - Tienda</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../css/tienda.css">
     <link rel="stylesheet" href="../css/styles-shared.css">
+    <link rel="stylesheet" href="../css/tienda.css">
+    <link rel="stylesheet" href="../css/responsive.css">
 </head>
 
 <body data-page="tienda">
@@ -16,6 +17,22 @@
 
     <!-- ===== CONTENIDO TIENDA ===== -->
     <main class="content">
+        <!-- Pantalla de carga Polaris -->
+        <div class="polaris-loading" id="tiendaLoading">
+            <canvas class="polaris-loading-stars"></canvas>
+            <div class="polaris-loading-content">
+                <div class="polaris-loading-orb">
+                    <div class="polaris-orb-ring r1"></div>
+                    <div class="polaris-orb-ring r2"></div>
+                    <div class="polaris-orb-ring r3"></div>
+                    <div class="polaris-orb-core">
+                        <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
+                    </div>
+                </div>
+                <div class="polaris-loading-title">Cargando</div>
+                <div class="polaris-loading-subtitle" id="tiendaLoadingSub">Obteniendo datos...</div>
+            </div>
+        </div>
 
         <!-- Canvas para efectos animados de fondo -->
         <canvas id="galaxyCanvas"  class="content-canvas"></canvas>
@@ -68,7 +85,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Galaxia</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 500</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 500</div>
                     </div>
                 </div>
 
@@ -79,7 +96,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Océano</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 550</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 550</div>
                     </div>
                 </div>
 
@@ -90,7 +107,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Volcán</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 600</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 600</div>
                     </div>
                 </div>
 
@@ -101,7 +118,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Amazonas</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 650</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 650</div>
                     </div>
                 </div>
 
@@ -112,7 +129,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Cielo Nocturno</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 700</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 700</div>
                     </div>
                 </div>
 
@@ -123,7 +140,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Lluvia Digital</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 750</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 750</div>
                     </div>
                 </div>
 
@@ -134,7 +151,7 @@
                     </div>
                     <div class="background-info">
                         <div class="background-name">Aurora Boreal</div>
-                        <div class="background-price"><i class="fas fa-coins"></i> 800</div>
+                        <div class="background-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 800</div>
                     </div>
                 </div>
             </div>
@@ -157,7 +174,7 @@
                 </div>
                 <div class="streak-action">
                     <div class="product-card" data-price="300" style="display:contents;">
-                        <span class="streak-price"><i class="fas fa-coins"></i> 300</span>
+                        <span class="streak-price"><img src="../images/gifs/coin.gif" class="coin-gif" alt="💰"> 300</span>
                         <button class="product-buy-btn" onclick="buyProduct('Streak Protector', 300, this)">
                             <i class="fas fa-shield-alt"></i> Obtener
                         </button>
@@ -201,9 +218,31 @@
         </div>
     </div>
 
+    <!-- Modal: Confirmar equipar fondo -->
+    <div class="modal" id="equipConfirmModal">
+        <div class="modal-content">
+            <div class="modal-icon"> <i class="fa-solid fa-images"></i> </div>  
+            <h2 class="modal-title">Cambiar fondo</h2>
+            <p class="modal-message">¿Deseas equipar <strong class="equip-confirm-name"></strong>?</p>
+            <div class="modal-buttons">
+                <button class="modal-btn" onclick="confirmEquip()">Equipar</button>
+                <button class="modal-btn modal-btn-secondary" onclick="closeEquipModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="../js/components.js"></script>
     <script src="../js/gamification.js"></script>
     <script src="../js/tienda.js"></script>
-
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof PolarisLoading !== 'undefined')
+            PolarisLoading.initStars(document.querySelector('#tiendaLoading .polaris-loading-stars'));
+    });
+    setTimeout(function() {
+        var el = document.getElementById('tiendaLoading');
+        if (el) { el.style.opacity='0'; el.style.pointerEvents='none'; setTimeout(function(){el.remove()},500); }
+    }, 8000);
+    </script>
 </body>
 </html>

@@ -178,16 +178,17 @@
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
+    padding-right: 32px;
     border-radius: 10px;
     border: 1px solid transparent;
     cursor: pointer;
     transition: all 0.18s;
     margin-bottom: 3px;
+    position: relative;
 }
 .chat-item:hover {
     background: rgba(139, 92, 246, 0.1);
     border-color: rgba(139, 92, 246, 0.22);
-    transform: translateX(2px);
 }
 .chat-item.active {
     background: rgba(139, 92, 246, 0.14);
@@ -218,6 +219,96 @@
     color: var(--text-secondary);
     font-family: "Space Mono", monospace;
     margin-top: 1px;
+}
+
+/* Botón eliminar chat — aparece al pasar cursor sobre el chat */
+.chat-item-delete {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.15s ease;
+}
+.chat-item:hover .chat-item-delete {
+    opacity: 0.5;
+    pointer-events: auto;
+}
+.chat-item-delete:hover {
+    opacity: 1 !important;
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+    transform: translateY(-50%) scale(1.15);
+}
+
+/* ── Modal (chat) ───────────────────────────────────────────*/
+.modal {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+.modal.show {
+    display: flex;
+    animation: modalFadeIn 0.25s ease;
+}
+@keyframes modalFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.modal-content {
+    background: var(--secondary-bg);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 20px;
+    padding: 30px;
+    max-width: 380px;
+    text-align: center;
+    animation: modalSlideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes modalSlideUp {
+    from { transform: translateY(15px) scale(0.96); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+.modal-icon    { font-size: 40px; margin-bottom: 12px; }
+.modal-title   { font-size: 1.1rem; font-weight: 800; margin-bottom: 8px; color: var(--text-primary); }
+.modal-message { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 6px; }
+.modal-sub     { color: var(--text-secondary); font-size: 0.72rem; opacity: 0.6; margin-bottom: 18px; }
+.modal-buttons { display: flex; justify-content: center; gap: 10px; }
+.modal-btn {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.modal-btn:hover { transform: translateY(-1px); }
+.modal-btn-danger {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: white;
+    box-shadow: 0 3px 12px rgba(239, 68, 68, 0.3);
+}
+.modal-btn-secondary {
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    color: var(--text-primary);
 }
 
 /* Perfil del chat sidebar */
@@ -273,6 +364,59 @@
     height: 100%;
     overflow: hidden;
     background: var(--primary-bg);
+    transition: background 0.8s ease;
+    position: relative;
+}
+
+/* Canvas para efectos animados */
+.chat-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    pointer-events: none;
+    z-index: 0;
+}
+.content.bg-galaxy  #galaxyCanvas  { opacity: 1; }
+.content.bg-forest  #forestCanvas  { opacity: 1; }
+.content.bg-volcano #volcanoCanvas { opacity: 1; }
+.content.bg-ocean   #oceanCanvas   { opacity: 1; }
+.content.bg-sky     #skyCanvas     { opacity: 1; }
+.content.bg-rain    #rainCanvas    { opacity: 1; }
+.content.bg-aurora  #auroraCanvas  { opacity: 1; }
+
+/* Contenido del chat por encima de los canvas */
+.chat-main > *:not(canvas) {
+    position: relative;
+    z-index: 1;
+}
+
+/* Fondos equipados — van en .chat-main */
+.content.bg-galaxy .chat-main {
+    background: radial-gradient(ellipse at 20% 30%, rgba(88,28,135,0.8) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 70%, rgba(30,64,175,0.6) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, #1B2735 0%, #090A0F 100%) !important;
+}
+.content.bg-volcano .chat-main {
+    background: linear-gradient(to bottom, rgba(26,15,15,0.2) 0%, rgba(15,15,35,0.4) 100%),
+                url('../images/backgrounds/volcano-bg.jpg') center/cover no-repeat !important;
+}
+.content.bg-ocean .chat-main {
+    background: url('../images/backgrounds/ocean-bg.png') center/cover no-repeat !important;
+}
+.content.bg-forest .chat-main {
+    background: linear-gradient(to bottom, rgba(10,26,10,0.3) 0%, rgba(5,16,5,0.5) 100%),
+                url('../images/backgrounds/forest-bg.jpg') center/cover no-repeat !important;
+}
+.content.bg-aurora .chat-main {
+    background: url('../images/backgrounds/aurora-bg.jpg') center/cover no-repeat !important;
+}
+.content.bg-sky .chat-main {
+    background: url('../images/backgrounds/sky-bg.png') center/cover no-repeat !important;
+}
+.content.bg-rain .chat-main {
+    background: url('../images/backgrounds/rain-bg.png') center/cover no-repeat !important;
 }
 
 .msgs {
@@ -449,3 +593,274 @@
     .msgs { padding: 16px; }
     .input-area { padding: 8px 16px 14px; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   COLORES TEMÁTICOS POR FONDO EQUIPADO
+   Afecta: sidebar, burbujas, input, botones, tipografía
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── GALAXIA — Púrpura/Azul ─────────────────────────────────*/
+.content.bg-galaxy .chat-sidebar { background: rgba(49, 10, 101, 0.92); border-right-color: rgba(139, 92, 246, 0.35); }
+.content.bg-galaxy .chat-sidebar .chat-logo-text { background: linear-gradient(135deg, #a78bfa, #c4b5fd); -webkit-background-clip: text; background-clip: text; }
+.content.bg-galaxy .chat-sidebar .section-label,
+.content.bg-galaxy .chat-sidebar .owl-sub,
+.content.bg-galaxy .chat-sidebar .chat-item-date { color: #a78bfa; }
+.content.bg-galaxy .chat-sidebar .chat-item:hover { background: rgba(139, 92, 246, 0.2); }
+.content.bg-galaxy .chat-sidebar .chat-item.active { background: rgba(139, 92, 246, 0.25); border-color: rgba(139, 92, 246, 0.5); }
+.content.bg-galaxy .chat-sidebar .chat-item-icon { background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(167, 139, 250, 0.15)); border-color: rgba(139, 92, 246, 0.3); }
+.content.bg-galaxy .chat-sidebar .chat-item-icon svg { stroke: #a78bfa; }
+.content.bg-galaxy .chat-sidebar .new-chat-btn { border-color: rgba(139, 92, 246, 0.4); background: rgba(139, 92, 246, 0.15); }
+.content.bg-galaxy .chat-sidebar .chat-profile-area { border-top-color: rgba(139, 92, 246, 0.3); }
+.content.bg-galaxy .chat-sidebar .chat-profile-card { background: rgba(139, 92, 246, 0.15); border-color: rgba(139, 92, 246, 0.3); }
+.content.bg-galaxy .chat-sidebar .chat-avatar { background: linear-gradient(135deg, #7c3aed, #a855f7); border-color: rgba(167, 139, 250, 0.5); box-shadow: 0 0 10px rgba(139, 92, 246, 0.35); }
+.content.bg-galaxy .chat-sidebar .chat-profile-plan { color: #a78bfa; }
+.content.bg-galaxy .chat-sidebar .online-badge { color: #a78bfa; background: rgba(139, 92, 246, 0.12); border-color: rgba(139, 92, 246, 0.3); }
+.content.bg-galaxy .chat-sidebar .online-dot { background: #a78bfa; }
+.content.bg-galaxy .bot .bubble { background: rgba(88, 28, 135, 0.4); border-color: rgba(139, 92, 246, 0.4); }
+.content.bg-galaxy .user .bubble { background: rgba(139, 92, 246, 0.22); border-color: rgba(167, 139, 250, 0.35); }
+.content.bg-galaxy .typing-dots { background: rgba(88, 28, 135, 0.4); border-color: rgba(139, 92, 246, 0.4); }
+.content.bg-galaxy .dot { background: #a78bfa; }
+.content.bg-galaxy .dot:nth-child(2) { background: #c4b5fd; }
+.content.bg-galaxy .dot:nth-child(3) { background: #e9d5ff; }
+.content.bg-galaxy .input-box { background: rgba(88, 28, 135, 0.25); border-color: rgba(139, 92, 246, 0.35); }
+.content.bg-galaxy .input-box:focus-within { border-color: rgba(167, 139, 250, 0.6); box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12); }
+.content.bg-galaxy .send-btn { background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 3px 12px rgba(139, 92, 246, 0.4); }
+.content.bg-galaxy .bot-av { background: linear-gradient(135deg, #7c3aed, #a855f7); }
+.content.bg-galaxy .user-av { background: linear-gradient(135deg, #7c3aed, #a855f7); border-color: rgba(167,139,250,0.5); }
+.content.bg-galaxy .msg-who { color: #c4b5fd; }
+.content.bg-galaxy .chat-item:hover .chat-item-delete { color: #a78bfa; }
+.content.bg-galaxy .chat-item-delete:hover { background: rgba(139, 92, 246, 0.25) !important; color: #c4b5fd !important; }
+
+/* ── VOLCÁN — Rojo/Naranja ──────────────────────────────────*/
+.content.bg-volcano .chat-sidebar { background: rgba(80, 15, 15, 0.92); border-right-color: rgba(248, 113, 113, 0.3); }
+.content.bg-volcano .chat-sidebar .chat-logo-text { background: linear-gradient(135deg, #f87171, #fbbf24); -webkit-background-clip: text; background-clip: text; }
+.content.bg-volcano .chat-sidebar .section-label,
+.content.bg-volcano .chat-sidebar .owl-sub,
+.content.bg-volcano .chat-sidebar .chat-item-date { color: #fca5a5; }
+.content.bg-volcano .chat-sidebar .chat-item:hover { background: rgba(239, 68, 68, 0.15); }
+.content.bg-volcano .chat-sidebar .chat-item.active { background: rgba(239, 68, 68, 0.22); border-color: rgba(248, 113, 113, 0.45); }
+.content.bg-volcano .chat-sidebar .chat-item-icon { background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(249, 115, 22, 0.12)); border-color: rgba(248, 113, 113, 0.25); }
+.content.bg-volcano .chat-sidebar .chat-item-icon svg { stroke: #f87171; }
+.content.bg-volcano .chat-sidebar .new-chat-btn { border-color: rgba(248, 113, 113, 0.35); background: rgba(239, 68, 68, 0.12); }
+.content.bg-volcano .chat-sidebar .chat-profile-area { border-top-color: rgba(248, 113, 113, 0.25); }
+.content.bg-volcano .chat-sidebar .chat-profile-card { background: rgba(239, 68, 68, 0.12); border-color: rgba(248, 113, 113, 0.25); }
+.content.bg-volcano .chat-sidebar .chat-avatar { background: linear-gradient(135deg, #dc2626, #f97316); border-color: rgba(251, 146, 60, 0.5); box-shadow: 0 0 10px rgba(239, 68, 68, 0.35); }
+.content.bg-volcano .chat-sidebar .chat-profile-plan { color: #fb923c; }
+.content.bg-volcano .chat-sidebar .online-badge { color: #fb923c; background: rgba(249, 115, 22, 0.12); border-color: rgba(251, 146, 60, 0.3); }
+.content.bg-volcano .chat-sidebar .online-dot { background: #fb923c; }
+.content.bg-volcano .bot .bubble { background: rgba(127, 29, 29, 0.45); border-color: rgba(248, 113, 113, 0.35); }
+.content.bg-volcano .user .bubble { background: rgba(249, 115, 22, 0.22); border-color: rgba(251, 146, 60, 0.35); }
+.content.bg-volcano .typing-dots { background: rgba(127, 29, 29, 0.45); border-color: rgba(248, 113, 113, 0.35); }
+.content.bg-volcano .dot { background: #f87171; }
+.content.bg-volcano .dot:nth-child(2) { background: #fb923c; }
+.content.bg-volcano .dot:nth-child(3) { background: #fbbf24; }
+.content.bg-volcano .input-box { background: rgba(127, 29, 29, 0.25); border-color: rgba(248, 113, 113, 0.3); }
+.content.bg-volcano .input-box:focus-within { border-color: rgba(251, 146, 60, 0.6); box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12); }
+.content.bg-volcano .send-btn { background: linear-gradient(135deg, #dc2626, #f97316); box-shadow: 0 3px 12px rgba(239, 68, 68, 0.4); }
+.content.bg-volcano .bot-av { background: linear-gradient(135deg, #dc2626, #f97316); }
+.content.bg-volcano .user-av { background: linear-gradient(135deg, #dc2626, #f97316); border-color: rgba(251,146,60,0.5); }
+.content.bg-volcano .msg-who { color: #fca5a5; }
+.content.bg-volcano .chat-item:hover .chat-item-delete { color: #fca5a5; }
+.content.bg-volcano .chat-item-delete:hover { background: rgba(248, 113, 113, 0.2) !important; color: #f87171 !important; }
+
+/* ── OCÉANO — Azul profundo ─────────────────────────────────*/
+.content.bg-ocean .chat-sidebar { background: rgba(5, 50, 80, 0.92); border-right-color: rgba(56, 189, 248, 0.25); }
+.content.bg-ocean .chat-sidebar .chat-logo-text { background: linear-gradient(135deg, #38bdf8, #7dd3fc); -webkit-background-clip: text; background-clip: text; }
+.content.bg-ocean .chat-sidebar .section-label,
+.content.bg-ocean .chat-sidebar .owl-sub,
+.content.bg-ocean .chat-sidebar .chat-item-date { color: #7dd3fc; }
+.content.bg-ocean .chat-sidebar .chat-item:hover { background: rgba(14, 165, 233, 0.15); }
+.content.bg-ocean .chat-sidebar .chat-item.active { background: rgba(14, 165, 233, 0.22); border-color: rgba(56, 189, 248, 0.45); }
+.content.bg-ocean .chat-sidebar .chat-item-icon { background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(56, 189, 248, 0.1)); border-color: rgba(56, 189, 248, 0.25); }
+.content.bg-ocean .chat-sidebar .chat-item-icon svg { stroke: #38bdf8; }
+.content.bg-ocean .chat-sidebar .new-chat-btn { border-color: rgba(56, 189, 248, 0.3); background: rgba(14, 165, 233, 0.12); }
+.content.bg-ocean .chat-sidebar .chat-profile-area { border-top-color: rgba(56, 189, 248, 0.2); }
+.content.bg-ocean .chat-sidebar .chat-profile-card { background: rgba(14, 165, 233, 0.12); border-color: rgba(56, 189, 248, 0.25); }
+.content.bg-ocean .chat-sidebar .chat-avatar { background: linear-gradient(135deg, #0284c7, #06b6d4); border-color: rgba(56, 189, 248, 0.5); box-shadow: 0 0 10px rgba(14, 165, 233, 0.35); }
+.content.bg-ocean .chat-sidebar .chat-profile-plan { color: #38bdf8; }
+.content.bg-ocean .chat-sidebar .online-badge { color: #38bdf8; background: rgba(14, 165, 233, 0.12); border-color: rgba(56, 189, 248, 0.3); }
+.content.bg-ocean .chat-sidebar .online-dot { background: #38bdf8; }
+.content.bg-ocean .bot .bubble { background: rgba(7, 89, 133, 0.45); border-color: rgba(56, 189, 248, 0.3); }
+.content.bg-ocean .user .bubble { background: rgba(14, 165, 233, 0.2); border-color: rgba(125, 211, 252, 0.3); }
+.content.bg-ocean .typing-dots { background: rgba(7, 89, 133, 0.45); border-color: rgba(56, 189, 248, 0.3); }
+.content.bg-ocean .dot { background: #38bdf8; }
+.content.bg-ocean .dot:nth-child(2) { background: #7dd3fc; }
+.content.bg-ocean .dot:nth-child(3) { background: #bae6fd; }
+.content.bg-ocean .input-box { background: rgba(7, 89, 133, 0.25); border-color: rgba(56, 189, 248, 0.3); }
+.content.bg-ocean .input-box:focus-within { border-color: rgba(56, 189, 248, 0.6); box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12); }
+.content.bg-ocean .send-btn { background: linear-gradient(135deg, #0284c7, #06b6d4); box-shadow: 0 3px 12px rgba(14, 165, 233, 0.4); }
+.content.bg-ocean .bot-av { background: linear-gradient(135deg, #0284c7, #06b6d4); }
+.content.bg-ocean .user-av { background: linear-gradient(135deg, #0284c7, #06b6d4); border-color: rgba(56,189,248,0.5); }
+.content.bg-ocean .msg-who { color: #7dd3fc; }
+.content.bg-ocean .chat-item:hover .chat-item-delete { color: #7dd3fc; }
+.content.bg-ocean .chat-item-delete:hover { background: rgba(56, 189, 248, 0.25) !important; color: #38bdf8 !important; }
+
+/* ── AMAZONAS — Verde tropical ──────────────────────────────*/
+.content.bg-forest .chat-sidebar { background: rgba(10, 50, 25, 0.92); border-right-color: rgba(74, 222, 128, 0.25); }
+.content.bg-forest .chat-sidebar .chat-logo-text { background: linear-gradient(135deg, #4ade80, #86efac); -webkit-background-clip: text; background-clip: text; }
+.content.bg-forest .chat-sidebar .section-label,
+.content.bg-forest .chat-sidebar .owl-sub,
+.content.bg-forest .chat-sidebar .chat-item-date { color: #86efac; }
+.content.bg-forest .chat-sidebar .chat-item:hover { background: rgba(34, 197, 94, 0.15); }
+.content.bg-forest .chat-sidebar .chat-item.active { background: rgba(34, 197, 94, 0.22); border-color: rgba(74, 222, 128, 0.45); }
+.content.bg-forest .chat-sidebar .chat-item-icon { background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(74, 222, 128, 0.1)); border-color: rgba(74, 222, 128, 0.25); }
+.content.bg-forest .chat-sidebar .chat-item-icon svg { stroke: #4ade80; }
+.content.bg-forest .chat-sidebar .new-chat-btn { border-color: rgba(74, 222, 128, 0.3); background: rgba(34, 197, 94, 0.12); }
+.content.bg-forest .chat-sidebar .chat-profile-area { border-top-color: rgba(74, 222, 128, 0.2); }
+.content.bg-forest .chat-sidebar .chat-profile-card { background: rgba(34, 197, 94, 0.12); border-color: rgba(74, 222, 128, 0.25); }
+.content.bg-forest .chat-sidebar .chat-avatar { background: linear-gradient(135deg, #15803d, #22c55e); border-color: rgba(74, 222, 128, 0.5); box-shadow: 0 0 10px rgba(34, 197, 94, 0.35); }
+.content.bg-forest .chat-sidebar .chat-profile-plan { color: #4ade80; }
+.content.bg-forest .chat-sidebar .online-badge { color: #4ade80; background: rgba(34, 197, 94, 0.12); border-color: rgba(74, 222, 128, 0.3); }
+.content.bg-forest .chat-sidebar .online-dot { background: #4ade80; }
+.content.bg-forest .bot .bubble { background: rgba(20, 83, 45, 0.5); border-color: rgba(74, 222, 128, 0.3); }
+.content.bg-forest .user .bubble { background: rgba(34, 197, 94, 0.2); border-color: rgba(134, 239, 172, 0.3); }
+.content.bg-forest .typing-dots { background: rgba(20, 83, 45, 0.5); border-color: rgba(74, 222, 128, 0.3); }
+.content.bg-forest .dot { background: #4ade80; }
+.content.bg-forest .dot:nth-child(2) { background: #86efac; }
+.content.bg-forest .dot:nth-child(3) { background: #bbf7d0; }
+.content.bg-forest .input-box { background: rgba(20, 83, 45, 0.3); border-color: rgba(74, 222, 128, 0.3); }
+.content.bg-forest .input-box:focus-within { border-color: rgba(74, 222, 128, 0.6); box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.12); }
+.content.bg-forest .send-btn { background: linear-gradient(135deg, #15803d, #22c55e); box-shadow: 0 3px 12px rgba(34, 197, 94, 0.4); }
+.content.bg-forest .bot-av { background: linear-gradient(135deg, #15803d, #22c55e); }
+.content.bg-forest .user-av { background: linear-gradient(135deg, #15803d, #22c55e); border-color: rgba(74,222,128,0.5); }
+.content.bg-forest .msg-who { color: #86efac; }
+.content.bg-forest .chat-item:hover .chat-item-delete { color: #86efac; }
+.content.bg-forest .chat-item-delete:hover { background: rgba(74, 222, 128, 0.2) !important; color: #4ade80 !important; }
+
+/* ── AURORA BOREAL — Verde neón ─────────────────────────────*/
+.content.bg-aurora .chat-sidebar { background: rgba(3, 45, 35, 0.92); border-right-color: rgba(52, 211, 153, 0.25); }
+.content.bg-aurora .chat-sidebar .chat-logo-text { background: linear-gradient(135deg, #34d399, #6ee7b7); -webkit-background-clip: text; background-clip: text; }
+.content.bg-aurora .chat-sidebar .section-label,
+.content.bg-aurora .chat-sidebar .owl-sub,
+.content.bg-aurora .chat-sidebar .chat-item-date { color: #6ee7b7; }
+.content.bg-aurora .chat-sidebar .chat-item:hover { background: rgba(16, 185, 129, 0.15); }
+.content.bg-aurora .chat-sidebar .chat-item.active { background: rgba(16, 185, 129, 0.22); border-color: rgba(52, 211, 153, 0.45); }
+.content.bg-aurora .chat-sidebar .chat-item-icon { background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(52, 211, 153, 0.1)); border-color: rgba(52, 211, 153, 0.25); }
+.content.bg-aurora .chat-sidebar .chat-item-icon svg { stroke: #34d399; }
+.content.bg-aurora .chat-sidebar .new-chat-btn { border-color: rgba(52, 211, 153, 0.3); background: rgba(16, 185, 129, 0.12); }
+.content.bg-aurora .chat-sidebar .chat-profile-area { border-top-color: rgba(52, 211, 153, 0.2); }
+.content.bg-aurora .chat-sidebar .chat-profile-card { background: rgba(16, 185, 129, 0.12); border-color: rgba(52, 211, 153, 0.25); }
+.content.bg-aurora .chat-sidebar .chat-avatar { background: linear-gradient(135deg, #059669, #10b981); border-color: rgba(52, 211, 153, 0.5); box-shadow: 0 0 10px rgba(16, 185, 129, 0.35); }
+.content.bg-aurora .chat-sidebar .chat-profile-plan { color: #34d399; }
+.content.bg-aurora .chat-sidebar .online-badge { color: #34d399; background: rgba(16, 185, 129, 0.12); border-color: rgba(52, 211, 153, 0.3); }
+.content.bg-aurora .chat-sidebar .online-dot { background: #34d399; }
+.content.bg-aurora .bot .bubble { background: rgba(6, 78, 59, 0.5); border-color: rgba(52, 211, 153, 0.35); }
+.content.bg-aurora .user .bubble { background: rgba(16, 185, 129, 0.2); border-color: rgba(110, 231, 183, 0.3); }
+.content.bg-aurora .typing-dots { background: rgba(6, 78, 59, 0.5); border-color: rgba(52, 211, 153, 0.35); }
+.content.bg-aurora .dot { background: #34d399; }
+.content.bg-aurora .dot:nth-child(2) { background: #6ee7b7; }
+.content.bg-aurora .dot:nth-child(3) { background: #a7f3d0; }
+.content.bg-aurora .input-box { background: rgba(6, 78, 59, 0.25); border-color: rgba(52, 211, 153, 0.3); }
+.content.bg-aurora .input-box:focus-within { border-color: rgba(52, 211, 153, 0.6); box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.12); }
+.content.bg-aurora .send-btn { background: linear-gradient(135deg, #059669, #10b981); box-shadow: 0 3px 12px rgba(16, 185, 129, 0.4); }
+.content.bg-aurora .bot-av { background: linear-gradient(135deg, #059669, #10b981); }
+.content.bg-aurora .user-av { background: linear-gradient(135deg, #059669, #10b981); border-color: rgba(52,211,153,0.5); }
+.content.bg-aurora .msg-who { color: #6ee7b7; }
+.content.bg-aurora .chat-item:hover .chat-item-delete { color: #6ee7b7; }
+.content.bg-aurora .chat-item-delete:hover { background: rgba(52, 211, 153, 0.2) !important; color: #34d399 !important; }
+
+/* ── CIELO NOCTURNO — Azul grisáceo ─────────────────────────*/
+.content.bg-sky .chat-sidebar { background: rgba(18, 28, 42, 0.95); border-right-color: rgba(148, 163, 184, 0.25); }
+.content.bg-sky .chat-sidebar .chat-logo-text { background: linear-gradient(135deg, #94a3b8, #cbd5e1); -webkit-background-clip: text; background-clip: text; }
+.content.bg-sky .chat-sidebar .section-label,
+.content.bg-sky .chat-sidebar .owl-sub,
+.content.bg-sky .chat-sidebar .chat-item-date { color: #94a3b8; }
+.content.bg-sky .chat-sidebar .chat-item:hover { background: rgba(100, 116, 139, 0.2); }
+.content.bg-sky .chat-sidebar .chat-item.active { background: rgba(100, 116, 139, 0.25); border-color: rgba(148, 163, 184, 0.4); }
+.content.bg-sky .chat-sidebar .chat-item-icon { background: linear-gradient(135deg, rgba(100, 116, 139, 0.2), rgba(148, 163, 184, 0.1)); border-color: rgba(148, 163, 184, 0.25); }
+.content.bg-sky .chat-sidebar .chat-item-icon svg { stroke: #94a3b8; }
+.content.bg-sky .chat-sidebar .new-chat-btn { border-color: rgba(148, 163, 184, 0.3); background: rgba(100, 116, 139, 0.12); }
+.content.bg-sky .chat-sidebar .chat-profile-area { border-top-color: rgba(148, 163, 184, 0.2); }
+.content.bg-sky .chat-sidebar .chat-profile-card { background: rgba(100, 116, 139, 0.12); border-color: rgba(148, 163, 184, 0.25); }
+.content.bg-sky .chat-sidebar .chat-avatar { background: linear-gradient(135deg, #475569, #64748b); border-color: rgba(148, 163, 184, 0.5); box-shadow: 0 0 10px rgba(100, 116, 139, 0.35); }
+.content.bg-sky .chat-sidebar .chat-profile-plan { color: #94a3b8; }
+.content.bg-sky .chat-sidebar .online-badge { color: #94a3b8; background: rgba(100, 116, 139, 0.12); border-color: rgba(148, 163, 184, 0.3); }
+.content.bg-sky .chat-sidebar .online-dot { background: #94a3b8; }
+.content.bg-sky .bot .bubble { background: rgba(30, 41, 59, 0.6); border-color: rgba(148, 163, 184, 0.3); }
+.content.bg-sky .user .bubble { background: rgba(100, 116, 139, 0.22); border-color: rgba(203, 213, 225, 0.25); }
+.content.bg-sky .typing-dots { background: rgba(30, 41, 59, 0.6); border-color: rgba(148, 163, 184, 0.3); }
+.content.bg-sky .dot { background: #94a3b8; }
+.content.bg-sky .dot:nth-child(2) { background: #cbd5e1; }
+.content.bg-sky .dot:nth-child(3) { background: #e2e8f0; }
+.content.bg-sky .input-box { background: rgba(30, 41, 59, 0.35); border-color: rgba(148, 163, 184, 0.3); }
+.content.bg-sky .input-box:focus-within { border-color: rgba(148, 163, 184, 0.6); box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.1); }
+.content.bg-sky .send-btn { background: linear-gradient(135deg, #475569, #64748b); box-shadow: 0 3px 12px rgba(71, 85, 105, 0.4); }
+.content.bg-sky .bot-av { background: linear-gradient(135deg, #475569, #64748b); }
+.content.bg-sky .user-av { background: linear-gradient(135deg, #475569, #64748b); border-color: rgba(148,163,184,0.5); }
+.content.bg-sky .msg-who { color: #94a3b8; }
+.content.bg-sky .chat-item:hover .chat-item-delete { color: #94a3b8; }
+.content.bg-sky .chat-item-delete:hover { background: rgba(148, 163, 184, 0.2) !important; color: #cbd5e1 !important; }
+
+/* ── LLUVIA DIGITAL — Cyan/Turquesa ─────────────────────────*/
+.content.bg-rain .chat-sidebar { background: rgba(5, 30, 42, 0.95); border-right-color: rgba(45, 212, 191, 0.25); }
+.content.bg-rain .chat-sidebar .chat-logo-text { background: linear-gradient(135deg, #2dd4bf, #5eead4); -webkit-background-clip: text; background-clip: text; }
+.content.bg-rain .chat-sidebar .section-label,
+.content.bg-rain .chat-sidebar .owl-sub,
+.content.bg-rain .chat-sidebar .chat-item-date { color: #5eead4; }
+.content.bg-rain .chat-sidebar .chat-item:hover { background: rgba(13, 148, 136, 0.15); }
+.content.bg-rain .chat-sidebar .chat-item.active { background: rgba(13, 148, 136, 0.22); border-color: rgba(45, 212, 191, 0.45); }
+.content.bg-rain .chat-sidebar .chat-item-icon { background: linear-gradient(135deg, rgba(13, 148, 136, 0.2), rgba(45, 212, 191, 0.1)); border-color: rgba(45, 212, 191, 0.25); }
+.content.bg-rain .chat-sidebar .chat-item-icon svg { stroke: #2dd4bf; }
+.content.bg-rain .chat-sidebar .new-chat-btn { border-color: rgba(45, 212, 191, 0.3); background: rgba(13, 148, 136, 0.12); }
+.content.bg-rain .chat-sidebar .chat-profile-area { border-top-color: rgba(45, 212, 191, 0.2); }
+.content.bg-rain .chat-sidebar .chat-profile-card { background: rgba(13, 148, 136, 0.12); border-color: rgba(45, 212, 191, 0.25); }
+.content.bg-rain .chat-sidebar .chat-avatar { background: linear-gradient(135deg, #0d9488, #2dd4bf); border-color: rgba(45, 212, 191, 0.5); box-shadow: 0 0 10px rgba(13, 148, 136, 0.35); }
+.content.bg-rain .chat-sidebar .chat-profile-plan { color: #2dd4bf; }
+.content.bg-rain .chat-sidebar .online-badge { color: #2dd4bf; background: rgba(13, 148, 136, 0.12); border-color: rgba(45, 212, 191, 0.3); }
+.content.bg-rain .chat-sidebar .online-dot { background: #2dd4bf; }
+.content.bg-rain .bot .bubble { background: rgba(8, 51, 68, 0.55); border-color: rgba(45, 212, 191, 0.3); }
+.content.bg-rain .user .bubble { background: rgba(13, 148, 136, 0.22); border-color: rgba(94, 234, 212, 0.3); }
+.content.bg-rain .typing-dots { background: rgba(8, 51, 68, 0.55); border-color: rgba(45, 212, 191, 0.3); }
+.content.bg-rain .dot { background: #2dd4bf; }
+.content.bg-rain .dot:nth-child(2) { background: #5eead4; }
+.content.bg-rain .dot:nth-child(3) { background: #99f6e4; }
+.content.bg-rain .input-box { background: rgba(8, 51, 68, 0.3); border-color: rgba(45, 212, 191, 0.3); }
+.content.bg-rain .input-box:focus-within { border-color: rgba(45, 212, 191, 0.6); box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.12); }
+.content.bg-rain .send-btn { background: linear-gradient(135deg, #0d9488, #2dd4bf); box-shadow: 0 3px 12px rgba(45, 212, 191, 0.4); }
+.content.bg-rain .bot-av { background: linear-gradient(135deg, #0d9488, #2dd4bf); }
+.content.bg-rain .user-av { background: linear-gradient(135deg, #0d9488, #2dd4bf); border-color: rgba(45,212,191,0.5); }
+.content.bg-rain .msg-who { color: #5eead4; }
+.content.bg-rain .chat-item:hover .chat-item-delete { color: #5eead4; }
+.content.bg-rain .chat-item-delete:hover { background: rgba(45, 212, 191, 0.25) !important; color: #2dd4bf !important; }
+/* ── Owl SVG theme colors via hue-rotate ────────────────────*/
+.content.bg-volcano .owl-svg { filter: hue-rotate(110deg) saturate(0.9) brightness(0.85) drop-shadow(0 0 14px rgba(200,50,30,0.45)); }
+.content.bg-ocean .owl-svg   { filter: hue-rotate(-70deg) saturate(1.3) drop-shadow(0 0 14px rgba(56,189,248,0.5)); }
+.content.bg-forest .owl-svg  { filter: hue-rotate(-150deg) saturate(1.2) drop-shadow(0 0 14px rgba(74,222,128,0.5)); }
+.content.bg-aurora .owl-svg  { filter: hue-rotate(-110deg) saturate(1.3) drop-shadow(0 0 14px rgba(52,211,153,0.5)); }
+.content.bg-sky .owl-svg     { filter: hue-rotate(-55deg) saturate(0.4) brightness(1.3) drop-shadow(0 0 14px rgba(148,163,184,0.4)); }
+.content.bg-rain .owl-svg    { filter: hue-rotate(-95deg) saturate(1.2) drop-shadow(0 0 14px rgba(45,212,191,0.5)); }
+.content.bg-galaxy .owl-svg  { filter: drop-shadow(0 0 14px rgba(139,92,246,0.55)); }
+
+/* ── Owl orbit ring colors ──────────────────────────────────*/
+.content.bg-volcano .ring1 circle, .content.bg-volcano .ring2 circle { fill: #f87171 !important; }
+.content.bg-ocean .ring1 circle, .content.bg-ocean .ring2 circle { fill: #38bdf8 !important; }
+.content.bg-forest .ring1 circle, .content.bg-forest .ring2 circle { fill: #4ade80 !important; }
+.content.bg-aurora .ring1 circle, .content.bg-aurora .ring2 circle { fill: #34d399 !important; }
+.content.bg-sky .ring1 circle, .content.bg-sky .ring2 circle { fill: #94a3b8 !important; }
+.content.bg-rain .ring1 circle, .content.bg-rain .ring2 circle { fill: #2dd4bf !important; }
+.content.bg-galaxy .ring1 circle, .content.bg-galaxy .ring2 circle { fill: #a78bfa !important; }
+
+/* ── Owl name gradient per theme ────────────────────────────*/
+.content.bg-volcano .owl-name { background: linear-gradient(135deg, #f87171, #fbbf24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.content.bg-ocean .owl-name { background: linear-gradient(135deg, #38bdf8, #7dd3fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.content.bg-forest .owl-name { background: linear-gradient(135deg, #4ade80, #86efac); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.content.bg-aurora .owl-name { background: linear-gradient(135deg, #34d399, #6ee7b7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.content.bg-sky .owl-name { background: linear-gradient(135deg, #94a3b8, #cbd5e1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.content.bg-rain .owl-name { background: linear-gradient(135deg, #2dd4bf, #5eead4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+/* ── Modal delete button themed ─────────────────────────────*/
+.content.bg-galaxy .modal-btn-danger { background: linear-gradient(135deg, #7c3aed, #a855f7); box-shadow: 0 3px 12px rgba(139,92,246,0.3); }
+.content.bg-volcano .modal-btn-danger { background: linear-gradient(135deg, #dc2626, #f97316); box-shadow: 0 3px 12px rgba(239,68,68,0.3); }
+.content.bg-ocean .modal-btn-danger { background: linear-gradient(135deg, #0284c7, #06b6d4); box-shadow: 0 3px 12px rgba(14,165,233,0.3); }
+.content.bg-forest .modal-btn-danger { background: linear-gradient(135deg, #15803d, #22c55e); box-shadow: 0 3px 12px rgba(34,197,94,0.3); }
+.content.bg-aurora .modal-btn-danger { background: linear-gradient(135deg, #059669, #10b981); box-shadow: 0 3px 12px rgba(16,185,129,0.3); }
+.content.bg-sky .modal-btn-danger { background: linear-gradient(135deg, #475569, #64748b); box-shadow: 0 3px 12px rgba(71,85,105,0.3); }
+.content.bg-rain .modal-btn-danger { background: linear-gradient(135deg, #0d9488, #2dd4bf); box-shadow: 0 3px 12px rgba(45,212,191,0.3); }
+
+/* ── Bot avatar SVG in messages — themed ────────────────────*/
+.content.bg-volcano .bot-av svg { filter: hue-rotate(110deg) saturate(0.9) brightness(0.85); }
+.content.bg-ocean .bot-av svg   { filter: hue-rotate(-70deg) saturate(1.3); }
+.content.bg-forest .bot-av svg  { filter: hue-rotate(-150deg) saturate(1.2); }
+.content.bg-aurora .bot-av svg  { filter: hue-rotate(-110deg) saturate(1.3); }
+.content.bg-sky .bot-av svg     { filter: hue-rotate(-55deg) saturate(0.4) brightness(1.3); }
+.content.bg-rain .bot-av svg    { filter: hue-rotate(-95deg) saturate(1.2); }

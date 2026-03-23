@@ -27,13 +27,11 @@ let friends = [], invitations = [], activeDuels = [], notifications = [];
 // ═══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('headerStars').innerHTML = generateStars(12);
-    // Limpiar datos de duelo en sesión para evitar loops con duelo-play.html
     sessionStorage.removeItem('duelData');
-
-    loadFriends();
-    loadPendingRequests();
-    loadActiveDuels();
-    loadNotifications();
+    const _dt = PolarisLoading.rotateMessages('duelLoadingSub',
+        ['Obteniendo tus datos...', 'Cargando amigos...', 'Buscando retos activos...']);
+    Promise.allSettled([loadFriends(), loadPendingRequests(), loadActiveDuels(), loadNotifications()])
+        .finally(() => { clearInterval(_dt); PolarisLoading.hide('duelLoadingScreen'); });
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -137,27 +135,70 @@ async function loadNotifications() {
 async function createDuel() {
     const opponentId = document.getElementById('opponentSelect').value;
     const mode = document.getElementById('topicUploadMode').style.display === 'none' ? 'text' : 'upload';
-    const topic = mode === 'text' ? document.getElementById('duelTopic').value.trim() : document.getElementById('fileName').textContent;
+    const topicInput = document.getElementById('duelTopic').value.trim();
+    const fileInput = document.getElementById('topicFile');
     const questionCount = parseInt(document.getElementById('numQuestions').value) || 10;
+    const timePerQuestion = parseInt(document.getElementById('timePerQuestion').value) || 30;
 
     if (!opponentId) { showToast('Selecciona un oponente', 'info'); return; }
-    if (!topic) { showToast('Ingresa un tema', 'info'); return; }
 
-    const btn = document.querySelector('#createDuelModal .modal-btn.confirm');
-    const orig = btn.innerHTML;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando...';
-    btn.disabled = true;
+    let topic, file;
+    if (mode === 'text') {
+        if (!topicInput) { showToast('Ingresa un tema', 'info'); return; }
+        topic = topicInput;
+    } else {
+        file = fileInput.files[0];
+        if (!file) { showToast('Selecciona un archivo', 'info'); return; }
+        topic = file.name;
+    }
+
+    // Cerrar modal y mostrar loading con pasos
+    closeCreateDuelModal();
+    showCreatingScreen();
 
     try {
-        const res = await fetch(CTX + '/api/duels/create', {
-            method: 'POST', headers: duelHeaders(),
-            body: JSON.stringify({ opponentId, topic, questionCount, text: topic })
-        });
+        // Step 1: Analizando contenido
+        activateStep('step-analyze');
+        updateCreatingProgress(20);
+        await delay(600);
+
+        // Step 2: Generando preguntas
+        activateStep('step-generate');
+        updateCreatingProgress(50);
+
+        // Construir request — FormData si hay archivo, JSON si solo texto
+        let res;
+        if (file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('opponentId', opponentId);
+            formData.append('topic', topic);
+            formData.append('questionCount', questionCount);
+            formData.append('timePerQuestion', timePerQuestion);
+
+            res = await fetch(CTX + '/api/duels/create', {
+                method: 'POST',
+                headers: { 'X-User-Id': getUserId() },
+                body: formData
+            });
+        } else {
+            res = await fetch(CTX + '/api/duels/create', {
+                method: 'POST', headers: duelHeaders(),
+                body: JSON.stringify({ opponentId, topic, questionCount, timePerQuestion, text: topic })
+            });
+        }
+
         const data = await res.json();
+
+        // Step 3: Creando duelo
+        activateStep('step-create');
+        updateCreatingProgress(90);
+        await delay(400);
+
         if (data.success) {
-            closeCreateDuelModal();
+            updateCreatingProgress(100);
+            await delay(300);
             showToast('¡Duelo creado! Juega cuando quieras desde Retos Activos.', 'success');
-            // Recargar retos activos y cambiar a la pestaña de retos
             await loadActiveDuels();
             const retosTab = document.querySelector('.tab-btn:nth-child(3)');
             if (retosTab) switchTab('retos', retosTab);
@@ -166,10 +207,52 @@ async function createDuel() {
         }
     } catch (e) {
         showToast('Error de conexión', 'error');
+        console.error('[Duelos] createDuel:', e);
     } finally {
-        btn.innerHTML = orig;
-        btn.disabled = false;
+        hideCreatingScreen();
     }
+}
+
+// ── Loading screen helpers ──
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showCreatingScreen() {
+    const screen = document.getElementById('duelCreatingScreen');
+    if (!screen) return;
+    screen.classList.add('show');
+    // Reset steps
+    document.querySelectorAll('.duel-creating-step').forEach(s => {
+        s.classList.remove('active', 'done');
+    });
+    updateCreatingProgress(0);
+}
+
+function hideCreatingScreen() {
+    const screen = document.getElementById('duelCreatingScreen');
+    if (!screen) return;
+    screen.style.opacity = '0';
+    setTimeout(() => { screen.classList.remove('show'); screen.style.opacity = ''; }, 400);
+}
+
+function activateStep(stepId) {
+    // Mark previous steps as done
+    document.querySelectorAll('.duel-creating-step.active').forEach(s => {
+        s.classList.remove('active');
+        s.classList.add('done');
+        s.querySelector('.duel-step-status').innerHTML = '<i class="fas fa-check" style="color:#2dd4bf;font-size:0.8rem;"></i>';
+    });
+    const step = document.getElementById(stepId);
+    if (step) step.classList.add('active');
+
+    // Update subtitle
+    const labels = { 'step-analyze': 'Analizando contenido...', 'step-generate': 'Generando preguntas con IA...', 'step-create': 'Finalizando el duelo...' };
+    const sub = document.getElementById('creatingSubtitle');
+    if (sub) sub.textContent = labels[stepId] || '';
+}
+
+function updateCreatingProgress(pct) {
+    const fill = document.getElementById('creatingProgressFill');
+    if (fill) fill.style.width = pct + '%';
 }
 
 /**
@@ -183,7 +266,8 @@ async function playChallenge(duelId) {
         if (data.success) {
             sessionStorage.setItem('duelData', JSON.stringify({
                 duelId, title: data.title, questions: data.questions,
-                questionCount: data.questionCount, topic: data.topic
+                questionCount: data.questionCount, topic: data.topic,
+                timePerQuestion: data.timePerQuestion || 30
             }));
             window.location.href = 'duelo-play.html';
         } else {
@@ -450,7 +534,7 @@ function handleDragLeave() { document.getElementById('fileDropZone').classList.r
 function handleDrop(e) { e.preventDefault(); document.getElementById('fileDropZone').classList.remove('drag-over'); if (e.dataTransfer.files[0]) showFilePreview(e.dataTransfer.files[0]); }
 function showFilePreview(file) {
     const ext = file.name.split('.').pop().toLowerCase();
-    const icons = { pdf: 'fa-file-pdf', doc: 'fa-file-word', docx: 'fa-file-word', txt: 'fa-file-alt' };
+    const icons = { pdf: 'fa-file-pdf', doc: 'fa-file-word', docx: 'fa-file-word', pptx: 'fa-file-powerpoint', txt: 'fa-file-alt' };
     document.getElementById('fileTypeIcon').className = `fas ${icons[ext] || 'fa-file'}`;
     document.getElementById('fileName').textContent = file.name;
     document.getElementById('fileSize').textContent = formatFileSize(file.size);
@@ -473,9 +557,21 @@ function showToast(msg, type = 'success') {
 }
 
 // ── Time ago ──
-function timeAgo(str) {
-    if (!str) return '';
-    const diff = Date.now() - new Date(str).getTime();
+function timeAgo(val) {
+    if (!val) return '';
+    let ts;
+    if (typeof val === 'number') {
+        ts = val;
+    } else {
+        let s = String(val).trim();
+        // Postgres text format without timezone → force UTC
+        if (!s.includes('+') && !s.endsWith('Z') && !s.includes('T')) {
+            s = s.replace(' ', 'T') + 'Z';
+        }
+        ts = new Date(s).getTime();
+    }
+    const diff = Date.now() - ts;
+    if (diff < 0 || isNaN(diff)) return 'ahora';
     const m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), d = Math.floor(diff / 86400000);
     if (m < 1) return 'ahora';
     if (m < 60) return `hace ${m} min`;

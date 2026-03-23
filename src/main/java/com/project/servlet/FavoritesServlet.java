@@ -70,6 +70,31 @@ public class FavoritesServlet extends HttpServlet {
                             .collect(Collectors.toList());
                 }
 
+                // Pre-cargar schemaType de todos los esquemas en UNA sola query
+                java.util.Map<String, String> schemaTypes = new java.util.HashMap<>();
+                List<String> schemaIds = favorites.stream()
+                        .filter(f -> "schema".equals(f.getType()))
+                        .map(EducationalContent::getId)
+                        .collect(Collectors.toList());
+
+                if (!schemaIds.isEmpty()) {
+                    try {
+                        String placeholders = schemaIds.stream().map(id -> "?::uuid").collect(Collectors.joining(","));
+                        String sql = "SELECT id::text, content->>'schemaType' AS schema_type FROM study_content WHERE id IN (" + placeholders + ")";
+                        try (java.sql.Connection conn = com.project.database.DatabaseConnection.getConnection();
+                             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+                            for (int i = 0; i < schemaIds.size(); i++) {
+                                ps.setString(i + 1, schemaIds.get(i));
+                            }
+                            java.sql.ResultSet rs = ps.executeQuery();
+                            while (rs.next()) {
+                                String st = rs.getString("schema_type");
+                                if (st != null) schemaTypes.put(rs.getString("id"), st);
+                            }
+                        }
+                    } catch (Exception ignored) { }
+                }
+
                 JsonArray arr = new JsonArray();
                 for (EducationalContent item : favorites) {
                     JsonObject obj = new JsonObject();
@@ -77,6 +102,13 @@ public class FavoritesServlet extends HttpServlet {
                     obj.addProperty("type", item.getType());
                     obj.addProperty("title", item.getTitle());
                     obj.addProperty("isFavorite", item.isFavorite());
+
+                    // Agregar schemaType si existe (ya pre-cargado)
+                    String st = schemaTypes.get(item.getId());
+                    if (st != null) {
+                        obj.addProperty("schemaType", st);
+                    }
+
                     arr.add(obj);
                 }
 

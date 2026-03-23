@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles-shared.css">
     <link rel="stylesheet" href="../css/sesion-estudio.css">
+    <link rel="stylesheet" href="../css/responsive.css">
     <style>
         /* Schema container */
         .se-schema-svg-wrap { width:100%; margin:0 auto; padding:16px 0; }
@@ -15,17 +16,94 @@
 
         /* Tree container — centrado y más grande */
         .se-tree-container {
-            width:100% !important;
-            max-width:100% !important;
-            display:flex;
-            justify-content:center;
-            align-items:center;
-            padding:24px 16px;
+            width:100% !important; max-width:100% !important;
+            display:flex; flex-direction:column; align-items:center;
+            padding:24px 16px; min-height:300px; overflow:visible !important;
         }
-        .se-panel-inner {
-            width:100% !important;
-            max-width:100% !important;
-        }
+        .se-panel-inner { width:100% !important; max-width:100% !important; overflow:visible !important; }
+        .se-result-panel, .se-panel, .se-content { overflow:visible !important; }
+
+        /* ═══ Floating detail tooltip (jerárquico + causa-efecto) ═══ */
+        .svg-detail-wrap { position:relative; width:100%; }
+        .float-detail { position:absolute; z-index:50; max-width:340px; min-width:220px; pointer-events:none; }
+        /* CLOSE sequence: card shrinks first → then stem retracts */
+        .float-detail .fd-stem { width:3px; height:0; background:rgba(139,92,246,0.5); margin:0 auto; border-radius:2px; transition:height 0.2s cubic-bezier(0.4,0,0.2,1) 0.15s; }
+        .float-detail .fd-card { background:rgba(10,10,28,0.97); backdrop-filter:blur(18px); border-radius:14px; padding:0; box-shadow:0 16px 48px rgba(0,0,0,0.7); border-left:3px solid rgba(139,92,246,0.5); border-top:1px solid rgba(139,92,246,0.15); border-right:1px solid rgba(139,92,246,0.08); border-bottom:1px solid rgba(139,92,246,0.08); max-height:0; overflow:hidden; opacity:0; transition:max-height 0.18s cubic-bezier(0.4,0,0.2,1), opacity 0.12s ease, padding 0.15s ease; }
+        /* OPEN sequence: stem grows first → then card expands */
+        .float-detail.on .fd-stem { height:30px; transition:height 0.22s cubic-bezier(0.4,0,0.2,1); }
+        .float-detail.on .fd-card { max-height:280px; opacity:1; padding:18px 22px; pointer-events:auto; transition:max-height 0.28s cubic-bezier(0.4,0,0.2,1) 0.18s, opacity 0.2s ease 0.18s, padding 0.22s ease 0.18s; }
+        .float-detail .fd-title { font-size:0.92rem; font-weight:700; color:#c4b5fd; margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+        .float-detail .fd-title::before { content:''; width:8px; height:8px; border-radius:50%; background:#8b5cf6; flex-shrink:0; box-shadow:0 0 8px rgba(139,92,246,0.5); }
+        .float-detail .fd-body { font-size:0.84rem; color:rgba(255,255,255,0.75); line-height:1.65; }
+        /* CE variant: horizontal line to the left + card */
+        .float-detail.ce-style { display:flex; flex-direction:row-reverse; align-items:center; max-width:none; min-width:0; }
+        .float-detail.ce-style .fd-stem { width:0; height:3px; margin:0; border-radius:2px; transition:width 0.2s cubic-bezier(0.4,0,0.2,1) 0.12s; background:var(--ce-col, rgba(251,191,36,0.4)); flex-shrink:0; }
+        .float-detail.ce-style.on .fd-stem { width:24px; transition:width 0.22s cubic-bezier(0.4,0,0.2,1); }
+        .float-detail.ce-style .fd-card { max-width:220px; min-width:150px; border-left:3px solid var(--ce-col, rgba(251,191,36,0.5)); border-top:1px solid rgba(255,255,255,0.06); border-right:1px solid rgba(255,255,255,0.04); border-bottom:1px solid rgba(255,255,255,0.04); max-height:0; overflow:hidden; opacity:0; padding:0; transition:max-height 0.18s cubic-bezier(0.4,0,0.2,1), opacity 0.12s ease, padding 0.15s ease; }
+        .float-detail.ce-style.on .fd-card { max-height:180px; opacity:1; padding:10px 14px; transition:max-height 0.25s cubic-bezier(0.4,0,0.2,1) 0.16s, opacity 0.18s ease 0.16s, padding 0.2s ease 0.16s; }
+        .float-detail.ce-style .fd-title { font-size:0.78rem; color:var(--ce-col, #fbbf24); margin-bottom:5px; }
+        .float-detail.ce-style .fd-title::before { background:var(--ce-col, #fbbf24); box-shadow:0 0 8px var(--ce-col, rgba(251,191,36,0.5)); width:6px; height:6px; }
+        .float-detail.ce-style .fd-body { font-size:0.72rem; line-height:1.5; }
+
+        /* ═══ Conceptual ═══ */
+        .cm-wrap { position:relative; width:100%; max-width:620px; margin:0 auto; aspect-ratio:1; }
+        .cm-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:80px; height:80px; border-radius:50%; background:radial-gradient(circle,#fcd34d,#f59e0b); box-shadow:0 0 30px rgba(251,191,36,0.6),0 0 60px rgba(251,191,36,0.2); display:flex; align-items:center; justify-content:center; font-size:28px; z-index:10; animation:cmPulse 3s ease-in-out infinite; }
+        @keyframes cmPulse { 0%,100%{box-shadow:0 0 30px rgba(251,191,36,0.6)} 50%{box-shadow:0 0 45px rgba(251,191,36,0.8)} }
+        .cm-line { position:absolute; top:50%; left:50%; transform-origin:0 0; height:2px; background:rgba(251,191,36,0.18); transition:all 0.5s; z-index:1; }
+        .cm-line.glow { background:rgba(251,191,36,0.65); box-shadow:0 0 10px rgba(251,191,36,0.5); height:3px; }
+        .cm-node { position:absolute; transform:translate(-50%,-50%); padding:11px 18px; border-radius:16px; cursor:pointer; font-size:0.85rem; font-weight:600; color:#fff; text-align:center; transition:all 0.4s cubic-bezier(0.4,0,0.2,1); z-index:5; max-width:150px; border:2px solid rgba(255,255,255,0.1); }
+        .cm-node:hover { transform:translate(-50%,-50%) scale(1.08); z-index:15; }
+        .cm-node.open { transform:translate(-50%,-50%) scale(1.12); z-index:20; border-color:rgba(255,255,255,0.4); }
+        .cm-expand { position:absolute; left:50%; transform:translateX(-50%); background:rgba(10,10,28,0.96); border-radius:14px; padding:0; max-height:0; overflow:hidden; opacity:0; transition:all 0.4s cubic-bezier(0.4,0,0.2,1); min-width:200px; backdrop-filter:blur(16px); pointer-events:none; box-shadow:0 14px 44px rgba(0,0,0,0.6); }
+        .cm-expand.dir-down { top:calc(100% + 10px); } .cm-expand.dir-up { bottom:calc(100% + 10px); }
+        .cm-node.open .cm-expand { max-height:500px; opacity:1; padding:12px 16px; pointer-events:auto; }
+
+        /* ═══ Timeline ═══ */
+        .tl-wrap { display:flex; align-items:stretch; position:relative; overflow:visible; padding:40px 20px; gap:0; width:100%; min-height:340px; }
+        .tl-spine { position:absolute; top:50%; left:20px; right:20px; height:3px; background:linear-gradient(90deg,rgba(45,212,191,0.15),rgba(45,212,191,0.5),rgba(45,212,191,0.15)); z-index:0; }
+        .tl-col { min-width:135px; flex:1; position:relative; z-index:1; }
+        .tl-dot-w{width:18px;height:18px;border-radius:50%;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);cursor:pointer;z-index:3}
+        .tl-dot-w::after{content:'';position:absolute;inset:5px;border-radius:50%;background:rgba(255,255,255,0.45)}
+        .tl-stem{width:2px;height:20px;opacity:0.4;position:absolute;left:50%;transform:translateX(-50%)}
+        .tl-above .tl-stem{bottom:50%;margin-bottom:9px}
+        .tl-below .tl-stem{top:50%;margin-top:9px}
+        .tl-card-area{position:absolute;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;z-index:2;overflow:visible}
+        .tl-above .tl-card-area{bottom:50%;margin-bottom:29px}
+        .tl-below .tl-card-area{top:50%;margin-top:29px}
+        .tl-top-space,.tl-bottom-space{display:none}
+        .tl-card{padding:10px 16px;border-radius:10px;background:rgba(15,15,40,0.85);border:1.5px solid;font-size:0.82rem;color:rgba(255,255,255,0.92);text-align:center;max-width:140px;cursor:pointer;transition:all 0.3s;font-weight:500}
+        .tl-card:hover{transform:scale(1.04)} .tl-card.active{background:rgba(15,15,40,0.95)}
+        .tl-detail{max-height:0;overflow:hidden;opacity:0;transition:all 0.4s cubic-bezier(0.4,0,0.2,1);width:220px;z-index:50;position:relative}
+        .tl-detail.on{max-height:600px;opacity:1;padding:10px 0;overflow:visible}
+        .tl-detail-inner{background:rgba(10,10,28,0.96);backdrop-filter:blur(16px);border-radius:14px;padding:14px 16px;box-shadow:0 12px 40px rgba(0,0,0,0.6);position:relative;z-index:50}
+        .tl-detail-hd{font-size:0.82rem;font-weight:700;color:#fff;margin-bottom:8px;display:flex;align-items:center;gap:7px}
+        .tl-detail-hd span{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+        /* ═══ Cíclico ═══ */
+        .cy-outer{width:100%;max-width:750px;margin:0 auto;padding:50px;overflow:visible}
+        .cy-ring-area{position:relative;width:100%;max-width:340px;margin:0 auto;aspect-ratio:1}
+        .cy-svg{position:absolute;inset:0;width:100%;height:100%}
+        .cy-svg .cy-arc{transition:stroke-width 0.3s,stroke-opacity 0.3s;cursor:pointer}
+        .cy-svg .cy-arc:hover{stroke-width:10;stroke-opacity:0.9}
+        .cy-svg .cy-arc.on{stroke-width:12;stroke-opacity:1}
+        .cy-center-ico{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:rgba(139,92,246,0.15);border:2.5px dashed rgba(139,92,246,0.45);display:flex;align-items:center;justify-content:center;font-size:20px;color:#a78bfa;z-index:5}
+        .cy-phase{position:absolute;transform:translate(-50%,-50%);z-index:10}
+        .cy-lbl{font-size:0.78rem;font-weight:600;cursor:pointer;padding:5px 12px;border-radius:10px;transition:all 0.35s;text-align:center;background:rgba(15,15,35,0.6);border:1.5px solid transparent;white-space:nowrap}
+        .cy-lbl:hover{transform:scale(1.06)} .cy-lbl.on{transform:scale(1.08);background:rgba(15,15,35,0.92)}
+        .cy-info{position:absolute;background:rgba(10,10,28,0.96);backdrop-filter:blur(16px);border-radius:16px;padding:0;width:240px;max-height:0;overflow:hidden;opacity:0;transition:all 0.45s cubic-bezier(0.4,0,0.2,1);z-index:30;box-shadow:0 14px 44px rgba(0,0,0,0.65);pointer-events:none}
+        .cy-info.on{max-height:500px;opacity:1;padding:16px 18px;pointer-events:auto}
+        .cy-info-hd{font-size:0.85rem;font-weight:700;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+        .cy-info-hd span{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+        .cy-info-ft{font-size:0.6rem;color:rgba(255,255,255,0.3);margin-top:10px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06);text-transform:uppercase;letter-spacing:0.08em}
+
+        /* ═══ Shared sub-items ═══ */
+        .s-item{font-size:0.76rem;font-weight:600;color:rgba(255,255,255,0.85);padding:7px 11px;margin-bottom:4px;border-radius:8px;background:rgba(255,255,255,0.04);border-left:3px solid;line-height:1.45;cursor:pointer;transition:background 0.2s;display:flex;align-items:center;gap:6px}
+        .s-item:hover{background:rgba(255,255,255,0.07)}
+        .s-item-detail{max-height:0;overflow:hidden;opacity:0;transition:all 0.35s;font-size:0.73rem;font-weight:400;color:rgba(255,255,255,0.6);line-height:1.55;padding:0 11px}
+        .s-item-detail.on{max-height:200px;opacity:1;padding:5px 11px 8px}
+        .sub-arrow{margin-left:auto;opacity:0.4;font-size:0.6rem}
+        .cm-sub-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+        @media(max-width:600px){.cy-outer{padding:20px}.cy-ring-area{max-width:280px}.cy-info{width:190px}}
 
         /* Fullscreen overlay */
         .fs-overlay {
@@ -69,22 +147,19 @@
     <!-- ================================================================
          PANTALLA DE CARGA (visible mientras genera)
     ================================================================ -->
-    <div class="loading-screen" id="loadingScreen">
-        <canvas id="loadingStars"></canvas>
-        <div class="loading-content">
-            <div class="loading-logo">
-                <img src="../images/modo-estudio/modo-estudio-logo.png" alt="Modo Estudio">
-            </div>
-            <div class="loading-orb">
-                <div class="loading-orb-ring r1"></div>
-                <div class="loading-orb-ring r2"></div>
-                <div class="loading-orb-ring r3"></div>
-                <div class="loading-orb-core">
-                    <i class="fas fa-brain"></i>
+    <div class="polaris-loading" id="loadingScreen">
+        <canvas class="polaris-loading-stars" id="loadingStars"></canvas>
+        <div class="polaris-loading-content">
+            <div class="polaris-loading-orb">
+                <div class="polaris-orb-ring r1"></div>
+                <div class="polaris-orb-ring r2"></div>
+                <div class="polaris-orb-ring r3"></div>
+                <div class="polaris-orb-core">
+                    <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
                 </div>
             </div>
-            <div class="loading-title">Generando tu sesión de estudio</div>
-            <div class="loading-subtitle" id="loadingSubtitle">Analizando tu contenido...</div>
+            <div class="polaris-loading-title">Generando tu sesión de estudio</div>
+            <div class="polaris-loading-subtitle" id="loadingSubtitle">Analizando tu contenido...</div>
             <div class="loading-progress-bar">
                 <div class="loading-progress-fill" id="loadingProgressFill"></div>
             </div>
@@ -284,8 +359,8 @@
                 })
             };
         }
-
-        const response = await fetch('/project-1.0-SNAPSHOT/modo-estudio/generar', requestInit);
+        const _apiBase = window.API_BASE !== undefined ? window.API_BASE : '';
+        const response = await fetch(_apiBase + '/modo-estudio/generar', requestInit);
 
         if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
         const data = await response.json();
@@ -459,7 +534,7 @@
             <div class="se-panel-inner">
                 <div class="se-panel-stats">
                     <div class="se-stat"><span class="se-stat-val">${cards.length}</span><span class="se-stat-lbl">tarjetas</span></div>
-                    <div class="se-stat"><span class="se-stat-val">${data.title ? '✓' : '—'}</span><span class="se-stat-lbl">tema</span></div>
+                    <div class="se-stat"><span class="se-stat-val">${data.title || '—'}</span><span class="se-stat-lbl">tema</span></div>
                 </div>
                 <div class="se-fc-preview">${preview}</div>
                 ${cards.length > 3 ? `<div class="se-more-badge">+${cards.length - 3} tarjetas más</div>` : ''}
@@ -494,6 +569,13 @@
             return lines;
         }
         function escSvg(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        function getDetail(node) {
+            if(!node)return'';
+            if(node.detail&&typeof node.detail==='string'&&node.detail.trim())return node.detail.trim();
+            if(node.description&&typeof node.description==='string'&&node.description.trim())return node.description.trim();
+            if(node.content&&typeof node.content==='string'&&node.content.trim())return node.content.trim();
+            return'';
+        }
         function measureText(lines, fontSize) {
             const charW = fontSize * 0.58;
             const w = Math.max(...lines.map(l => l.length)) * charW + 24;
@@ -509,357 +591,115 @@
         }
 
         // ══════════════════════════════════════════════════
-        // JERÁRQUICO — Árbol top-down con gradientes purple
-        // Fiel a la card: root (violeta oscuro) → mid (violeta medio) → leaf (violeta claro)
-        // Líneas conectoras finas, nodos redondeados
-        // ══════════════════════════════════════════════════
+        // JERÁRQUICO — leaf nodes clickable → floating tooltip nearby
         function renderJerarquico(root) {
             if (!root) return '';
-
-            const gradients = [
-                { id:'jg0', c1:'#8b5cf6', c2:'#7c3aed' },
-                { id:'jg1', c1:'#a78bfa', c2:'#8b5cf6' },
-                { id:'jg2', c1:'#c4b5fd', c2:'#a78bfa' },
-            ];
-            const textColors = ['#fff', '#fff', 'rgba(20,10,40,0.9)'];
-            const fontSizes = [13, 11.5, 10.5];
-            const levelH = 85;
-            const nodeGap = 14;
-
-            let defs = gradients.map(g =>
-                `<linearGradient id="${g.id}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${g.c1}"/><stop offset="100%" stop-color="${g.c2}"/></linearGradient>`
-            ).join('');
-            defs += `<filter id="jGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-            defs += `<filter id="jGlowSm"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-
-            // Pass 1: compute each node's size and subtree width (bottom-up)
-            const meta = new Map();
-            function computeWidths(node, depth) {
-                const d = Math.min(depth, 2);
-                const fs = fontSizes[d];
-                const maxChars = depth === 0 ? 20 : depth === 1 ? 16 : 14;
-                const lines = wrapText(node.label, maxChars);
-                const { w, h } = measureText(lines, fs);
-                const children = node.children || [];
-                let subtreeW;
-                if (children.length === 0) {
-                    subtreeW = w;
-                } else {
-                    children.forEach(c => computeWidths(c, depth + 1));
-                    const childrenTotalW = children.reduce((sum, c) => sum + meta.get(c).subtreeW, 0)
-                        + (children.length - 1) * nodeGap;
-                    subtreeW = Math.max(w, childrenTotalW);
-                }
-                meta.set(node, { w, h, lines, depth, subtreeW });
-            }
-            computeWidths(root, 0);
-
-            // Pass 2: assign x,y positions (top-down)
-            const positions = new Map();
-            function layoutNode(node, cx, cy) {
-                const m = meta.get(node);
-                positions.set(node, { cx, cy, w: m.w, h: m.h, lines: m.lines, depth: m.depth });
-                const children = node.children || [];
-                if (children.length === 0) return;
-                const childrenTotalW = children.reduce((sum, c) => sum + meta.get(c).subtreeW, 0)
-                    + (children.length - 1) * nodeGap;
-                let startX = cx - childrenTotalW / 2;
-                children.forEach(c => {
-                    const cm = meta.get(c);
-                    const childCx = startX + cm.subtreeW / 2;
-                    layoutNode(c, childCx, cy + levelH);
-                    startX += cm.subtreeW + nodeGap;
-                });
-            }
-
-            const rootMeta = meta.get(root);
-            const svgW = Math.max(600, rootMeta.subtreeW + 80);
-            let maxDepth = 0;
-            meta.forEach(m => { if (m.depth > maxDepth) maxDepth = m.depth; });
-            const svgH = (maxDepth + 1) * levelH + 40;
-            layoutNode(root, svgW / 2, 35);
-
-            // Draw lines
-            let linesStr = '';
-            function drawLines(node) {
-                const p = positions.get(node);
-                (node.children || []).forEach(child => {
-                    const cp = positions.get(child);
-                    if (p && cp) {
-                        linesStr += `<line x1="${p.cx}" y1="${p.cy + p.h/2}" x2="${cp.cx}" y2="${cp.cy - cp.h/2}" stroke="rgba(139,92,246,0.35)" stroke-width="2"/>`;
-                    }
-                    drawLines(child);
-                });
-            }
-            drawLines(root);
-
-            // Draw nodes
-            let nodesStr = '';
-            positions.forEach((p, node) => {
-                const gIdx = Math.min(p.depth, 2);
-                const grad = gradients[gIdx].id;
-                const filter = p.depth === 0 ? ' filter="url(#jGlow)"' : p.depth === 1 ? ' filter="url(#jGlowSm)"' : '';
-                nodesStr += `<rect x="${p.cx - p.w/2}" y="${p.cy - p.h/2}" width="${p.w}" height="${p.h}" rx="10" fill="url(#${grad})"${filter}/>`;
-                nodesStr += svgTextBlock(p.lines, p.cx, p.cy, fontSizes[gIdx], textColors[gIdx], p.depth === 0 ? '600' : 'normal');
+            const gradients=[{id:'jg0',c1:'#8b5cf6',c2:'#7c3aed'},{id:'jg1',c1:'#a78bfa',c2:'#8b5cf6'},{id:'jg2',c1:'#c4b5fd',c2:'#a78bfa'}];
+            const textColors=['#fff','#fff','rgba(20,10,40,0.9)'], fontSizes=[13,11.5,10.5], levelH=85, nodeGap=14;
+            let defs=gradients.map(g=>`<linearGradient id="${g.id}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${g.c1}"/><stop offset="100%" stop-color="${g.c2}"/></linearGradient>`).join('');
+            defs+=`<filter id="jGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+            defs+=`<filter id="jGlowSm"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+            const meta=new Map();
+            function computeWidths(node,depth){const d=Math.min(depth,2),fs=fontSizes[d],mc=depth===0?20:depth===1?16:14;const ln=wrapText(node.label,mc),{w,h}=measureText(ln,fs),ch=node.children||[];let stw;if(!ch.length)stw=w;else{ch.forEach(c=>computeWidths(c,depth+1));stw=Math.max(w,ch.reduce((s,c)=>s+meta.get(c).subtreeW,0)+(ch.length-1)*nodeGap);}meta.set(node,{w,h,lines:ln,depth,subtreeW:stw});}
+            computeWidths(root,0);
+            const positions=new Map();
+            function layoutNode(node,cx,cy){const m=meta.get(node);positions.set(node,{cx,cy,w:m.w,h:m.h,lines:m.lines,depth:m.depth});const ch=node.children||[];if(!ch.length)return;const ctw=ch.reduce((s,c)=>s+meta.get(c).subtreeW,0)+(ch.length-1)*nodeGap;let sx=cx-ctw/2;ch.forEach(c=>{const cm=meta.get(c);layoutNode(c,sx+cm.subtreeW/2,cy+levelH);sx+=cm.subtreeW+nodeGap;});}
+            const rm=meta.get(root),svgW=Math.max(600,rm.subtreeW+80);let maxD=0;meta.forEach(m=>{if(m.depth>maxD)maxD=m.depth;});const svgH=(maxD+1)*levelH+40;layoutNode(root,svgW/2,35);
+            let linesStr='';function drawLines(nd){const p=positions.get(nd);(nd.children||[]).forEach(ch=>{const cp=positions.get(ch);if(p&&cp)linesStr+=`<line x1="${p.cx}" y1="${p.cy+p.h/2}" x2="${cp.cx}" y2="${cp.cy-cp.h/2}" stroke="rgba(139,92,246,0.35)" stroke-width="2"/>`;drawLines(ch);});}drawLines(root);
+            const leafData=[];let nodesStr='';
+            positions.forEach((p,node)=>{const gIdx=Math.min(p.depth,2),grad=gradients[gIdx].id,filter=p.depth===0?' filter="url(#jGlow)"':p.depth===1?' filter="url(#jGlowSm)"':'';
+                const isLeaf=!node.children||node.children.length===0;const dt=getDetail(node);
+                if(isLeaf){const li=leafData.length;leafData.push({label:node.label,detail:dt,cx:p.cx,cy:p.cy+p.h/2});
+                    nodesStr+=`<rect x="${p.cx-p.w/2}" y="${p.cy-p.h/2}" width="${p.w}" height="${p.h}" rx="10" fill="url(#${grad})"${filter} style="cursor:pointer" onmouseenter="floatShow(event,${li},'jq')"/>`;
+                }else{nodesStr+=`<rect x="${p.cx-p.w/2}" y="${p.cy-p.h/2}" width="${p.w}" height="${p.h}" rx="10" fill="url(#${grad})"${filter}/>`;}
+                nodesStr+=svgTextBlock(p.lines,p.cx,p.cy,fontSizes[gIdx],textColors[gIdx],p.depth===0?'600':'normal');
             });
-
-            return `<div class="se-schema-svg-wrap"><svg viewBox="0 0 ${svgW} ${svgH}"><defs>${defs}</defs>${linesStr}${nodesStr}</svg></div>`;
+            const jqJSON=JSON.stringify(leafData).replace(/"/g,'&quot;');
+            return `<div class="svg-detail-wrap" onmouseleave="floatHide('jq')"><div class="se-schema-svg-wrap"><svg viewBox="0 0 ${svgW} ${svgH}"><defs>${defs}</defs>${linesStr}${nodesStr}</svg></div><div class="float-detail" id="floatJQ" data-items="${jqJSON}"><div class="fd-stem"></div><div class="fd-card"><div class="fd-title"></div><div class="fd-body"></div></div></div></div>`;
         }
 
-        // ══════════════════════════════════════════════════
-        // CONCEPTUAL — Nodo central dorado + burbujas radiales
-        // Fiel a la card: centro con lightbulb dorado con glow,
-        // burbujas coloreadas en rounded-rect grandes, líneas doradas
-        // Sin sub-nodos — limpio y radial
-        // ══════════════════════════════════════════════════
+        // CONCEPTUAL — 3-level progressive disclosure
         function renderConceptual(root) {
-            if (!root) return '';
-            const children = (root.children || []).slice(0, 8);
-            const n = Math.max(children.length, 1);
-
-            // Adaptar radio según cantidad de nodos
-            const R = n <= 3 ? 140 : n <= 5 ? 160 : 175;
-            const padding = 100; // espacio para burbujas en los bordes
-            const W = (R + padding) * 2;
-            const H = W;
-            const cx = W / 2, cy = H / 2;
-
-            const cols = ['#2dd4bf','#3b82f6','#22c55e','#ec4899','#8b5cf6','#f97316','#ef4444','#fbbf24'];
-
-            let defs = `<radialGradient id="cgGold"><stop offset="0%" stop-color="#fcd34d"/><stop offset="100%" stop-color="#f59e0b"/></radialGradient>`;
-            defs += `<filter id="cgGlow"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-
-            let lines = '', bubbles = '';
-            children.forEach((c, i) => {
-                const angle = (2 * Math.PI * i / n) - Math.PI / 2;
-                const x = cx + R * Math.cos(angle);
-                const y = cy + R * Math.sin(angle);
-                const col = cols[i % cols.length];
-                const txtLines = wrapText(c.label, 13);
-                const { w: bW, h: bH } = measureText(txtLines, 12);
-
-                // Línea dorada del centro a la burbuja
-                lines += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(251,191,36,0.3)" stroke-width="2"/>`;
-                // Burbuja coloreada grande (como la card)
-                bubbles += `<rect x="${x-bW/2}" y="${y-bH/2}" width="${bW}" height="${bH}" rx="14" fill="${col}" opacity="0.92"/>`;
-                bubbles += svgTextBlock(txtLines, x, y, 12, '#fff', '600');
+            if(!root)return'';const children=(root.children||[]).slice(0,8);const n=Math.max(children.length,1);
+            const cols=['#2dd4bf','#3b82f6','#22c55e','#ec4899','#8b5cf6','#f97316','#ef4444','#fbbf24'];const R=n<=3?30:n<=5?34:36;
+            let linesHTML='',nodesHTML='';
+            children.forEach((c,i)=>{const angle=(2*Math.PI*i/n)-Math.PI/2;const xPct=50+R*Math.cos(angle),yPct=50+R*Math.sin(angle);const col=cols[i%cols.length];const subs=(c.children||[]).slice(0,5);
+                const dx=xPct-50,dy=yPct-50,dist=Math.sqrt(dx*dx+dy*dy),rot=Math.atan2(dy,dx)*180/Math.PI;
+                linesHTML+=`<div class="cm-line" id="cmL${i}" style="width:${dist}%;transform:rotate(${rot}deg)"></div>`;
+                const expandDir=yPct<48?'dir-up':'dir-down';let subsHTML='';
+                if(subs.length){subsHTML=`<div class="cm-expand ${expandDir}" style="border:1.5px solid ${col}40">${subs.map((s,si)=>{
+                    const dt=getDetail(s);const arrow=dt?'<span class="sub-arrow">\u25B8</span>':'';
+                    const click=dt?`onclick="event.stopPropagation();subToggle('cmSD${i}_${si}')"`:'';
+                    const det=dt?`<div class="s-item-detail" id="cmSD${i}_${si}">${escSvg(dt)}</div>`:'';
+                    return `<div class="s-item" ${click} style="border-left-color:${col}"><div class="cm-sub-dot" style="background:${col}"></div>${escSvg(s.label)}${arrow}</div>${det}`;
+                }).join('')}</div>`;}
+                nodesHTML+=`<div class="cm-node" id="cmN${i}" style="left:${xPct}%;top:${yPct}%;background:${col};box-shadow:0 0 20px ${col}55,0 4px 16px rgba(0,0,0,0.3)" onclick="cmToggle(${i})" onmouseenter="cmHL(${i},1)" onmouseleave="cmHL(${i},0)">${escSvg(c.label)}${subsHTML}</div>`;
             });
-
-            // Centro dorado con lightbulb (igual a la card)
-            const centerR = n <= 3 ? 36 : 40;
-            const center = `<circle cx="${cx}" cy="${cy}" r="${centerR}" fill="url(#cgGold)" filter="url(#cgGlow)"/>` +
-                `<text x="${cx}" y="${cy+5}" text-anchor="middle" dominant-baseline="middle" font-size="24">💡</text>`;
-
-            return `<div class="se-schema-svg-wrap" style="max-width:550px;"><svg viewBox="0 0 ${W} ${H}"><defs>${defs}</defs>${lines}${center}${bubbles}</svg></div>`;
+            return `<div class="cm-wrap">${linesHTML}<div class="cm-center">\uD83D\uDCA1</div>${nodesHTML}</div>`;
         }
 
-        // ══════════════════════════════════════════════════
-        // LÍNEA DEL TIEMPO — Línea horizontal con dots y cards alternados
-        // Fiel a la card: línea cyan degradada, dots coloreados con glow,
-        // cards con borde del color del dot, stems conectores, alternando arriba/abajo
-        // ══════════════════════════════════════════════════
+        // TIMELINE — 3-level HTML
         function renderTimeline(root) {
-            if (!root) return '';
-            const nodes = [];
-            function flatten(n) { nodes.push(n.label); (n.children||[]).forEach(flatten); }
-            flatten(root);
-            const dotCols = ['#22c55e','#3b82f6','#fbbf24','#ec4899','#8b5cf6','#f97316','#2dd4bf','#ef4444'];
-            const n = nodes.length;
-            const svgW = Math.max(650, n * 130);
-            const spineY = 150;
-            const cardH = 50;
-
-            let defs = `<filter id="tDotGlow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-
-            const items = nodes.map((label, i) => {
-                const x = 65 + i * (svgW - 130) / Math.max(n - 1, 1);
-                const above = i % 2 === 0;
-                const col = dotCols[i % dotCols.length];
-                const txtLines = wrapText(label, 14);
-                const { w: bW, h: bH } = measureText(txtLines, 10.5);
-                const stemLen = 18;
-                const cardY = above ? spineY - 10 - stemLen - bH : spineY + 10 + stemLen;
-                const stemY1 = above ? spineY - 10 : spineY + 10;
-                const stemY2 = above ? cardY + bH : cardY;
-
-                let s = '';
-                // Stem
-                s += `<line x1="${x}" y1="${stemY1}" x2="${x}" y2="${stemY2}" stroke="${col}" stroke-width="2" stroke-opacity="0.5"/>`;
-                // Card con borde coloreado (como la ilustración)
-                s += `<rect x="${x-bW/2}" y="${cardY}" width="${bW}" height="${bH}" rx="8" fill="rgba(15,15,40,0.85)" stroke="${col}" stroke-width="1.5"/>`;
-                // Texto
-                s += svgTextBlock(txtLines, x, cardY + bH/2, 10.5, 'rgba(255,255,255,0.9)', 'normal');
-                // Dot con glow
-                s += `<circle cx="${x}" cy="${spineY}" r="9" fill="${col}" filter="url(#tDotGlow)"/>`;
-                s += `<circle cx="${x}" cy="${spineY}" r="4" fill="rgba(255,255,255,0.5)"/>`;
-                return s;
-            }).join('');
-
-            const svgH = spineY * 2 + 40;
-            // Línea principal con gradiente cyan como la card
-            const spine = `<line x1="25" y1="${spineY}" x2="${svgW-25}" y2="${spineY}" stroke="rgba(45,212,191,0.45)" stroke-width="3" stroke-linecap="round"/>`;
-
-            return `<div class="se-schema-svg-wrap"><svg viewBox="0 0 ${svgW} ${svgH}"><defs>${defs}</defs>${spine}${items}</svg></div>`;
+            if(!root)return'';const events=(root.children||[]);if(!events.length)return'';
+            const dotCols=['#22c55e','#3b82f6','#fbbf24','#ec4899','#8b5cf6','#f97316','#2dd4bf','#ef4444'];let colsHTML='';
+            events.forEach((ev,i)=>{const above=i%2===0,col=dotCols[i%dotCols.length],subs=(ev.children||[]).slice(0,5),cls=above?'tl-above':'tl-below';
+                let detailInner='';if(subs.length){detailInner=`<div class="tl-detail-inner" style="border:1.5px solid ${col}40"><div class="tl-detail-hd"><span style="background:${col}"></span>${escSvg(ev.label)}</div>${subs.map((s,si)=>{
+                    const dt=getDetail(s);const arrow=dt?'<span class="sub-arrow">\u25B8</span>':'';const click=dt?`onclick="event.stopPropagation();subToggle('tlSD${i}_${si}')"`:'';const det=dt?`<div class="s-item-detail" id="tlSD${i}_${si}">${escSvg(dt)}</div>`:'';
+                    return `<div class="s-item" style="border-left-color:${col}" ${click}>${escSvg(s.label)}${arrow}</div>${det}`;}).join('')}</div>`;}
+                if(above){colsHTML+=`<div class="tl-col ${cls}"><div class="tl-card-area"><div class="tl-detail" id="tlD${i}">${detailInner}</div><div class="tl-card" style="border-color:${col}" onclick="tlToggle(${i})">${escSvg(ev.label)}</div></div><div class="tl-stem" style="background:${col}"></div><div class="tl-dot-w" style="background:${col};box-shadow:0 0 12px ${col}88" onclick="tlToggle(${i})"></div><div class="tl-bottom-space"></div></div>`;}
+                else{colsHTML+=`<div class="tl-col ${cls}"><div class="tl-top-space"></div><div class="tl-dot-w" style="background:${col};box-shadow:0 0 12px ${col}88" onclick="tlToggle(${i})"></div><div class="tl-stem" style="background:${col}"></div><div class="tl-card-area"><div class="tl-card" style="border-color:${col}" onclick="tlToggle(${i})">${escSvg(ev.label)}</div><div class="tl-detail" id="tlD${i}">${detailInner}</div></div></div>`;}
+            });return `<div class="tl-wrap"><div class="tl-spine"></div>${colsHTML}</div>`;
         }
 
-        // ══════════════════════════════════════════════════
-        // CAUSA Y EFECTO — Diagrama Ishikawa / Espina de pescado
-        // Fiel a la card: cola izquierda (flecha), espina dorada,
-        // cabeza derecha (triángulo grande), ramas diagonales con sub-causas
-        // ══════════════════════════════════════════════════
+        // CAUSA Y EFECTO — sub-causes clickable → floating tooltip nearby
         function renderCausaEfecto(root) {
-            if (!root) return '';
-            const causes = (root.children || []);
-            const top = [], bot = [];
-            causes.forEach((c, i) => { (i % 2 === 0 ? top : bot).push(c); });
-
-            const maxSide = Math.max(top.length, bot.length, 1);
-            const svgW = Math.max(650, maxSide * 180 + 200);
-            const svgH = 340;
-            const spineY = svgH / 2;
-            const branchCols = ['rgba(239,68,68,0.85)','rgba(99,102,241,0.85)','rgba(34,197,94,0.85)','rgba(251,191,36,0.85)','rgba(139,92,246,0.85)','rgba(45,212,191,0.85)'];
-            const branchBg =  ['rgba(239,68,68,0.15)','rgba(99,102,241,0.15)','rgba(34,197,94,0.15)','rgba(251,191,36,0.15)','rgba(139,92,246,0.15)','rgba(45,212,191,0.15)'];
-
-            const tailX = 35;
-            const headX = svgW - 70;
-            const spineLen = headX - tailX - 20;
-
-            let defs = `<filter id="hGlow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-            let svg = '';
-
-            // Tail (flecha izquierda)
-            svg += `<polygon points="${tailX-12},${spineY-14} ${tailX+6},${spineY} ${tailX-12},${spineY+14}" fill="rgba(251,191,36,0.45)"/>`;
-            // Spine
-            svg += `<line x1="${tailX}" y1="${spineY}" x2="${headX}" y2="${spineY}" stroke="rgba(251,191,36,0.7)" stroke-width="3.5" stroke-linecap="round"/>`;
-            // Head (triángulo derecho)
-            svg += `<polygon points="${headX},${spineY-28} ${headX+55},${spineY} ${headX},${spineY+28}" fill="rgba(251,191,36,0.85)" filter="url(#hGlow)"/>`;
-
-            // Efecto label (arriba del head para que no se corte)
-            const eLines = wrapText(root.label, 16);
-            const { w: eW, h: eH } = measureText(eLines, 11);
-            svg += `<rect x="${headX-eW/2+20}" y="${spineY-28-eH-8}" width="${eW}" height="${eH}" rx="6" fill="rgba(251,191,36,0.15)" stroke="rgba(251,191,36,0.4)" stroke-width="1"/>`;
-            svg += svgTextBlock(eLines, headX + 20, spineY - 28 - eH/2 - 8, 11, 'rgba(251,191,36,0.95)', '700');
-
-            function drawBranch(cause, i, isTop, totalInSide) {
-                const col = branchCols[i % branchCols.length];
-                const bg = branchBg[i % branchBg.length];
-                // Distribute branches evenly along the usable spine
-                const spacing = spineLen / (totalInSide + 1);
-                const bx = tailX + 30 + spacing * (i + 1);
-                const dy = isTop ? -100 : 100;
-                const endX = bx - 40;
-                const endY = spineY + dy;
-
-                // Diagonal branch line
-                svg += `<line x1="${bx}" y1="${spineY}" x2="${endX}" y2="${endY}" stroke="${col}" stroke-width="2.5" stroke-linecap="round"/>`;
-
-                // Main cause label box
-                const lines = wrapText(cause.label, 14);
-                const { w: bW, h: bH } = measureText(lines, 10.5);
-                const labelY = isTop ? endY - bH/2 - 4 : endY + bH/2 + 4;
-                svg += `<rect x="${endX-bW/2}" y="${labelY-bH/2}" width="${bW}" height="${bH}" rx="7" fill="${bg}" stroke="${col}" stroke-width="1.2"/>`;
-                svg += svgTextBlock(lines, endX, labelY, 10.5, '#fff', '500');
-
-                // Sub-causas (líneas pequeñas sobre la rama diagonal)
-                if (cause.children) {
-                    cause.children.slice(0, 2).forEach((sub, si) => {
-                        const t = 0.3 + si * 0.28;
-                        const sx = bx + (endX - bx) * t;
-                        const sy = spineY + dy * t;
-                        const lineLen = 28;
-                        const offX = -lineLen;
-                        const offY = isTop ? -8 : 8;
-                        svg += `<line x1="${sx}" y1="${sy}" x2="${sx+offX}" y2="${sy+offY}" stroke="${col}" stroke-width="1.5" stroke-opacity="0.5"/>`;
-                        svg += `<text x="${sx+offX-3}" y="${sy+offY + (isTop ? -5 : 12)}" text-anchor="end" fill="rgba(255,255,255,0.55)" font-size="8.5" font-family="'Segoe UI',sans-serif">${escSvg(sub.label)}</text>`;
-                    });
-                }
+            if(!root)return'';const causes=(root.children||[]);const top=[],bot=[];causes.forEach((c,i)=>{(i%2===0?top:bot).push(c);});
+            const maxSide=Math.max(top.length,bot.length,1);const svgW=Math.max(500,maxSide*150+180),svgH=280,spineY=svgH/2;
+            const branchCols=['#ef4444','#6366f1','#22c55e','#fbbf24','#8b5cf6','#2dd4bf'];
+            const branchBg=['rgba(239,68,68,0.15)','rgba(99,102,241,0.15)','rgba(34,197,94,0.15)','rgba(251,191,36,0.15)','rgba(139,92,246,0.15)','rgba(45,212,191,0.15)'];
+            const tailX=30,headX=svgW-60,spineLen=headX-tailX-15;
+            let defs=`<filter id="hGlow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;let svg='';
+            svg+=`<polygon points="${tailX-10},${spineY-12} ${tailX+5},${spineY} ${tailX-10},${spineY+12}" fill="rgba(251,191,36,0.45)"/>`;
+            svg+=`<line x1="${tailX}" y1="${spineY}" x2="${headX}" y2="${spineY}" stroke="rgba(251,191,36,0.7)" stroke-width="3" stroke-linecap="round"/>`;
+            svg+=`<polygon points="${headX},${spineY-22} ${headX+45},${spineY} ${headX},${spineY+22}" fill="rgba(251,191,36,0.85)" filter="url(#hGlow)"/>`;
+            const eLines=wrapText(root.label,16),{w:eW,h:eH}=measureText(eLines,10);
+            svg+=`<rect x="${headX-eW/2+18}" y="${spineY-22-eH-6}" width="${eW}" height="${eH}" rx="5" fill="rgba(251,191,36,0.15)" stroke="rgba(251,191,36,0.4)" stroke-width="1"/>`;
+            svg+=svgTextBlock(eLines,headX+18,spineY-22-eH/2-6,10,'rgba(251,191,36,0.95)','700');
+            const ceLeafData=[];let causeIdx=0;
+            function drawBranch(cause,i,isTop,totalInSide){const col=branchCols[causeIdx%branchCols.length],bg=branchBg[causeIdx%branchBg.length];causeIdx++;
+                const spacing=spineLen/(totalInSide+1),bx=tailX+25+spacing*(i+1),dy=isTop?-80:80,endX=bx-30,endY=spineY+dy;
+                svg+=`<line x1="${bx}" y1="${spineY}" x2="${endX}" y2="${endY}" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-opacity="0.7"/>`;
+                const lines=wrapText(cause.label,14),{w:bW,h:bH}=measureText(lines,9.5),labelY=isTop?endY-bH/2-3:endY+bH/2+3;
+                svg+=`<rect x="${endX-bW/2}" y="${labelY-bH/2}" width="${bW}" height="${bH}" rx="6" fill="${bg}" stroke="${col}" stroke-width="1.2"/>`;
+                svg+=svgTextBlock(lines,endX,labelY,9.5,'#fff','500');
+                if(cause.children) cause.children.slice(0,3).forEach((sub,si)=>{const t=0.25+si*0.25,sx=bx+(endX-bx)*t,sy=spineY+dy*t;const dt=getDetail(sub);
+                    const li=ceLeafData.length;ceLeafData.push({label:sub.label,detail:dt,parent:cause.label,col:col});
+                    svg+=`<line x1="${sx}" y1="${sy}" x2="${sx-22}" y2="${sy+(isTop?-6:6)}" stroke="${col}" stroke-width="1.2" stroke-opacity="0.4"/>`;
+                    if(dt){svg+=`<text x="${sx-25}" y="${sy+(isTop?-4:10)}" text-anchor="end" fill="rgba(255,255,255,0.65)" font-size="8" font-family="'Segoe UI',sans-serif" style="cursor:pointer;text-decoration:underline" onmouseenter="floatShow(event,${li},'ce')">${escSvg(sub.label)}</text>`;}
+                    else{svg+=`<text x="${sx-25}" y="${sy+(isTop?-4:10)}" text-anchor="end" fill="rgba(255,255,255,0.45)" font-size="7.5" font-family="'Segoe UI',sans-serif">${escSvg(sub.label)}</text>`;}
+                });
             }
-
-            top.forEach((c, i) => drawBranch(c, i, true, top.length));
-            bot.forEach((c, i) => drawBranch(c, i, false, bot.length));
-
-            return `<div class="se-schema-svg-wrap"><svg viewBox="0 0 ${svgW} ${svgH}"><defs>${defs}</defs>${svg}</svg></div>`;
+            top.forEach((c,i)=>drawBranch(c,i,true,top.length));bot.forEach((c,i)=>drawBranch(c,i,false,bot.length));
+            const ceJSON=JSON.stringify(ceLeafData).replace(/"/g,'&quot;');
+            return `<div class="svg-detail-wrap" style="max-width:650px;margin:0 auto" onmouseleave="floatHide('ce')"><div class="se-schema-svg-wrap"><svg viewBox="0 0 ${svgW} ${svgH}"><defs>${defs}</defs>${svg}</svg></div><div class="float-detail ce-style" id="floatCE" data-items="${ceJSON}"><div class="fd-stem"></div><div class="fd-card"><div class="fd-title"></div><div class="fd-body"></div></div></div></div>`;
         }
 
-        // ══════════════════════════════════════════════════
-        // CÍCLICO — Anillo grueso segmentado con flechas
-        // Fiel a la card (Image 7): anillo grueso con arcos coloreados,
-        // flechas triangulares en las uniones, labels como texto
-        // coloreado FUERA del anillo, icono refresh en el centro
-        // ══════════════════════════════════════════════════
+        // CÍCLICO — 3-level outward expanding
         function renderCiclico(root) {
-            if (!root) return '';
-            const fases = (root.children || []);
-            if (!fases.length) return `<div style="text-align:center;color:#a78bfa;padding:20px">${escSvg(root.label)}</div>`;
-            const n = fases.length;
-            const ringR = 130;
-            const labelR = ringR + 55; // distancia del centro a los labels
-            const W = (labelR + 80) * 2;
-            const H = W;
-            const cx = W / 2, cy = H / 2;
-            const strokeW = 7; // grosor del anillo
-            const colors = ['#3b82f6','#22c55e','#f97316','#ec4899','#8b5cf6','#fbbf24','#2dd4bf','#ef4444'];
-
-            let svg = '', defs = '';
-
-            // Dibujar arcos del anillo (segmentos gruesos)
-            fases.forEach((f, i) => {
-                const col = colors[i % colors.length];
-                const startAngle = (2 * Math.PI * i / n) - Math.PI / 2;
-                const endAngle = (2 * Math.PI * (i + 1) / n) - Math.PI / 2;
-                // Gap más amplio para que las flechas no toquen los arcos
-                const gapAngle = 0.22;
-                const sa = startAngle + gapAngle;
-                const ea = endAngle - gapAngle;
-                const x1 = cx + ringR * Math.cos(sa);
-                const y1 = cy + ringR * Math.sin(sa);
-                const x2 = cx + ringR * Math.cos(ea);
-                const y2 = cy + ringR * Math.sin(ea);
-                const arcSpan = ea - sa;
-                const largeArc = arcSpan > Math.PI ? 1 : 0;
-                svg += `<path d="M${x1} ${y1} A${ringR} ${ringR} 0 ${largeArc} 1 ${x2} ${y2}" fill="none" stroke="${col}" stroke-width="${strokeW}" stroke-linecap="round" stroke-opacity="0.75"/>`;
-            });
-
-            // Dibujar flechas triangulares en las uniones del anillo
-            fases.forEach((f, i) => {
-                const col = colors[i % colors.length];
-                const junctionAngle = (2 * Math.PI * (i + 1) / n) - Math.PI / 2;
-                // Punto en el anillo donde termina el segmento
-                const px = cx + ringR * Math.cos(junctionAngle);
-                const py = cy + ringR * Math.sin(junctionAngle);
-                // Dirección tangente (perpendicular al radio, en sentido horario)
-                const tx = -Math.sin(junctionAngle);
-                const ty = Math.cos(junctionAngle);
-                // Normal (hacia afuera del centro)
-                const nx = Math.cos(junctionAngle);
-                const ny = Math.sin(junctionAngle);
-                // Triángulo: punta en dirección tangente, base perpendicular
-                const arrowLen = 14;
-                const arrowW = 10;
-                const tipX = px + tx * arrowLen;
-                const tipY = py + ty * arrowLen;
-                const baseAx = px + nx * arrowW/2;
-                const baseAy = py + ny * arrowW/2;
-                const baseBx = px - nx * arrowW/2;
-                const baseBy = py - ny * arrowW/2;
-                svg += `<polygon points="${tipX},${tipY} ${baseAx},${baseAy} ${baseBx},${baseBy}" fill="${col}" opacity="0.9"/>`;
-            });
-
-            // Labels de fases FUERA del anillo (texto coloreado, sin cajas)
-            fases.forEach((f, i) => {
-                const col = colors[i % colors.length];
-                const midAngle = (2 * Math.PI * (i + 0.5) / n) - Math.PI / 2;
-                const lx = cx + labelR * Math.cos(midAngle);
-                const ly = cy + labelR * Math.sin(midAngle);
-                const txtLines = wrapText(f.label, 14);
-                svg += svgTextBlock(txtLines, lx, ly, 13, col, '600');
-            });
-
-            // Centro: círculo dashed + icono refresh
-            svg += `<circle cx="${cx}" cy="${cy}" r="30" fill="rgba(139,92,246,0.15)" stroke="rgba(139,92,246,0.5)" stroke-width="2.5" stroke-dasharray="6,3"/>`;
-            svg += `<text x="${cx}" y="${cy+7}" text-anchor="middle" dominant-baseline="middle" fill="#a78bfa" font-size="24">↻</text>`;
-
-            return `<div class="se-schema-svg-wrap" style="max-width:550px;"><svg viewBox="0 0 ${W} ${H}"><defs>${defs}</defs>${svg}</svg></div>`;
+            if(!root)return'';const fases=(root.children||[]);if(!fases.length)return `<div style="text-align:center;color:#a78bfa;padding:20px">${escSvg(root.label)}</div>`;
+            const n=fases.length,colors=['#3b82f6','#22c55e','#f97316','#ec4899','#8b5cf6','#fbbf24','#2dd4bf','#ef4444'],r=38,svgCx=50,svgCy=50;
+            let arcs='',arrows='';fases.forEach((f,i)=>{const col=colors[i%colors.length],sa0=(2*Math.PI*i/n)-Math.PI/2,ea0=(2*Math.PI*(i+1)/n)-Math.PI/2,gap=0.2,sa=sa0+gap,ea=ea0-gap;
+                arcs+=`<path class="cy-arc" id="cyA${i}" d="M${svgCx+r*Math.cos(sa)} ${svgCy+r*Math.sin(sa)} A${r} ${r} 0 ${(ea-sa>Math.PI)?1:0} 1 ${svgCx+r*Math.cos(ea)} ${svgCy+r*Math.sin(ea)}" fill="none" stroke="${col}" stroke-width="5.5" stroke-linecap="round" stroke-opacity="0.65" onclick="cyToggle(${i})"/>`;
+                const ja=(2*Math.PI*(i+1)/n)-Math.PI/2,px=svgCx+r*Math.cos(ja),py=svgCy+r*Math.sin(ja),tx=-Math.sin(ja),ty=Math.cos(ja),nx=Math.cos(ja),ny=Math.sin(ja);
+                arrows+=`<polygon points="${px+tx*2},${py+ty*2} ${px+nx*1.5},${py+ny*1.5} ${px-nx*1.5},${py-ny*1.5}" fill="${col}" opacity="0.8"/>`;
+            });const lblR=52;let phasesHTML='';
+            fases.forEach((f,i)=>{const col=colors[i%colors.length],ma=(2*Math.PI*(i+0.5)/n)-Math.PI/2,cosA=Math.cos(ma),sinA=Math.sin(ma),lx=50+lblR*cosA,ly=50+lblR*sinA,subs=(f.children||[]).slice(0,4);
+                let infoPos='';if(Math.abs(cosA)>=Math.abs(sinA)){infoPos=cosA>0?'left:calc(100% + 32px);top:50%;transform:translateY(-50%);':'right:calc(100% + 32px);top:50%;transform:translateY(-50%);';}
+                else{infoPos=sinA>0?'top:calc(100% + 26px);left:50%;transform:translateX(-50%);':'bottom:calc(100% + 26px);left:50%;transform:translateX(-50%);';}
+                let rows=subs.length>0?subs.map((s,si)=>{const dt=getDetail(s);const arrow=dt?'<span class="sub-arrow">\u25B8</span>':'';const click=dt?`onclick="event.stopPropagation();subToggle('cySD${i}_${si}')"`:'';const det=dt?`<div class="s-item-detail" id="cySD${i}_${si}">${escSvg(dt)}</div>`:'';
+                    return `<div class="s-item" style="border-left-color:${col}" ${click}>${escSvg(s.label)}${arrow}</div>${det}`;}).join(''):`<div class="s-item" style="border-left-color:${col};color:rgba(255,255,255,0.3);font-style:italic;cursor:default">Sin detalles</div>`;
+                phasesHTML+=`<div class="cy-phase" style="left:${lx}%;top:${ly}%;"><div class="cy-lbl" id="cyL${i}" style="color:${col}" onclick="cyToggle(${i})">${escSvg(f.label)}</div><div class="cy-info" id="cyI${i}" style="border:1.5px solid ${col};${infoPos}"><div class="cy-info-hd"><span style="background:${col}"></span>${escSvg(f.label)}</div>${rows}<div class="cy-info-ft">Fase ${i+1} de ${n}</div></div></div>`;
+            });return `<div class="cy-outer"><div class="cy-ring-area"><svg class="cy-svg" viewBox="0 0 100 100">${arcs}${arrows}</svg><div class="cy-center-ico">\u21BB</div>${phasesHTML}</div></div>`;
         }
 
         let schemaHTML;
@@ -875,7 +715,6 @@
             <div class="se-panel-inner">
                 <div class="se-panel-stats">
                     <div class="se-stat"><span class="se-stat-val">${tipoLabels[tipo] || tipo}</span><span class="se-stat-lbl">tipo</span></div>
-                    <div class="se-stat"><span class="se-stat-val">${countNodes(root)}</span><span class="se-stat-lbl">nodos</span></div>
                 </div>
                 <div class="se-tree-container">
                     ${root ? schemaHTML : '<p style="color:rgba(255,255,255,0.4)">Sin datos</p>'}
@@ -907,7 +746,6 @@
             <div class="se-panel-inner">
                 <div class="se-panel-stats">
                     <div class="se-stat"><span class="se-stat-val">${questions.length}</span><span class="se-stat-lbl">preguntas</span></div>
-                    <div class="se-stat"><span class="se-stat-val">${diff[config?.dificultad] || '—'}</span><span class="se-stat-lbl">dificultad</span></div>
                     ${config?.tipo === 'expert_exam' ? `<div class="se-stat"><span class="se-stat-val">${config.tiempoPorPregunta}s</span><span class="se-stat-lbl">/ pregunta</span></div>` : ''}
                 </div>
                 <div class="se-exam-preview">
@@ -1004,41 +842,10 @@
     // FULLSCREEN ESQUEMA
     // ================================================================
     let fsScale = 1;
-    function openFullscreen() {
-        const treeContainer = document.querySelector('.se-tree-container');
-        if (!treeContainer) return;
-        const overlay = document.getElementById('fsOverlay');
-        const body = document.getElementById('fsBody');
-        // Copiar el contenido del esquema al overlay
-        body.innerHTML = treeContainer.innerHTML;
-        // Quitar max-width para que se expanda
-        const wrap = body.querySelector('.se-schema-svg-wrap');
-        if (wrap) { wrap.style.maxWidth = '95vw'; wrap.style.width = '95vw'; }
-        // Título
-        const tipo = flow?.configs?.esquemas?.tipo || 'esquema';
-        const tipoLabels = { jerarquico:'Jerárquico', conceptual:'Conceptual', timeline:'Línea del tiempo', 'causa-efecto':'Causa y efecto', ciclico:'Cíclico' };
-        document.getElementById('fsTitle').textContent = tipoLabels[tipo] || 'Esquema';
-        fsScale = 1;
-        document.getElementById('fsZoomLevel').textContent = '100%';
-        overlay.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    }
-    function closeFullscreen() {
-        document.getElementById('fsOverlay').classList.remove('active');
-        document.body.style.overflow = '';
-    }
-    function fsZoom(delta) {
-        fsScale = Math.max(0.3, Math.min(3, fsScale + delta));
-        const wrap = document.querySelector('#fsBody .se-schema-svg-wrap');
-        if (wrap) wrap.style.transform = `scale(${fsScale})`;
-        document.getElementById('fsZoomLevel').textContent = Math.round(fsScale * 100) + '%';
-    }
-    function fsZoomReset() {
-        fsScale = 1;
-        const wrap = document.querySelector('#fsBody .se-schema-svg-wrap');
-        if (wrap) wrap.style.transform = 'scale(1)';
-        document.getElementById('fsZoomLevel').textContent = '100%';
-    }
+    function openFullscreen(){var tc=document.querySelector('.se-tree-container');if(!tc)return;var body=document.getElementById('fsBody');while(tc.firstChild)body.appendChild(tc.firstChild);tc.setAttribute('data-fs','1');var w=body.querySelector('.se-schema-svg-wrap');if(w){w.style.maxWidth='95vw';w.style.width='95vw';}var cy=body.querySelector('.cy-outer');if(cy){cy.style.maxWidth='90vw';cy.style.padding='60px';}var cm=body.querySelector('.cm-wrap');if(cm){cm.style.maxWidth='80vh';}var tl=body.querySelector('.tl-wrap');if(tl){tl.style.maxWidth='95vw';}var tipo=flow?.configs?.esquemas?.tipo||'esquema';var labels={jerarquico:'Jerárquico',conceptual:'Conceptual',timeline:'Línea del tiempo','causa-efecto':'Causa y efecto',ciclico:'Cíclico'};document.getElementById('fsTitle').textContent=labels[tipo]||'Esquema';fsScale=1;document.getElementById('fsZoomLevel').textContent='100%';document.getElementById('fsOverlay').classList.add('active');document.body.style.overflow='hidden';}
+    function closeFullscreen(){var body=document.getElementById('fsBody'),tc=document.querySelector('.se-tree-container[data-fs]');if(tc){while(body.firstChild)tc.appendChild(body.firstChild);tc.removeAttribute('data-fs');var w=tc.querySelector('.se-schema-svg-wrap');if(w){w.style.maxWidth='';w.style.width='';w.style.transform='';}var cy=tc.querySelector('.cy-outer');if(cy){cy.style.maxWidth='';cy.style.padding='';}var cm=tc.querySelector('.cm-wrap');if(cm)cm.style.maxWidth='';var tl=tc.querySelector('.tl-wrap');if(tl){tl.style.maxWidth='';tl.style.transform='';}}document.getElementById('fsOverlay').classList.remove('active');document.body.style.overflow='';}
+    function fsZoom(delta){fsScale=Math.max(0.3,Math.min(3,fsScale+delta));var el=document.querySelector('#fsBody .se-schema-svg-wrap')||document.querySelector('#fsBody .tl-wrap')||document.querySelector('#fsBody .cm-wrap')||document.querySelector('#fsBody .cy-outer');if(el)el.style.transform='scale('+fsScale+')';document.getElementById('fsZoomLevel').textContent=Math.round(fsScale*100)+'%';}
+    function fsZoomReset(){fsScale=1;var el=document.querySelector('#fsBody .se-schema-svg-wrap')||document.querySelector('#fsBody .tl-wrap')||document.querySelector('#fsBody .cm-wrap')||document.querySelector('#fsBody .cy-outer');if(el)el.style.transform='scale(1)';document.getElementById('fsZoomLevel').textContent='100%';}
     // Cerrar con Escape
     document.addEventListener('keydown', e => {
         if (e.key === 'Escape' && document.getElementById('fsOverlay').classList.contains('active')) {
@@ -1178,6 +985,87 @@
         }
         animate(); window.addEventListener('resize',resize);
     }
+    // ════════════════════════════════════════════════
+    // INTERACTIVE SCHEMA FUNCTIONS
+    // ════════════════════════════════════════════════
+    function subToggle(id){var el=document.getElementById(id);if(el)el.classList.toggle('on');}
+
+    // Floating tooltip for jerárquico + causa-efecto
+    var _floatTimer = null;
+    var _floatCurrent = -1;
+    var _floatType = '';
+
+    function floatShow(evt, idx, type) {
+        if (_floatTimer) { clearTimeout(_floatTimer); _floatTimer = null; }
+        var panel = document.getElementById(type === 'jq' ? 'floatJQ' : 'floatCE');
+        if (!panel) return;
+        if (_floatCurrent === idx && _floatType === type) return;
+        try {
+            var items = JSON.parse(panel.getAttribute('data-items'));
+            var item = items[idx]; if (!item) return;
+            var wrapRect = panel.parentElement.getBoundingClientRect();
+            var targetRect = evt.target.getBoundingClientRect();
+            var isCE = type === 'ce';
+
+            function doOpen() {
+                if (isCE) {
+                    var textCenterY = targetRect.top - wrapRect.top + targetRect.height / 2;
+                    var rightFromWrap = wrapRect.width - (targetRect.left - wrapRect.left) + 6;
+                    panel.style.left = 'auto';
+                    panel.style.right = rightFromWrap + 'px';
+                    panel.style.top = textCenterY + 'px';
+                    panel.style.transform = 'translateY(-50%)';
+                } else {
+                    var l = targetRect.left - wrapRect.left + targetRect.width / 2 - 160;
+                    var t = targetRect.bottom - wrapRect.top + 4;
+                    l = Math.max(5, Math.min(l, wrapRect.width - 350));
+                    panel.style.right = 'auto';
+                    panel.style.transform = '';
+                    panel.style.left = l + 'px';
+                    panel.style.top = t + 'px';
+                }
+                var titleEl = panel.querySelector('.fd-card .fd-title');
+                var bodyEl = panel.querySelector('.fd-card .fd-body');
+                if (titleEl) titleEl.textContent = item.label;
+                if (bodyEl) bodyEl.textContent = item.detail || 'Sin detalles adicionales';
+                if (item.col) panel.style.setProperty('--ce-col', item.col);
+                void panel.offsetHeight;
+                panel.classList.add('on');
+                _floatCurrent = idx;
+                _floatType = type;
+            }
+
+            if (_floatCurrent >= 0) {
+                panel.classList.remove('on');
+                _floatCurrent = -1;
+                _floatTimer = setTimeout(doOpen, 380);
+            } else {
+                doOpen();
+            }
+        } catch(e) { console.error('floatShow:', e); }
+    }
+
+    function floatHide(type) {
+        if (_floatTimer) { clearTimeout(_floatTimer); _floatTimer = null; }
+        var panel = document.getElementById(type === 'jq' ? 'floatJQ' : 'floatCE');
+        if (panel) panel.classList.remove('on');
+        _floatCurrent = -1;
+        _floatType = '';
+    }
+
+    // Conceptual
+    var _cmOpen=-1;
+    function cmToggle(i){if(_cmOpen===i){var n=document.getElementById('cmN'+i);if(n)n.classList.remove('open');_cmOpen=-1;}else{document.querySelectorAll('.cm-node').forEach(function(el){el.classList.remove('open')});var n=document.getElementById('cmN'+i);if(n)n.classList.add('open');_cmOpen=i;}}
+    function cmHL(i,on){var l=document.getElementById('cmL'+i);if(l){if(on)l.classList.add('glow');else l.classList.remove('glow');}}
+
+    // Cíclico
+    var _cyOpen=-1;
+    function cyToggle(i){document.querySelectorAll('.cy-arc').forEach(function(a){a.classList.remove('on')});document.querySelectorAll('.cy-lbl').forEach(function(l){l.classList.remove('on');l.style.borderColor='transparent'});document.querySelectorAll('.cy-info').forEach(function(p){p.classList.remove('on')});if(_cyOpen===i){_cyOpen=-1;return;}var arc=document.getElementById('cyA'+i),lbl=document.getElementById('cyL'+i),inf=document.getElementById('cyI'+i);if(arc)arc.classList.add('on');if(lbl){lbl.classList.add('on');lbl.style.borderColor=lbl.style.color;}if(inf)inf.classList.add('on');_cyOpen=i;}
+
+    // Timeline
+    var _tlOpen=-1;
+    function tlToggle(i){document.querySelectorAll('.tl-detail').forEach(function(el){el.classList.remove('on')});document.querySelectorAll('.tl-card').forEach(function(el){el.classList.remove('active')});if(_tlOpen===i){_tlOpen=-1;return;}var d=document.getElementById('tlD'+i);if(d)d.classList.add('on');var cols=document.querySelectorAll('.tl-col');if(cols[i]){var c=cols[i].querySelector('.tl-card');if(c)c.classList.add('active');}  _tlOpen=i;}
+
     </script>
 
 </body>

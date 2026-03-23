@@ -1,7 +1,12 @@
 package com.project.servlet;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.stream.Collectors;
+
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.io.RandomAccessReadBuffer;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -15,10 +20,20 @@ import com.project.util.AIService;
 import com.project.util.GamificationService;
 
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
+
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xslf.usermodel.XMLSlideShow;
+import org.apache.poi.xslf.usermodel.XSLFSlide;
+import org.apache.poi.xslf.usermodel.XSLFTextShape;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 
 /**
  * Servlet de Duelos y Amigos.
@@ -43,6 +58,7 @@ import jakarta.servlet.http.HttpServletResponse;
  * Todos requieren header X-User-Id.
  */
 @WebServlet("/api/duels/*")
+@MultipartConfig(maxFileSize = 10485760) // 10MB
 public class DuelServlet extends HttpServlet {
 
     private final IDuelDAO duelDAO = new DuelDAOImpl();
@@ -127,10 +143,18 @@ public class DuelServlet extends HttpServlet {
         if (userId == null || userId.isBlank()) { sendError(res, 401, "Falta X-User-Id."); return; }
 
         String path = req.getPathInfo() != null ? req.getPathInfo() : "";
-        String body = req.getReader().lines().collect(Collectors.joining());
-        JsonObject data = JsonParser.parseString(body).getAsJsonObject();
 
         try {
+            // /create puede venir como multipart (con archivo) o JSON (solo texto)
+            if ("/create".equals(path)) {
+                handleCreate(req, res, userId);
+                return;
+            }
+
+            // El resto siempre es JSON
+            String body = req.getReader().lines().collect(Collectors.joining());
+            JsonObject data = JsonParser.parseString(body).getAsJsonObject();
+
             switch (path) {
 
                 // ── AMIGOS ──
@@ -162,44 +186,6 @@ public class DuelServlet extends HttpServlet {
                     boolean ok = duelDAO.removeFriend(fid, userId);
                     JsonObject r = new JsonObject();
                     r.addProperty("success", ok);
-                    res.getWriter().write(gson.toJson(r));
-                }
-
-                // ── CREAR DUELO ──
-                // Solo genera el quiz y crea el duelo. NO retorna las preguntas.
-                // Ambos jugadores usan GET /play?id= para obtener preguntas cuando quieran jugar.
-                case "/create" -> {
-                    String opponentId    = data.get("opponentId").getAsString();
-                    String topic         = data.get("topic").getAsString();
-                    int    questionCount = data.has("questionCount") ? data.get("questionCount").getAsInt() : 10;
-                    String text          = data.has("text") && !data.get("text").isJsonNull()
-                                           ? data.get("text").getAsString() : topic;
-
-                    // 1. Generar quiz con la IA
-                    JsonObject quizConfig = new JsonObject();
-                    quizConfig.addProperty("tipo", "quiz");
-                    quizConfig.addProperty("numPreguntas", questionCount);
-                    quizConfig.addProperty("dificultad", "medio");
-
-                    String aiJson = AIService.generate("quiz", text, quizConfig);
-                    JsonObject aiData = JsonParser.parseString(aiJson).getAsJsonObject();
-                    String title = aiData.has("title") ? aiData.get("title").getAsString() : topic;
-
-                    // 2. Guardar quiz en study_content (type='duel_quiz')
-                    Quiz quizContent = new Quiz(userId, "duel_quiz", title, null);
-                    String contentId = contentDAO.save(quizContent, aiJson, text);
-
-                    // 3. Crear duelo con status 'waiting_opponent'
-                    String duelId = duelDAO.createDuel(userId, opponentId, contentId, topic, questionCount);
-
-                    // 4. Responder solo con metadata (sin preguntas)
-                    JsonObject r = new JsonObject();
-                    r.addProperty("success", true);
-                    r.addProperty("duelId", duelId);
-                    r.addProperty("contentId", contentId);
-                    r.addProperty("title", title);
-                    r.addProperty("questionCount", questionCount);
-                    r.addProperty("topic", topic);
                     res.getWriter().write(gson.toJson(r));
                 }
 
@@ -267,6 +253,114 @@ public class DuelServlet extends HttpServlet {
         } catch (Exception e) {
             sendError(res, 500, e.getMessage());
         }
+    }
+
+    // ─── CREAR DUELO (JSON o Multipart con archivo) ───────────
+    private void handleCreate(HttpServletRequest req, HttpServletResponse res, String userId)
+            throws Exception {
+
+        String contentType = req.getContentType();
+        String opponentId, topic, text;
+        int questionCount, timePerQ;
+
+        if (contentType != null && contentType.contains("multipart/form-data")) {
+            // ── Multipart: archivo subido ──
+            opponentId    = req.getParameter("opponentId");
+            topic         = req.getParameter("topic");
+            questionCount = parseInt(req.getParameter("questionCount"), 10);
+            timePerQ      = parseInt(req.getParameter("timePerQuestion"), 30);
+
+            Part filePart = req.getPart("file");
+            if (filePart == null || filePart.getSize() == 0) {
+                sendError(res, 400, "No se recibió archivo."); return;
+            }
+
+            text = extractTextFromFile(filePart);
+            if (text == null || text.isBlank()) {
+                sendError(res, 400, "No se pudo extraer texto del archivo."); return;
+            }
+
+        } else {
+            // ── JSON: solo texto ──
+            String body = req.getReader().lines().collect(Collectors.joining());
+            JsonObject data = JsonParser.parseString(body).getAsJsonObject();
+            opponentId    = data.get("opponentId").getAsString();
+            topic         = data.get("topic").getAsString();
+            questionCount = data.has("questionCount") ? data.get("questionCount").getAsInt() : 10;
+            timePerQ      = data.has("timePerQuestion") ? data.get("timePerQuestion").getAsInt() : 30;
+            text          = data.has("text") && !data.get("text").isJsonNull()
+                            ? data.get("text").getAsString() : topic;
+        }
+
+        // 1. Generar quiz con la IA
+        JsonObject quizConfig = new JsonObject();
+        quizConfig.addProperty("tipo", "quiz");
+        quizConfig.addProperty("numPreguntas", questionCount);
+        quizConfig.addProperty("dificultad", "medio");
+
+        String aiJson = AIService.generate("quiz", text, quizConfig);
+        JsonObject aiData = JsonParser.parseString(aiJson).getAsJsonObject();
+        String title = aiData.has("title") ? aiData.get("title").getAsString() : topic;
+
+        // 2. Guardar quiz en study_content (type='duel_quiz')
+        Quiz quizContent = new Quiz(userId, "duel_quiz", title, null);
+        String contentId = contentDAO.save(quizContent, aiJson, text);
+
+        // 3. Crear duelo
+        String duelId = duelDAO.createDuel(userId, opponentId, contentId, topic, questionCount, timePerQ);
+
+        // 4. Responder con metadata
+        JsonObject r = new JsonObject();
+        r.addProperty("success", true);
+        r.addProperty("duelId", duelId);
+        r.addProperty("contentId", contentId);
+        r.addProperty("title", title);
+        r.addProperty("questionCount", questionCount);
+        r.addProperty("topic", topic);
+        res.getWriter().write(gson.toJson(r));
+    }
+
+    private int parseInt(String val, int defaultVal) {
+        try { return val != null ? Integer.parseInt(val) : defaultVal; }
+        catch (NumberFormatException e) { return defaultVal; }
+    }
+
+    /** Extrae texto de PDF, DOCX, PPTX o TXT */
+    private String extractTextFromFile(Part filePart) {
+        String fileName = filePart.getSubmittedFileName().toLowerCase();
+        try (InputStream is = filePart.getInputStream()) {
+            if (fileName.endsWith(".txt")) {
+                return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            if (fileName.endsWith(".pdf")) {
+                try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(is))) {
+                    return new PDFTextStripper().getText(doc);
+                }
+            }
+            if (fileName.endsWith(".docx")) {
+                try (XWPFDocument doc = new XWPFDocument(is)) {
+                    StringBuilder sb = new StringBuilder();
+                    for (XWPFParagraph p : doc.getParagraphs()) sb.append(p.getText()).append("\n");
+                    return sb.toString();
+                }
+            }
+            if (fileName.endsWith(".pptx")) {
+                try (XMLSlideShow ppt = new XMLSlideShow(is)) {
+                    StringBuilder sb = new StringBuilder();
+                    for (XSLFSlide slide : ppt.getSlides()) {
+                        for (var shape : slide.getShapes()) {
+                            if (shape instanceof XSLFTextShape ts) {
+                                sb.append(ts.getText()).append("\n");
+                            }
+                        }
+                    }
+                    return sb.toString();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[DuelServlet] Error extrayendo texto: " + e.getMessage());
+        }
+        return null;
     }
 
     private void sendError(HttpServletResponse res, int status, String message) throws IOException {

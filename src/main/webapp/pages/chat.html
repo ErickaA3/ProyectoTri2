@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="../css/styles-shared.css">
 <link rel="stylesheet" href="../css/chat.css">
+<link rel="stylesheet" href="../css/responsive.css">
 </head>
 <body data-page="mi-profesor">
 
@@ -16,6 +17,22 @@
   <div id="sidebar-container"></div>
 
   <main class="content">
+        <!-- Pantalla de carga Polaris -->
+        <div class="polaris-loading" id="chatLoading">
+            <canvas class="polaris-loading-stars"></canvas>
+            <div class="polaris-loading-content">
+                <div class="polaris-loading-orb">
+                    <div class="polaris-orb-ring r1"></div>
+                    <div class="polaris-orb-ring r2"></div>
+                    <div class="polaris-orb-ring r3"></div>
+                    <div class="polaris-orb-core">
+                        <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
+                    </div>
+                </div>
+                <div class="polaris-loading-title">Cargando</div>
+                <div class="polaris-loading-subtitle" id="chatLoadingSub">Obteniendo datos...</div>
+            </div>
+        </div>
 
     <!-- ══ CHAT SIDEBAR (búho + historial) ══ -->
     <aside class="chat-sidebar">
@@ -104,6 +121,20 @@
     <!-- ══ CHAT PRINCIPAL ══ -->
     <div class="chat-main">
 
+      <!-- Botón para abrir chats recientes en mobile -->
+      <button class="chat-mobile-toggle" onclick="toggleChatSidebar()">
+        <i class="fas fa-clock-rotate-left"></i>
+      </button>
+
+      <!-- Canvas para efectos animados de fondo -->
+      <canvas id="galaxyCanvas"  class="chat-canvas"></canvas>
+      <canvas id="forestCanvas"  class="chat-canvas"></canvas>
+      <canvas id="volcanoCanvas" class="chat-canvas"></canvas>
+      <canvas id="oceanCanvas"   class="chat-canvas"></canvas>
+      <canvas id="skyCanvas"     class="chat-canvas"></canvas>
+      <canvas id="rainCanvas"    class="chat-canvas"></canvas>
+      <canvas id="auroraCanvas"  class="chat-canvas"></canvas>
+
       <div class="msgs" id="msgsArea">
 
         <!-- Mensaje de bienvenida -->
@@ -162,9 +193,44 @@
       </div>
 
     </div><!-- /chat-main -->
+
+    <!-- Overlay para cerrar sidebar en mobile -->
+    <div class="chat-sidebar-overlay" id="chatSidebarOverlay" onclick="toggleChatSidebar()"></div>
   </main>
+
+  <!-- Modal: Confirmar eliminar chat -->
+  <div class="modal" id="deleteConfirmModal">
+    <div class="modal-content">
+      <div class="modal-icon">🗑️</div>
+      <h2 class="modal-title">Eliminar chat</h2>
+      <p class="modal-message">¿Deseas eliminar "<strong class="delete-chat-name"></strong>"?</p>
+      <p class="modal-sub">Esta acción no se puede deshacer.</p>
+      <div class="modal-buttons">
+        <button class="modal-btn modal-btn-danger" onclick="confirmDeleteChat()">Eliminar</button>
+        <button class="modal-btn modal-btn-secondary" onclick="closeDeleteModal()">Cancelar</button>
+      </div>
+    </div>
+  </div>
 
   <script src="../js/components.js"></script>
   <script src="../js/chat.js"></script>
+  <script src="../js/backgrounds-fx.js"></script>
+  <script>
+    // Toggle chat sidebar en mobile
+    function toggleChatSidebar() {
+        document.querySelector('.chat-sidebar').classList.toggle('mobile-open');
+        document.getElementById('chatSidebarOverlay').classList.toggle('active');
+    }
+  </script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (typeof PolarisLoading !== 'undefined')
+            PolarisLoading.initStars(document.querySelector('#chatLoading .polaris-loading-stars'));
+    });
+    setTimeout(function() {
+        var el = document.getElementById('chatLoading');
+        if (el) { el.style.opacity='0'; el.style.pointerEvents='none'; setTimeout(function(){el.remove()},500); }
+    }, 8000);
+    </script>
 </body>
 </html>

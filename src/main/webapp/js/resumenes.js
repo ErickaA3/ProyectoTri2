@@ -18,7 +18,7 @@
  * }
  */
 
-const API = '/project-1.0-SNAPSHOT/api/summaries';
+const API = (window.API_BASE || '') + '/api/summaries';
 
 // ─── Auth (mismo patrón que historial.js) ────────────────────
 function getUserId() {
@@ -35,10 +35,6 @@ function authHeaders() {
 document.addEventListener('DOMContentLoaded', () => {
     generateStars();
 
-    document.getElementById('notesTextarea')?.addEventListener('input', updateCharCounter);
-    document.getElementById('notesModal')?.addEventListener('click', e => {
-        if (e.target === e.currentTarget) closeNotesModal();
-    });
     document.getElementById('downloadModal')?.addEventListener('click', function(e) {
         const bar = document.getElementById('downloadBarFill');
         if (e.target === this && bar?.style.width === '100%') this.classList.remove('show');
@@ -98,7 +94,7 @@ function renderSummary(json) {
 
     // ── Secciones ──
     let html = '';
-    (content.sections || []).forEach(sec => {
+    (content.sections || []).forEach((sec, idx) => {
         const highlight = sec.highlight
             ? `<div class="highlight-box">
                  <div class="highlight-icon"><i class="fas fa-lightbulb"></i></div>
@@ -112,7 +108,7 @@ function renderSummary(json) {
         html += `
             <section class="resumen-section">
                 <h2 class="section-title">
-                    <span class="section-number">${escapeHtml(String(sec.number ?? ''))}</span>
+                    <span class="section-number">${sec.number && sec.number !== 'null' ? escapeHtml(String(sec.number)) : String(idx + 1).padStart(2, '0')}</span>
                     ${escapeHtml(sec.heading ?? '')}
                 </h2>
                 <p class="resumen-text">${escapeHtml(sec.body ?? '')}</p>
@@ -184,63 +180,332 @@ function updateFavoriteButton(isFav) {
     else       { icon.classList.replace('fas', 'far'); btn.classList.remove('active'); }
 }
 
-// ─── Notas (localStorage — sin backend) ──────────────────────
-function openNotesModal() {
-    const key      = `notes_${window._currentSummaryId || 'draft'}`;
-    const textarea = document.getElementById('notesTextarea');
-    if (textarea) { textarea.value = localStorage.getItem(key) || ''; updateCharCounter(); }
-    generateNotesSparkles();
-    document.getElementById('notesModal').classList.add('show');
-}
-
-function closeNotesModal() {
-    document.getElementById('notesModal').classList.remove('show');
-}
-
-function updateCharCounter() {
-    const ta      = document.getElementById('notesTextarea');
-    const counter = document.getElementById('charCounter');
-    if (!ta || !counter) return;
-    counter.textContent = ta.value.length;
-    counter.style.color = ta.value.length > 1800 ? '#ff6b6b' : 'var(--text-secondary)';
-}
-
-function saveNotes() {
-    const ta = document.getElementById('notesTextarea');
-    if (!ta) return;
-    if (ta.value.length > 2000) {
-        showToast('El texto excede el límite', 'fa-exclamation-triangle');
+// ─── Descarga PDF real con jsPDF ─────────────────────────────
+function downloadPDF() {
+    if (!window.jspdf?.jsPDF) {
+        showToast('jsPDF no cargado, intenta de nuevo', 'fa-circle-xmark');
         return;
     }
-    localStorage.setItem(`notes_${window._currentSummaryId || 'draft'}`, ta.value);
-    closeNotesModal();
-    showToast('Nota guardada correctamente', 'fa-check-circle');
-}
 
-// ─── Descarga PDF (simulada) ───────────────────────────────────
-function downloadPDF() {
     const modal = document.getElementById('downloadModal');
     const bar   = document.getElementById('downloadBarFill');
     modal.classList.add('show');
     bar.style.width = '0%';
-    setEl('downloadTitle',   'Preparando descarga...');
-    setEl('downloadMessage', 'Tu PDF estará listo en un momento');
+    setEl('downloadTitle',   'Generando PDF...');
+    setEl('downloadMessage', 'Un momento por favor');
 
-    let progress = 0;
-    const interval = setInterval(() => {
-        progress += Math.random() * 15;
-        if (progress >= 100) {
-            progress = 100;
-            clearInterval(interval);
-            setEl('downloadTitle',   '¡Descarga completa!');
-            setEl('downloadMessage', 'Tu PDF ha sido descargado');
+    // Pequeño delay para mostrar el modal antes de bloquear el hilo
+    setTimeout(() => {
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+            const pageW  = doc.internal.pageSize.getWidth();
+            const pageH  = doc.internal.pageSize.getHeight();
+            const margin = 20;
+            const inner  = pageW - margin * 2;
+            let y = 0;
+
+            // Colores del tema
+            const BG       = [12, 12, 28];      // #0c0c1c
+            const BG2      = [22, 22, 46];       // #16162e
+            const CARD     = [30, 30, 58];       // #1e1e3a
+            const CYAN     = [45, 212, 191];     // #2dd4bf
+            const PURPLE   = [139, 92, 246];     // #8b5cf6
+            const AMBER    = [251, 191, 36];     // #fbbf24
+            const TXT      = [230, 230, 248];    // texto principal
+            const TXT2     = [140, 140, 180];    // texto secundario
+            const BORDER   = [45, 45, 80];       // bordes
+
+            const setRGB  = (arr) => { doc.setTextColor(...arr); };
+            const setFill = (arr) => { doc.setFillColor(...arr); };
+            const setDraw = (arr) => { doc.setDrawColor(...arr); };
+
+            const addPage = () => {
+                // Footer en página anterior
+                doc.setFontSize(7.5);
+                setRGB([70, 70, 110]);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Polaris  ·  página ${doc.internal.getNumberOfPages()}`, pageW / 2, pageH - 8, { align: 'center' });
+                // Línea footer
+                setDraw([40, 40, 75]);
+                doc.setLineWidth(0.3);
+                doc.line(margin, pageH - 12, pageW - margin, pageH - 12);
+                doc.addPage();
+                // Fondo nueva página
+                setFill(BG);
+                doc.rect(0, 0, pageW, pageH, 'F');
+                y = margin;
+            };
+
+            const checkY = (needed = 10) => { if (y + needed > pageH - 18) addPage(); };
+
+            // ═══════════════════════════════════════════════════════
+            // PÁGINA 1 — PORTADA
+            // ═══════════════════════════════════════════════════════
+            setFill(BG);
+            doc.rect(0, 0, pageW, pageH, 'F');
+
+            // Franja decorativa superior (gradiente simulado con rectángulos)
+            setFill(BG2);
+            doc.rect(0, 0, pageW, 40, 'F');
+
+            // Acento cyan izquierdo
+            setFill(CYAN);
+            doc.rect(0, 0, 4, 40, 'F');
+
+            // Texto "RESUMEN" en la franja
+            y = 16;
+            setRGB(CYAN);
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'bold');
+            doc.text('RESUMEN DE ESTUDIO', margin + 4, y);
+
+            // Fecha a la derecha
+            const createdAt = document.getElementById('createdAt')?.textContent || '';
+            setRGB(TXT2);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.text(createdAt, pageW - margin, y, { align: 'right' });
+
+            // Subtítulo
+            y = 28;
+            const readTime = document.getElementById('readTime')?.textContent || '--';
+            setRGB([80, 80, 120]);
+            doc.setFontSize(7.5);
+            doc.text(`${readTime} min de lectura`, margin + 4, y);
+
+            // ── Título principal ──
+            y = 64;
+            const title = document.getElementById('resumenTitle')?.textContent || 'Resumen';
+            setRGB(TXT);
+            doc.setFontSize(22);
+            doc.setFont('helvetica', 'bold');
+            const titleLines = doc.splitTextToSize(title, inner);
+            doc.text(titleLines, margin, y);
+            y += titleLines.length * 10 + 6;
+
+            // Línea decorativa bajo el título
+            setFill(CYAN);
+            doc.rect(margin, y, 40, 1.2, 'F');
+            setFill(PURPLE);
+            doc.rect(margin + 42, y, 20, 1.2, 'F');
+            setFill([50, 50, 90]);
+            doc.rect(margin + 64, y, inner - 64, 1.2, 'F');
+            y += 14;
+
+            // ── Keywords en portada (los primeros 6) ──
+            const kwEls = Array.from(document.querySelectorAll('.keyword-tag')).slice(0, 7);
+            if (kwEls.length > 0) {
+                const kwColors = [CYAN, PURPLE, AMBER, [236, 72, 153], [56, 189, 248], [52, 211, 153], [251, 146, 60]];
+                let kwX = margin;
+                kwEls.forEach((el, i) => {
+                    const kw = el.textContent.trim();
+                    const col = kwColors[i % kwColors.length];
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'normal');
+                    const tw = doc.getTextWidth(kw) + 10;
+                    if (kwX + tw > pageW - margin) { kwX = margin; y += 10; }
+                    // Fondo pill
+                    doc.setFillColor(col[0], col[1], col[2]);
+                    doc.setGState(new doc.GState({ opacity: 0.15 }));
+                    doc.roundedRect(kwX, y - 5, tw, 8, 2, 2, 'F');
+                    doc.setGState(new doc.GState({ opacity: 1 }));
+                    // Borde
+                    doc.setDrawColor(col[0], col[1], col[2]);
+                    doc.setLineWidth(0.3);
+                    doc.roundedRect(kwX, y - 5, tw, 8, 2, 2, 'S');
+                    // Texto
+                    doc.setTextColor(col[0], col[1], col[2]);
+                    doc.text(kw, kwX + 5, y);
+                    kwX += tw + 4;
+                });
+                y += 18;
+            }
+
+            // ── Caja de estadísticas ──
+            checkY(28);
+            setFill(CARD);
+            doc.roundedRect(margin, y, inner, 22, 4, 4, 'F');
+            setDraw(BORDER);
+            doc.setLineWidth(0.3);
+            doc.roundedRect(margin, y, inner, 22, 4, 4, 'S');
+
+            const sections = document.querySelectorAll('.resumen-section');
+            const highlights = document.querySelectorAll('.highlight-box');
+            const kwAll = document.querySelectorAll('.keyword-tag');
+
+            const stats = [
+                { label: 'SECCIONES', value: String(sections.length), color: CYAN },
+                { label: 'HIGHLIGHTS', value: String(highlights.length), color: PURPLE },
+                { label: 'PALABRAS CLAVE', value: String(kwAll.length), color: AMBER },
+                { label: 'TIEMPO LECTURA', value: readTime + ' min', color: [56, 189, 248] },
+            ];
+
+            const colW = inner / stats.length;
+            stats.forEach((s, i) => {
+                const cx = margin + colW * i + colW / 2;
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(14);
+                doc.setTextColor(...s.color);
+                doc.text(s.value, cx, y + 10, { align: 'center' });
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(6.5);
+                doc.setTextColor(...TXT2);
+                doc.text(s.label, cx, y + 17, { align: 'center' });
+                // separador
+                if (i < stats.length - 1) {
+                    setDraw(BORDER);
+                    doc.setLineWidth(0.3);
+                    doc.line(margin + colW * (i + 1), y + 4, margin + colW * (i + 1), y + 19);
+                }
+            });
+            y += 32;
+
+            // ═══════════════════════════════════════════════════════
+            // SECCIONES DE CONTENIDO
+            // ═══════════════════════════════════════════════════════
+            bar.style.width = '30%';
+
+            sections.forEach((sec, i) => {
+                checkY(32);
+
+                const num     = sec.querySelector('.section-number')?.textContent?.trim() || String(i + 1).padStart(2, '0');
+                const heading = sec.querySelector('.section-title')?.textContent?.replace(num, '').trim() || '';
+                const body    = sec.querySelector('.resumen-text')?.textContent?.trim() || '';
+                const hl      = sec.querySelector('.highlight-content p')?.textContent?.trim();
+
+                // ── Header de sección ──
+                setFill(BG2);
+                doc.roundedRect(margin, y, inner, 12, 2, 2, 'F');
+
+                // Acento izquierdo de color variable
+                const sColors = [CYAN, PURPLE, AMBER, [236, 72, 153], [56, 189, 248]];
+                const sc = sColors[i % sColors.length];
+                setFill(sc);
+                doc.roundedRect(margin, y, 2.5, 12, 1, 1, 'F');
+
+                // Número
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(8);
+                doc.setTextColor(...sc);
+                doc.text(num, margin + 7, y + 7.5);
+
+                // Heading
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(10.5);
+                setRGB(TXT);
+                const hLines = doc.splitTextToSize(heading, inner - 26);
+                doc.text(hLines[0] || '', margin + 18, y + 7.5);
+                y += 16;
+
+                // ── Body ──
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9.5);
+                setRGB(TXT2);
+                const bodyLines = doc.splitTextToSize(body, inner);
+                bodyLines.forEach(line => {
+                    checkY(6);
+                    doc.text(line, margin, y);
+                    y += 5.8;
+                });
+                y += 3;
+
+                // ── Highlight ──
+                if (hl && hl.length > 2) {
+                    checkY(22);
+                    const hlH = Math.max(18, Math.ceil(doc.splitTextToSize(hl, inner - 22).length * 5.5) + 12);
+                    setFill(CARD);
+                    doc.roundedRect(margin, y, inner, hlH, 3, 3, 'F');
+                    setFill(CYAN);
+                    doc.roundedRect(margin, y, 3, hlH, 1.5, 1.5, 'F');
+
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(7.5);
+                    setRGB(CYAN);
+                    doc.text('DATO IMPORTANTE', margin + 8, y + 7);
+
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(9);
+                    setRGB(TXT);
+                    const hlLines = doc.splitTextToSize(hl, inner - 12);
+                    hlLines.forEach((line, li) => {
+                        doc.text(line, margin + 8, y + 13 + li * 5.5);
+                    });
+                    y += hlH + 4;
+                }
+
+                y += 6;
+                bar.style.width = Math.min(30 + ((i + 1) / sections.length) * 55, 85) + '%';
+            });
+
+            // ═══════════════════════════════════════════════════════
+            // KEYWORDS COMPLETAS
+            // ═══════════════════════════════════════════════════════
+            const allKws = Array.from(document.querySelectorAll('.keyword-tag')).map(k => k.textContent.trim());
+            if (allKws.length > 0) {
+                checkY(30);
+                y += 4;
+                setFill(BG2);
+                doc.rect(margin, y, inner, 0.5, 'F');
+                y += 8;
+
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                setRGB(PURPLE);
+                doc.text('PALABRAS CLAVE', margin, y);
+                y += 8;
+
+                const kwColors2 = [CYAN, PURPLE, AMBER, [236, 72, 153], [56, 189, 248], [52, 211, 153], [251, 146, 60]];
+                let kwX2 = margin;
+                allKws.forEach((kw, i) => {
+                    const col = kwColors2[i % kwColors2.length];
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'normal');
+                    const tw = doc.getTextWidth(kw) + 10;
+                    if (kwX2 + tw > pageW - margin) { kwX2 = margin; y += 10; }
+                    checkY(10);
+                    doc.setFillColor(col[0], col[1], col[2]);
+                    doc.setGState(new doc.GState({ opacity: 0.12 }));
+                    doc.roundedRect(kwX2, y - 5, tw, 8, 2, 2, 'F');
+                    doc.setGState(new doc.GState({ opacity: 1 }));
+                    doc.setDrawColor(col[0], col[1], col[2]);
+                    doc.setLineWidth(0.3);
+                    doc.roundedRect(kwX2, y - 5, tw, 8, 2, 2, 'S');
+                    doc.setTextColor(col[0], col[1], col[2]);
+                    doc.text(kw, kwX2 + 5, y);
+                    kwX2 += tw + 5;
+                });
+                y += 14;
+            }
+
+            // Footer última página
+            doc.setFontSize(7.5);
+            setRGB([70, 70, 110]);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Polaris  ·  página ${doc.internal.getNumberOfPages()}`, pageW / 2, pageH - 8, { align: 'center' });
+            setDraw([40, 40, 75]);
+            doc.setLineWidth(0.3);
+            doc.line(margin, pageH - 12, pageW - margin, pageH - 12);
+
+            bar.style.width = '100%';
+
+            const fileName = title.replace(/[^a-zA-Z\u00C0-\u024F0-9\s]/g, '').trim().substring(0, 60) || 'resumen';
+            doc.save(`${fileName}.pdf`);
+
+            setEl('downloadTitle',   '¡PDF generado!');
+            setEl('downloadMessage', 'La descarga comenzó automáticamente');
             setTimeout(() => {
                 modal.classList.remove('show');
-                showToast('PDF descargado correctamente', 'fa-file-pdf');
-            }, 1500);
+                showToast('PDF descargado', 'fa-file-pdf');
+            }, 1000);
+
+        } catch (err) {
+            modal.classList.remove('show');
+            showToast('Error generando PDF', 'fa-circle-xmark');
+            console.error('[downloadPDF]', err);
         }
-        bar.style.width = progress + '%';
-    }, 200);
+    }, 80);
 }
 
 // ─── Animaciones ──────────────────────────────────────────────

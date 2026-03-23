@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles-shared.css">
     <link rel="stylesheet" href="../css/examen-experto.css">
+    <link rel="stylesheet" href="../css/responsive.css">
     
 </head>
 <body data-page="modo-estudio">
@@ -15,15 +16,8 @@
     <div id="sidebar-container"></div>
 
     <canvas id="starsCanvas"></canvas>
-
-    <!-- Confetti & XP Toast -->
+    <!-- Confetti -->
     <div class="confetti-container" id="confettiContainer"></div>
-    <div class="exam-xp-toast" id="xpToast">
-        <img src="glowing-star_1f31f.gif" alt="star">
-        <span class="xp-text">Ganaste</span>
-        <span class="xp-amount" id="xpToastAmount">+50 XP</span>
-    </div>
-
     <main class="content" style="padding: 0; overflow-x: hidden;">
     <div class="exam-wrapper">
 
@@ -37,7 +31,6 @@
                 </div>
                 <div class="exam-topbar-right">
                     <div class="highscore-display"><i class="fas fa-crown"></i> <span id="highscoreValue">Best: --</span></div>
-                    <div class="xp-display"><i class="fas fa-bolt"></i> <span id="xpValue">+50 XP</span></div>
                     <div class="question-counter"><span id="currentQ">1</span> / <span id="totalQ">10</span></div>
                     <div class="timer" id="timer"><i class="fas fa-clock"></i> <span class="timer-value" id="timerValue">20:00</span></div>
                 </div>
@@ -64,15 +57,26 @@
         <!-- ===== RESULTS SCREEN ===== -->
         <div class="results-screen" id="resultsScreen">
             <div class="results-card">
-                <img class="results-emoji" id="resultsEmoji" src="giphy.gif" alt="emoji">
+                <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:0.5rem">
+                    <button class="results-back-btn" onclick="exitExam()">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </button>
+                    <div style="position:relative">
+                        <button class="btn-result btn-favorite" id="favoriteBtn" onclick="toggleFavorite()" title="Guardar en favoritos">
+                            <i class="far fa-heart" id="favIcon"></i> <span id="favLabel">Guardar</span>
+                        </button>
+                        <div class="sparkles-container" id="sparklesContainer" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;width:44px;height:44px"></div>
+                    </div>
+                </div>
+                <img class="results-emoji" id="resultsEmoji" src="../images/modo-estudio/giphy.gif" alt="emoji">
                 <div class="results-main-title" id="resultsMainTitle">¡Bien hecho!</div>
                 <div class="results-main-subtitle" id="resultsMainSubtitle">Sigue practicando</div>
 
                 <!-- New High Score (igual a flashcards) -->
-                <div class="new-highscore" id="newHighscore">
-                    <img src="glowing-star_1f31f.gif" alt="star">
+                <div class="new-highscore" id="newHighscore" style="display:none">
+                    <img src="../images/gifs/star.gif" alt="star">
                     <span>¡Nuevo récord personal!</span>
-                    <img src="glowing-star_1f31f.gif" alt="star">
+                    <img src="../images/gifs/star.gif" alt="star">
                 </div>
 
                 <!-- Grade circle (igual a flashcards score ring) -->
@@ -88,7 +92,7 @@
                 </div>
 
                 <!-- XP Earned -->
-                <div class="xp-earned" id="xpEarned"><i class="fas fa-bolt"></i> <span>+0 XP ganados</span></div>
+                <div class="xp-earned" id="xpEarned"><i class="fas fa-bolt"></i> <span id="xpEarnedText">+0 XP ganados</span></div>
 
                 <div class="grade-message" id="gradeMessage"></div>
                 <div class="results-stats" id="resultsStats"></div>
@@ -100,6 +104,8 @@
 
                 <div class="results-actions">
                     <button class="btn-result btn-retry" onclick="retryExam()"><i class="fas fa-redo"></i> Intentar de nuevo</button>
+                    <button class="btn-result btn-review" onclick="reviewMistakes()" style="display:none"><i class="fas fa-search"></i> Repasar errores</button>
+                    <button class="btn-result btn-full" onclick="restartFullExam()" style="display:none"><i class="fas fa-list"></i> Examen completo</button>
                     <button class="btn-result btn-exit" onclick="exitExam()"><i class="fas fa-home"></i> Volver al inicio</button>
                 </div>
             </div>

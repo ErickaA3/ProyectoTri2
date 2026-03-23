@@ -10,7 +10,6 @@ import com.google.gson.JsonParser;
 import com.project.dao.implementation.ContentDAOImpl;
 import com.project.dao.implementation.HistorialDAOImpl;
 import com.project.dao.interfaces.IContentDAO;
-import com.project.dao.interfaces.IHistorialDAO;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -49,8 +48,8 @@ import jakarta.servlet.http.HttpSession;
 @WebServlet("/api/historial/*")
 public class HistorialServlet extends HttpServlet {
 
-    private final IContentDAO   contentDAO   = new ContentDAOImpl();
-    private final IHistorialDAO historialDAO = new HistorialDAOImpl();
+    private final IContentDAO      contentDAO   = new ContentDAOImpl();
+    private final HistorialDAOImpl historialDAO = new HistorialDAOImpl();
     private final Gson gson = new Gson();
 
     // -----------------------------------------------------------------------
@@ -118,6 +117,8 @@ public class HistorialServlet extends HttpServlet {
 
         try {
             if (contentId != null) {
+                // Limpiar duelos que referencian este contenido (FK constraint)
+                historialDAO.deleteDuelsForContent(contentId);
                 // Eliminar un solo elemento
                 boolean deleted = contentDAO.delete(contentId, userId);
                 if (!deleted) { sendError(res, 404, "Elemento no encontrado o no te pertenece."); return; }
