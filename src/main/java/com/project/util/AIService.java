@@ -35,6 +35,11 @@ public class AIService {
 
     // ── Cargar API key desde properties ──────────────────────────────────────
     private static String loadApiKey() {
+        // 1. Variable de entorno (Railway en producción)
+        String envKey = System.getenv("OPENAI_API_KEY");
+        if (envKey != null && !envKey.isBlank()) return envKey.trim();
+
+        // 2. Archivo local (desarrollo)
         try (InputStream in = AIService.class
                 .getClassLoader()
                 .getResourceAsStream("config/database.properties")) {

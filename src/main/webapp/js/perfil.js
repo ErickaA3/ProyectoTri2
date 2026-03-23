@@ -1,6 +1,6 @@
 /* ===== PERFIL.JS - Mi ProfesorIA ===== */
 
-const API_BASE = 'http://localhost:8080/project-1.0-SNAPSHOT';
+const API_BASE = window.API_BASE || '';
 
 // ─── Init ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
