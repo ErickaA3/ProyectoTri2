@@ -24,7 +24,7 @@
             </div>
             <div class="exam-topbar-right">
                 <div class="question-counter"><span id="qCurrent">1</span> / <span id="qTotal">10</span></div>
-                <div class="timer" id="timerBox"><i class="fas fa-clock"></i><span class="timer-value" id="timerDisplay">00:00</span></div>
+                <div class="timer" id="timerBox"><i class="fas fa-clock"></i><span class="timer-value" id="timerDisplay">30</span></div>
             </div>
         </div>
         <div class="progress-container"><div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div></div>
@@ -91,21 +91,64 @@
     // ── FLUJO NORMAL ──
 
     const questions=duelData.questions||[],totalQ=questions.length,duelId=duelData.duelId;
-    let currentQ=0,score=0,answers=[],startTime=Date.now(),questionStart=Date.now(),timerInterval=null,selectedIdx=null;
+    const TIME_PER_Q=duelData.timePerQuestion||30;
+    let currentQ=0,score=0,answers=[],startTime=Date.now(),questionStart=Date.now();
+    let countdownInterval=null,secondsLeft=TIME_PER_Q,selectedIdx=null;
 
     document.getElementById('duelTitle').textContent=duelData.title||'Duelo';
     document.getElementById('qTotal').textContent=totalQ;
     document.getElementById('qDots').innerHTML=questions.map((_,i)=>`<div class="q-dot ${i===0?'current':''}" id="dot-${i}"></div>`).join('');
 
-    timerInterval=setInterval(()=>{
-        const e=Math.floor((Date.now()-startTime)/1000);
-        document.getElementById('timerDisplay').textContent=String(Math.floor(e/60)).padStart(2,'0')+':'+String(e%60).padStart(2,'0');
-    },1000);
-
     initStars();showQuestion(0);
+
+    function startCountdown(){
+        secondsLeft=TIME_PER_Q;
+        updateTimerDisplay();
+        const timerBox=document.getElementById('timerBox');
+        timerBox.classList.remove('warning','danger');
+        clearInterval(countdownInterval);
+        countdownInterval=setInterval(()=>{
+            secondsLeft--;
+            updateTimerDisplay();
+            // Clases de urgencia
+            if(secondsLeft<=5){timerBox.classList.remove('warning');timerBox.classList.add('danger');}
+            else if(secondsLeft<=10){timerBox.classList.add('warning');}
+            // Se acabó el tiempo → auto-fail
+            if(secondsLeft<=0){
+                clearInterval(countdownInterval);
+                timeUpForQuestion();
+            }
+        },1000);
+    }
+
+    function updateTimerDisplay(){
+        const s=Math.max(0,secondsLeft);
+        document.getElementById('timerDisplay').textContent=String(s);
+    }
+
+    function timeUpForQuestion(){
+        if(selectedIdx!==null)return; // ya respondió
+        selectedIdx=-1; // marca como timeout
+        const q=questions[currentQ],correct=q.correct,timeMs=TIME_PER_Q*1000;
+        answers.push({questionIndex:currentQ,answerGiven:'-1',isCorrect:false,timeMs});
+        document.getElementById(`dot-${currentQ}`).classList.add('answered');
+        // Mostrar correcta
+        document.querySelectorAll('.option-btn').forEach((btn,i)=>{
+            btn.style.pointerEvents='none';
+            const letter=btn.querySelector('.option-letter');
+            if(i===correct){btn.style.borderColor='var(--accent-green)';btn.style.background='rgba(34,197,94,0.15)';letter.style.background='var(--accent-green)';letter.style.color='#0f0f23';letter.style.borderColor='var(--accent-green)';}
+        });
+        document.getElementById('btnNext').disabled=false;
+        // Auto-avanzar después de 1.2s
+        setTimeout(()=>{
+            if(currentQ<totalQ-1)showQuestion(currentQ+1);
+            else finishDuel();
+        },1200);
+    }
 
     function showQuestion(idx){
         const q=questions[idx];if(!q)return;currentQ=idx;selectedIdx=null;questionStart=Date.now();
+        clearInterval(countdownInterval);
         document.querySelectorAll('.q-dot').forEach((d,i)=>d.classList.toggle('current',i===idx));
         const card=document.getElementById('questionCard');
         card.classList.add('exit');
@@ -119,11 +162,14 @@
             const btn=document.getElementById('btnNext');btn.disabled=true;
             btn.innerHTML=idx<totalQ-1?'Siguiente <i class="fas fa-arrow-right"></i>':'<i class="fas fa-flag-checkered"></i> Finalizar';
             if(idx===totalQ-1){btn.classList.remove('btn-siguiente');btn.classList.add('btn-entregar');}
+            else{btn.classList.remove('btn-entregar');btn.classList.add('btn-siguiente');}
+            startCountdown();
         },idx===0?0:300);
     }
 
     function selectOption(idx,el){
         if(selectedIdx!==null)return;selectedIdx=idx;
+        clearInterval(countdownInterval);
         const q=questions[currentQ],correct=q.correct,isCorrect=idx===correct,timeMs=Date.now()-questionStart;
         if(isCorrect)score++;
         answers.push({questionIndex:currentQ,answerGiven:String(idx),isCorrect,timeMs});
@@ -137,10 +183,10 @@
         document.getElementById('btnNext').disabled=false;
     }
 
-    function nextQuestion(){if(selectedIdx===null)return;if(currentQ<totalQ-1)showQuestion(currentQ+1);else finishDuel();}
+    function nextQuestion(){if(selectedIdx===null)return;clearInterval(countdownInterval);if(currentQ<totalQ-1)showQuestion(currentQ+1);else finishDuel();}
 
     async function finishDuel(){
-        clearInterval(timerInterval);
+        clearInterval(countdownInterval);
         const totalTime=Math.floor((Date.now()-startTime)/1000);
         document.getElementById('examScreen').classList.add('hidden');
         document.getElementById('resultsScreen').classList.add('active');

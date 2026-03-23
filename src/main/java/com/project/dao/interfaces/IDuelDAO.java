@@ -41,7 +41,7 @@ public interface IDuelDAO {
      * @return UUID del duelo creado
      */
     String createDuel(String challengerId, String opponentId, String contentId,
-                      String topic, int questionCount) throws Exception;
+                      String topic, int questionCount, int timePerQuestion) throws Exception;
 
     /** Obtener info completa de un duelo por ID. */
     JsonObject getDuel(String duelId, String userId) throws Exception;
