@@ -378,12 +378,17 @@ async function loadEquippedBackground() {
         if (!item) return;
 
         const bgClass = BG_CLASS_MAP[item.name];
-        if (!bgClass || bgClass === 'bg-default') return;
+        if (!bgClass) return;
 
         // Aplicar al .content (padre de sidebar + chat-main)
         const content = document.querySelector('.content');
         if (content) {
-            content.classList.add(bgClass);
+            // Siempre limpiar clases previas primero
+            content.classList.remove('bg-galaxy','bg-volcano','bg-ocean','bg-forest','bg-aurora','bg-sky','bg-rain');
+            // Solo agregar si no es el default
+            if (bgClass !== 'bg-default') {
+                content.classList.add(bgClass);
+            }
         }
         console.log('[Chat] Fondo equipado:', item.name, '→', bgClass);
     } catch (e) {

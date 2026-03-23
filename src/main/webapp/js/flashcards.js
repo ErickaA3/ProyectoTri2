@@ -1,306 +1,418 @@
 // ─────────────────────────────────────────────────────────────
-//  favoritos.js — Mi ProfesorIA
-//  Conecta favoritos.html con FavoritesServlet (/api/favoritos)
+//  flashcards.js — Mi ProfesorIA
+//  Estudia flashcards generadas por IA con evaluación y score
 // ─────────────────────────────────────────────────────────────
 
-const userRaw = localStorage.getItem('user');
-let userId = null;
-if (userRaw) {
-    try { userId = JSON.parse(userRaw).id; } catch(e) {}
-}
+// ═══════════════════════════════════════════════════════════════
+// ESTADO
+// ═══════════════════════════════════════════════════════════════
+let cards       = [];
+let currentIdx  = 0;
+let isFlipped   = false;
+let answers     = [];   // { correct: bool } por cada card
+let highScore   = 0;
+let reviewMode  = false;
 
-let favorites     = [];
-let currentFilter = 'all';
-let itemToRemove  = null;
+// ═══════════════════════════════════════════════════════════════
+// INICIALIZACIÓN
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+    // Stars background
+    initStars();
 
-// Mapeo tipo BD → nombre de opción en sesion-estudio
-const typeToOption = {
-    flashcard: 'flashcards',
-    schema:    'esquemas',
-    summary:   'resumenes',
-    quiz:      'examenes'
-};
-
-// ─────────────────────────────────────────────────────────────
-//  CARGA INICIAL
-// ─────────────────────────────────────────────────────────────
-
-async function loadFavorites() {
-    if (!userId) {
-        window.location.href = '../index.html';
-        return;
-    }
+    // Cargar datos desde sessionStorage
+    const raw = sessionStorage.getItem('studyResults');
+    if (!raw) { goBack(); return; }
 
     try {
-        const response = await fetch('../api/favoritos', {
-            headers: { 'X-User-Id': userId }
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error('[Favoritos] Error del servidor:', data.error);
-            return;
+        const results = JSON.parse(raw);
+        const data = results.flashcards;
+        if (!data || !data.cards || data.cards.length === 0) {
+            goBack(); return;
         }
+        cards = data.cards;
+        document.getElementById('topicLabel').textContent = data.title || 'Flashcards';
+    } catch (e) {
+        console.error('Error parsing flashcards:', e);
+        goBack(); return;
+    }
 
-        favorites = data.map(item => ({
-            id:       item.id,
-            type:     item.type,
-            title:    item.title || 'Sin título',
-            category: mapTypeToLabel(item.type),
-            icon:     mapTypeToIcon(item.type)
-        }));
+    // Cargar high score
+    const savedHS = localStorage.getItem('fc_highscore_' + cards.length);
+    if (savedHS) highScore = parseInt(savedHS);
+    document.getElementById('highScoreDisplay').textContent = highScore + '%';
 
-        renderFavorites();
+    // Inicializar
+    answers = new Array(cards.length).fill(null);
+    document.getElementById('totalNum').textContent = cards.length;
+    buildDots();
+    showCard(0);
+});
 
-    } catch (error) {
-        console.error('[Favoritos] Error de conexión:', error);
+// ═══════════════════════════════════════════════════════════════
+// NAVEGACIÓN DE TARJETAS
+// ═══════════════════════════════════════════════════════════════
+function showCard(idx) {
+    currentIdx = idx;
+    isFlipped = false;
+
+    const card = cards[idx];
+    document.getElementById('questionText').textContent = card.front;
+    document.getElementById('answerText').textContent = card.back;
+    document.getElementById('currentNum').textContent = idx + 1;
+
+    // Reset flip
+    document.getElementById('flashcard').classList.remove('flipped');
+
+    // Progress
+    const pct = ((idx + 1) / cards.length) * 100;
+    document.getElementById('progressFill').style.width = pct + '%';
+
+    // Nav buttons
+    document.getElementById('prevBtn').disabled = idx === 0;
+
+    // Eval buttons: mostrar solo si la tarjeta está volteada y no evaluada
+    updateEvalVisibility();
+
+    // Dots
+    updateDots();
+}
+
+function flipCard() {
+    isFlipped = !isFlipped;
+    document.getElementById('flashcard').classList.toggle('flipped');
+    updateEvalVisibility();
+}
+
+function nextCard() {
+    if (currentIdx < cards.length - 1) {
+        showCard(currentIdx + 1);
+    } else {
+        // Si todas evaluadas, mostrar resultados
+        if (answers.every(a => a !== null)) {
+            showResults();
+        }
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  QUITAR FAVORITO
-// ─────────────────────────────────────────────────────────────
-
-async function removeFavorite(contentId) {
-    try {
-        const response = await fetch('../api/favoritos', {
-            method:  'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Id': userId
-            },
-            body: JSON.stringify({
-                contentId:  contentId,
-                isFavorite: false
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            favorites = favorites.filter(f => f.id !== contentId);
-            renderFavorites();
-            showToast('Eliminado de favoritos');
-        } else {
-            console.error('[Favoritos] No se pudo eliminar:', data.error);
-            showToast('Error al eliminar favorito');
-        }
-
-    } catch (error) {
-        console.error('[Favoritos] Error de conexión:', error);
+function prevCard() {
+    if (currentIdx > 0) {
+        showCard(currentIdx - 1);
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  VER CONTENIDO — fetch completo + redirigir a sesion-estudio
-// ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// EVALUACIÓN
+// ═══════════════════════════════════════════════════════════════
+function markAnswer(correct) {
+    answers[currentIdx] = { correct };
+    updateDots();
 
-async function openItem(id) {
-    try {
-        const response = await fetch(`../api/favoritos/${id}`, {
-            headers: { 'X-User-Id': userId }
-        });
+    // XP toast
+    if (correct) showXPToast('+10 XP');
 
-        if (!response.ok) {
-            showToast('Error al cargar el contenido');
-            return;
+    // Avanzar automáticamente
+    setTimeout(() => {
+        if (currentIdx < cards.length - 1) {
+            nextCard();
+        } else if (answers.every(a => a !== null)) {
+            showResults();
         }
+    }, 400);
+}
 
-        const data = await response.json();
-        // data = { type: "schema", title: "...", isFavorite: true, content: {...} }
-
-        const dbType = data.type;
-        const option = typeToOption[dbType];
-
-        if (!option) {
-            showToast('Tipo de contenido no soportado');
-            return;
-        }
-
-        // Construir studyResults en el formato que espera sesion-estudio
-        const contentObj = data.content;
-        contentObj.id    = id;
-        contentObj.title = data.title;
-
-        const studyResults = {};
-        studyResults[option] = contentObj;
-
-        const flow = {
-            userId:  userId,
-            options: [option],
-            configs: {}
-        };
-
-        // Recuperar el tipo específico del contenido (esquema, examen, etc.)
-        if (option === 'esquemas' && contentObj.schemaType) {
-            flow.configs.esquemas = { tipo: contentObj.schemaType };
-        }
-        if (option === 'examenes' && contentObj.schemaType) {
-            flow.configs.examenes = { tipo: contentObj.schemaType };
-        }
-
-        sessionStorage.setItem('studyResults', JSON.stringify(studyResults));
-        sessionStorage.setItem('modoEstudioFlow', JSON.stringify(flow));
-        sessionStorage.setItem('fromHistorial', 'true');
-
-        window.location.href = '../pages/sesion-estudio.html';
-
-    } catch (error) {
-        console.error('[Favoritos] Error al abrir contenido:', error);
-        showToast('Error de conexión');
+function updateEvalVisibility() {
+    const evalBtns = document.getElementById('evalButtons');
+    // Mostrar si está volteada y no evaluada
+    if (isFlipped && answers[currentIdx] === null) {
+        evalBtns.style.opacity = '1';
+        evalBtns.style.pointerEvents = 'auto';
+    } else {
+        evalBtns.style.opacity = '0.3';
+        evalBtns.style.pointerEvents = 'none';
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  RENDER
-// ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// DOTS (indicadores de progreso)
+// ═══════════════════════════════════════════════════════════════
+function buildDots() {
+    const container = document.getElementById('dotsContainer');
+    container.innerHTML = cards.map((_, i) =>
+        `<div class="fc-dot" data-idx="${i}" onclick="showCard(${i})"></div>`
+    ).join('');
+}
 
-function renderFavorites() {
-    const grid       = document.getElementById('favoritesGrid');
-    const emptyState = document.getElementById('emptyState');
-    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-
-    const filtered = favorites.filter(item => {
-        const matchesFilter = currentFilter === 'all' || item.type === currentFilter;
-        const matchesSearch = item.title.toLowerCase().includes(searchTerm);
-        return matchesFilter && matchesSearch;
+function updateDots() {
+    document.querySelectorAll('.fc-dot').forEach((dot, i) => {
+        dot.className = 'fc-dot';
+        if (i === currentIdx) dot.classList.add('current');
+        if (answers[i] !== null) {
+            dot.classList.add(answers[i].correct ? 'correct' : 'incorrect');
+        }
     });
+}
 
-    if (filtered.length === 0) {
-        grid.style.display = 'none';
-        emptyState.style.display = 'block';
+// ═══════════════════════════════════════════════════════════════
+// RESULTADOS
+// ═══════════════════════════════════════════════════════════════
+function showResults() {
+    const correct   = answers.filter(a => a && a.correct).length;
+    const incorrect = answers.filter(a => a && !a.correct).length;
+    const score     = Math.round((correct / cards.length) * 100);
+
+    // Hide study, show results
+    document.getElementById('studyView').classList.add('hidden');
+    document.getElementById('resultsView').classList.add('active');
+
+    // Emoji y mensajes según score
+    const resultsTitle = document.getElementById('resultsTitle');
+    const resultsSub   = document.getElementById('resultsSubtitle');
+    if (score >= 90) {
+        resultsTitle.textContent = '¡Increíble!';
+        resultsSub.textContent = 'Dominas este tema completamente';
+    } else if (score >= 70) {
+        resultsTitle.textContent = '¡Muy bien!';
+        resultsSub.textContent = 'Casi perfecto, sigue así';
+    } else if (score >= 50) {
+        resultsTitle.textContent = '¡Buen intento!';
+        resultsSub.textContent = 'Repasa las que fallaste para mejorar';
+    } else {
+        resultsTitle.textContent = 'Hay que repasar';
+        resultsSub.textContent = 'No te rindas, intenta de nuevo';
+    }
+
+    // Stats
+    document.getElementById('correctCount').textContent = correct;
+    document.getElementById('incorrectCount').textContent = incorrect;
+    document.getElementById('scoreNumber').textContent = score + '%';
+
+    // High score
+    const isNewHS = score > highScore;
+    if (isNewHS) {
+        highScore = score;
+        localStorage.setItem('fc_highscore_' + cards.length, highScore);
+    }
+    document.getElementById('highScoreResult').textContent = highScore + '%';
+    document.getElementById('highScoreDisplay').textContent = highScore + '%';
+    document.getElementById('newHighscore').style.display = isNewHS ? 'flex' : 'none';
+
+    // Score ring animation
+    const ring = document.getElementById('scoreRing');
+    const circumference = 2 * Math.PI * 75; // r=75
+    const offset = circumference - (score / 100) * circumference;
+    setTimeout(() => {
+        ring.style.transition = 'stroke-dashoffset 1.5s ease';
+        ring.style.strokeDashoffset = offset;
+        // Color según score
+        if (score >= 70) ring.style.stroke = '#22c55e';
+        else if (score >= 50) ring.style.stroke = '#fbbf24';
+        else ring.style.stroke = '#ef4444';
+    }, 200);
+
+    // Answers detail
+    const detail = document.getElementById('answersDetail');
+    const detailHTML = cards.map((card, i) => {
+        const ans = answers[i];
+        const isCorrect = ans && ans.correct;
+        return `
+            <div class="fc-answer-item ${isCorrect ? 'is-correct' : 'is-incorrect'}">
+                <div class="fc-answer-status ${isCorrect ? 'green' : 'red'}">
+                    <i class="fas ${isCorrect ? 'fa-check' : 'fa-times'}"></i>
+                </div>
+                <div class="fc-answer-text">
+                    <div class="fc-answer-q">${card.front}</div>
+                    <div class="fc-answer-a">${card.back}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+    detail.innerHTML = `<div class="fc-answers-title"><i class="fas fa-list-check"></i> Detalle de respuestas</div>` + detailHTML;
+
+    // Confetti si score > 70
+    if (score >= 70) launchConfetti();
+
+    // XP por completar
+    showXPToast('+25 XP');
+
+    // Gamification hook (si existe)
+    if (typeof Gamification !== 'undefined' && Gamification.addXP) {
+        const xp = score >= 90 ? 50 : score >= 70 ? 35 : 25;
+        Gamification.addXP(xp);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ACCIONES DE RESULTADOS
+// ═══════════════════════════════════════════════════════════════
+function restartFlashcards() {
+    answers = new Array(cards.length).fill(null);
+    reviewMode = false;
+    document.getElementById('resultsView').classList.remove('active');
+    document.getElementById('studyView').classList.remove('hidden');
+
+    // Reset score ring
+    const ring = document.getElementById('scoreRing');
+    ring.style.transition = 'none';
+    ring.style.strokeDashoffset = 471.24;
+
+    showCard(0);
+}
+
+function reviewMistakes() {
+    const mistakeIndices = answers
+        .map((a, i) => (a && !a.correct) ? i : -1)
+        .filter(i => i !== -1);
+
+    if (mistakeIndices.length === 0) {
+        restartFlashcards();
         return;
     }
 
-    grid.style.display = 'grid';
-    emptyState.style.display = 'none';
+    // Crear subset solo con errores
+    const originalCards = [...cards];
+    cards = mistakeIndices.map(i => originalCards[i]);
+    answers = new Array(cards.length).fill(null);
+    reviewMode = true;
 
-    grid.innerHTML = filtered.map(item => `
-        <div class="favorite-card ${item.type}" onclick="openItem('${item.id}')">
-            <div class="card-stars">${generateStars()}</div>
-            <span class="card-type-badge ${item.type}">${item.type.toUpperCase()}</span>
-            <i class="fas fa-star card-star"></i>
-            <div class="card-preview ${item.type}">
-                <i class="${item.icon} card-preview-icon"></i>
-            </div>
-            <div class="card-content">
-                <h3 class="card-title">${item.title}</h3>
-                <div class="card-category ${item.type}">
-                    <i class="${item.icon}"></i>
-                    ${item.category}
-                </div>
-                <div class="card-actions">
-                    <button class="card-btn-ver" onclick="event.stopPropagation(); openItem('${item.id}')">
-                        <i class="fas fa-play"></i> Ver
-                    </button>
-                    <button class="card-btn-heart active" onclick="event.stopPropagation(); handleHeartClick('${item.id}', '${item.title}', this)">
-                        <i class="fas fa-heart"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `).join('');
+    document.getElementById('resultsView').classList.remove('active');
+    document.getElementById('studyView').classList.remove('hidden');
+    document.getElementById('totalNum').textContent = cards.length;
+
+    // Reset ring
+    const ring = document.getElementById('scoreRing');
+    ring.style.transition = 'none';
+    ring.style.strokeDashoffset = 471.24;
+
+    buildDots();
+    showCard(0);
 }
 
-// ─────────────────────────────────────────────────────────────
-//  FILTROS Y BÚSQUEDA
-// ─────────────────────────────────────────────────────────────
-
-function setFilter(filter, element) {
-    currentFilter = filter;
-    document.querySelectorAll('.filter-tab').forEach(tab => tab.classList.remove('active'));
-    element.classList.add('active');
-    renderFavorites();
-}
-
-function filterFavorites() {
-    renderFavorites();
-}
-
-// ─────────────────────────────────────────────────────────────
-//  CORAZÓN — modal de confirmación
-// ─────────────────────────────────────────────────────────────
-
-function handleHeartClick(id, title, btn) {
-    btn.classList.remove('active');
-    btn.innerHTML = '<i class="far fa-heart"></i>';
-    showRemoveModal(id, title);
-}
-
-function showRemoveModal(id, title) {
-    itemToRemove = { id, title };
-    document.getElementById('modalItemName').textContent = `"${title}"`;
-    document.getElementById('removeModal').classList.add('show');
-}
-
-function closeRemoveModal() {
-    document.getElementById('removeModal').classList.remove('show');
-    itemToRemove = null;
-}
-
-function confirmRemove() {
-    if (itemToRemove) {
-        removeFavorite(itemToRemove.id);
-        closeRemoveModal();
-    }
-}
-
-// ─────────────────────────────────────────────────────────────
-//  UTILIDADES
-// ─────────────────────────────────────────────────────────────
-
-function generateStars() {
-    let html = '';
-    for (let i = 0; i < 20; i++) {
-        const size  = 1 + Math.random() * 2;
-        const left  = Math.random() * 100;
-        const top   = Math.random() * 100;
-        const delay = Math.random() * 2;
-        html += `<div class="star" style="width:${size}px;height:${size}px;left:${left}%;top:${top}%;animation-delay:${delay}s"></div>`;
-    }
-    return html;
-}
-
-function mapTypeToLabel(type) {
-    const labels = {
-        flashcard: 'Flashcard',
-        schema:    'Esquema',
-        summary:   'Resumen',
-        quiz:      'Quiz'
-    };
-    return labels[type] || type;
-}
-
-function mapTypeToIcon(type) {
-    const icons = {
-        flashcard: 'fas fa-layer-group',
-        schema:    'fas fa-project-diagram',
-        summary:   'fas fa-file-alt',
-        quiz:      'fas fa-clipboard-list'
-    };
-    return icons[type] || 'fas fa-file';
-}
-
-function showToast(message) {
-    const toast = document.getElementById('toast');
-    document.getElementById('toastMessage').textContent = message;
+// ═══════════════════════════════════════════════════════════════
+// XP TOAST
+// ═══════════════════════════════════════════════════════════════
+function showXPToast(text) {
+    const toast = document.getElementById('xpToast');
+    document.getElementById('xpAmount').textContent = text;
     toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 3000);
+    setTimeout(() => toast.classList.remove('show'), 2000);
 }
 
-// ─────────────────────────────────────────────────────────────
-//  EVENTOS
-// ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// CONFETTI
+// ═══════════════════════════════════════════════════════════════
+function launchConfetti() {
+    const container = document.getElementById('confettiContainer');
+    const colors = ['#2dd4bf', '#8b5cf6', '#fbbf24', '#ec4899', '#3b82f6', '#22c55e'];
 
-document.getElementById('removeModal').addEventListener('click', function(e) {
-    if (e.target === this) closeRemoveModal();
+    for (let i = 0; i < 60; i++) {
+        const piece = document.createElement('div');
+        piece.style.cssText = `
+            position:fixed; width:${6 + Math.random()*6}px; height:${6 + Math.random()*6}px;
+            background:${colors[Math.floor(Math.random()*colors.length)]};
+            left:${Math.random()*100}vw; top:-10px;
+            border-radius:${Math.random() > 0.5 ? '50%' : '2px'};
+            animation:confettiFall ${2 + Math.random()*2}s ease-in forwards;
+            animation-delay:${Math.random()*0.5}s;
+            z-index:9999; pointer-events:none;
+        `;
+        container.appendChild(piece);
+    }
+
+    // Cleanup
+    setTimeout(() => container.innerHTML = '', 5000);
+}
+
+// Add confetti animation
+const confettiStyle = document.createElement('style');
+confettiStyle.textContent = `
+    @keyframes confettiFall {
+        0% { transform: translateY(0) rotate(0deg); opacity:1; }
+        100% { transform: translateY(100vh) rotate(${360 + Math.random()*360}deg); opacity:0; }
+    }
+`;
+document.head.appendChild(confettiStyle);
+
+// ═══════════════════════════════════════════════════════════════
+// NAVEGACIÓN
+// ═══════════════════════════════════════════════════════════════
+function goBack(e) {
+    if (e) e.preventDefault();
+    // Volver a sesion-estudio con los resultados existentes
+    window.location.href = '../pages/sesion-estudio.html';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TECLADO
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+    switch (e.key) {
+        case ' ':
+        case 'Enter':
+            e.preventDefault();
+            flipCard();
+            break;
+        case 'ArrowRight':
+            nextCard();
+            break;
+        case 'ArrowLeft':
+            prevCard();
+            break;
+        case '1':
+            if (isFlipped && answers[currentIdx] === null) markAnswer(true);
+            break;
+        case '2':
+            if (isFlipped && answers[currentIdx] === null) markAnswer(false);
+            break;
+    }
 });
 
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeRemoveModal();
-});
+// ═══════════════════════════════════════════════════════════════
+// STARS BACKGROUND
+// ═══════════════════════════════════════════════════════════════
+function initStars() {
+    const canvas = document.getElementById('starsCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const content = document.getElementById('mainContent');
 
-const _ft = PolarisLoading.rotateMessages('favoritosLoadingSub',
-    ['Cargando favoritos...', 'Buscando tu contenido...', 'Casi listo...']);
-loadFavorites().finally(() => { clearInterval(_ft); PolarisLoading.hide('favoritosLoading'); });
+    function resize() {
+        canvas.width = content.offsetWidth;
+        canvas.height = Math.max(content.scrollHeight, window.innerHeight);
+    }
+    resize();
+
+    const stars = Array.from({ length: 100 }, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 1.8 + 0.3,
+        speedX: (Math.random() - 0.5) * 0.06,
+        speedY: (Math.random() - 0.5) * 0.06,
+        opacity: Math.random() * 0.4 + 0.1,
+        opacityChange: (Math.random() - 0.5) * 0.008,
+        color: ['#ffffff', '#c4b5fd', '#99f6e4'][Math.floor(Math.random() * 3)]
+    }));
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        stars.forEach(s => {
+            s.x += s.speedX;
+            s.y += s.speedY;
+            if (s.x < 0) s.x = canvas.width;
+            if (s.x > canvas.width) s.x = 0;
+            if (s.y < 0) s.y = canvas.height;
+            if (s.y > canvas.height) s.y = 0;
+            s.opacity += s.opacityChange;
+            if (s.opacity <= 0.05 || s.opacity >= 0.5) s.opacityChange *= -1;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+            ctx.fillStyle = s.color;
+            ctx.globalAlpha = s.opacity;
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+        requestAnimationFrame(animate);
+    }
+    animate();
+    window.addEventListener('resize', resize);
+}

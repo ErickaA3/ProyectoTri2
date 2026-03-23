@@ -595,151 +595,82 @@ html *:active {
     cursor: default;
 }
 
-.streak-shield-badge {
+/* ── Shield Pill (protector separado, a la izquierda de la racha) ── */
+.shield-pill {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 16px;
-    height: 16px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    height: 34px;
+    border-radius: 17px;
+    background: linear-gradient(135deg, rgba(56,189,248,0.12), rgba(99,102,241,0.12));
+    border: 1px solid rgba(56,189,248,0.3);
+    padding: 0 4px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    max-width: 34px;
+    transition: max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                padding 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                background 0.3s ease,
+                border-color 0.3s ease,
+                opacity 0.4s ease;
+}
+.shield-pill:hover {
+    max-width: 200px;
+    padding: 0 12px 0 4px;
+    background: linear-gradient(135deg, rgba(56,189,248,0.18), rgba(99,102,241,0.18));
+    border-color: rgba(56,189,248,0.5);
+}
+
+.shield-icon-wrap {
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
-    font-size: 0.55rem;
+    background: linear-gradient(135deg, #38bdf8, #6366f1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px rgba(56,189,248,0.5);
+    animation: shieldGlow 2.5s ease-in-out infinite;
+}
+.shield-icon-wrap i {
+    font-size: 0.65rem;
     color: #fff;
-    margin-left: 2px;
-    box-shadow: 0 0 6px rgba(139,92,246,0.6);
-    animation: shieldPulse 2.5s ease-in-out infinite;
 }
 
-@keyframes shieldPulse {
-    0%, 100% { box-shadow: 0 0 6px rgba(139,92,246,0.5); }
-    50%       { box-shadow: 0 0 14px rgba(139,92,246,0.95), 0 0 22px rgba(99,102,241,0.4); }
+@keyframes shieldGlow {
+    0%, 100% { box-shadow: 0 0 6px rgba(56,189,248,0.4); }
+    50%      { box-shadow: 0 0 14px rgba(56,189,248,0.8), 0 0 22px rgba(99,102,241,0.3); }
 }
 
-.streak-tooltip {
-    position: absolute;
-    top: calc(100% + 10px);
-    left: 50%;
-    transform: translateX(-50%) translateY(-4px);
-    min-width: 215px;
+.shield-expand {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    overflow: hidden;
     opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    z-index: 2000;
+    max-width: 0;
+    margin-left: 0;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                max-width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                margin-left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
-
-.stat-pill-streak:hover .streak-tooltip {
+.shield-pill:hover .shield-expand {
     opacity: 1;
-    transform: translateX(-50%) translateY(0);
-    pointer-events: auto;
+    max-width: 150px;
+    margin-left: 8px;
 }
-
-.streak-tooltip::before {
-    content: '';
-    position: absolute;
-    top: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    border: 6px solid transparent;
-    border-bottom-color: rgba(26, 26, 53, 0.98);
-    border-top: none;
+.shield-expand i {
+    font-size: 0.65rem;
+    color: #38bdf8;
 }
-
-.streak-tooltip-inner {
-    background: linear-gradient(165deg, rgba(26,26,53,0.98), rgba(15,15,35,0.98));
-    border: 1px solid rgba(255,107,107,0.2);
-    border-radius: 14px;
-    padding: 1rem 1.1rem;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 20px rgba(255,107,107,0.07);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.45rem;
-    text-align: center;
-}
-
-.streak-tooltip-header {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
+.shield-timer {
     font-size: 0.7rem;
-    color: rgba(255,255,255,0.45);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-
-.streak-tooltip-days {
-    font-size: 2.6rem;
     font-weight: 700;
-    color: #ff6b6b;
-    line-height: 1;
-    text-shadow: 0 0 22px rgba(255,107,107,0.5);
+    font-family: "Space Mono", monospace;
+    color: rgba(255,255,255,0.75);
 }
 
-.streak-tooltip-label {
-    font-size: 0.72rem;
-    color: rgba(255,255,255,0.4);
-    margin-top: -4px;
-}
-
-.streak-tooltip-divider {
-    width: 100%;
-    height: 1px;
-    background: rgba(255,255,255,0.06);
-    margin: 0.15rem 0;
-}
-
-.streak-tooltip-timer {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.77rem;
-    color: rgba(255,255,255,0.55);
-    background: rgba(255,255,255,0.04);
-    border-radius: 8px;
-    padding: 0.35rem 0.7rem;
-    width: 100%;
-    justify-content: center;
-    transition: color 0.3s, background 0.3s, border 0.3s;
-    border: 1px solid transparent;
-}
-
-.streak-tooltip-timer i { color: var(--accent-cyan); font-size: 0.7rem; }
-
-.streak-timer-urgent {
-    background: rgba(239,68,68,0.1) !important;
-    color: #fca5a5 !important;
-    border-color: rgba(239,68,68,0.25) !important;
-    animation: urgentPulse 1.2s ease-in-out infinite;
-}
-.streak-timer-urgent i { color: #f87171 !important; }
-
-@keyframes urgentPulse {
-    0%, 100% { background: rgba(239,68,68,0.07); }
-    50%       { background: rgba(239,68,68,0.17); }
-}
-
-.streak-shield-row,
-.streak-noshield-row {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    font-size: 0.71rem;
-    border-radius: 8px;
-    padding: 0.3rem 0.65rem;
-    width: 100%;
-    justify-content: center;
-}
-
-.streak-shield-row {
-    color: #a78bfa;
-    background: rgba(139,92,246,0.12);
-    border: 1px solid rgba(139,92,246,0.2);
-}
-.streak-shield-row i { color: #8b5cf6; }
-
-.streak-noshield-row {
-    color: rgba(255,255,255,0.28);
-    background: rgba(255,255,255,0.03);
-    border: 1px solid transparent;
-}
-.streak-noshield-row i { opacity: 0.3; }
+/* (streak tooltip removed — info moved to shield pill) */
