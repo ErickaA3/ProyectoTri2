@@ -71,20 +71,25 @@
                 opacity: Math.random()*0.5+0.5, wobble: Math.random()*Math.PI*2, wobbleSpeed: Math.random()*0.03+0.01 };
         }
         for (let i=0;i<15;i++) { const l=createLeaf(); l.y=Math.random()*c.height; leaves.push(l); }
+        let forestRunning = false;
         function animate() {
-            if (!hasBg('bg-forest')) { requestAnimationFrame(animate); return; }
-            ctx.clearRect(0,0,c.width,c.height);
-            if (leafImg.complete && leafImg.naturalWidth>0) {
-                leaves.forEach((l,i) => {
-                    l.wobble+=l.wobbleSpeed; l.y+=l.speedY; l.x+=l.speedX+Math.sin(l.wobble)*0.2; l.rotation+=l.rotationSpeed;
-                    if (l.y>c.height+100) leaves[i]=createLeaf();
-                    if (l.x<-100) l.x=c.width+50; if (l.x>c.width+100) l.x=-50;
-                    ctx.save(); ctx.translate(l.x,l.y); ctx.rotate(l.rotation); ctx.globalAlpha=l.opacity;
-                    const w=leafImg.width*l.scale, h=leafImg.height*l.scale;
-                    ctx.drawImage(leafImg,-w/2,-h/2,w,h); ctx.restore();
-                });
-            }
-            ctx.globalAlpha=1; requestAnimationFrame(animate);
+            if (forestRunning) return;
+            forestRunning = true;
+            (function loop() {
+                if (!hasBg('bg-forest')) { requestAnimationFrame(loop); return; }
+                ctx.clearRect(0,0,c.width,c.height);
+                if (leafImg.complete && leafImg.naturalWidth>0) {
+                    leaves.forEach((l,i) => {
+                        l.wobble+=l.wobbleSpeed; l.y+=l.speedY; l.x+=l.speedX+Math.sin(l.wobble)*0.2; l.rotation+=l.rotationSpeed;
+                        if (l.y>c.height+100) leaves[i]=createLeaf();
+                        if (l.x<-100) l.x=c.width+50; if (l.x>c.width+100) l.x=-50;
+                        ctx.save(); ctx.translate(l.x,l.y); ctx.rotate(l.rotation); ctx.globalAlpha=l.opacity;
+                        const w=leafImg.width*l.scale, h=leafImg.height*l.scale;
+                        ctx.drawImage(leafImg,-w/2,-h/2,w,h); ctx.restore();
+                    });
+                }
+                ctx.globalAlpha=1; requestAnimationFrame(loop);
+            })();
         }
         leafImg.onload = animate;
         if (leafImg.complete) animate();
@@ -201,25 +206,30 @@
                 speed:Math.random()*0.4+0.2, opacity:Math.random()*0.4+0.3 };
         }
         for(let i=0;i<8;i++) clouds.push(mkC(i));
+        let skyRunning = false;
         function animate() {
-            if (!hasBg('bg-sky')) { requestAnimationFrame(animate); return; }
-            ctx.clearRect(0,0,c.width,c.height);
-            stars.forEach(s => {
-                s.opacity+=s.opacityChange;
-                if(s.opacity<0.1||s.opacity>0.8) s.opacityChange*=-1;
-                ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI*2);
-                ctx.fillStyle=`rgba(255,255,255,${s.opacity})`; ctx.fill();
-            });
-            if(cloudImg.complete&&cloudImg.naturalWidth) {
-                clouds.forEach((cl,i) => {
-                    cl.x+=cl.speed;
-                    if(cl.x>c.width+100) { clouds[i]=mkC(); clouds[i].x=-cloudImg.width*clouds[i].scale; }
-                    ctx.save(); ctx.globalAlpha=cl.opacity;
-                    ctx.drawImage(cloudImg,cl.x,cl.y,cloudImg.width*cl.scale,cloudImg.height*cl.scale);
-                    ctx.restore();
+            if (skyRunning) return;
+            skyRunning = true;
+            (function loop() {
+                if (!hasBg('bg-sky')) { requestAnimationFrame(loop); return; }
+                ctx.clearRect(0,0,c.width,c.height);
+                stars.forEach(s => {
+                    s.opacity+=s.opacityChange;
+                    if(s.opacity<0.1||s.opacity>0.8) s.opacityChange*=-1;
+                    ctx.beginPath(); ctx.arc(s.x,s.y,s.size,0,Math.PI*2);
+                    ctx.fillStyle=`rgba(255,255,255,${s.opacity})`; ctx.fill();
                 });
-            }
-            requestAnimationFrame(animate);
+                if(cloudImg.complete&&cloudImg.naturalWidth) {
+                    clouds.forEach((cl,i) => {
+                        cl.x+=cl.speed;
+                        if(cl.x>c.width+100) { clouds[i]=mkC(); clouds[i].x=-cloudImg.width*clouds[i].scale; }
+                        ctx.save(); ctx.globalAlpha=cl.opacity;
+                        ctx.drawImage(cloudImg,cl.x,cl.y,cloudImg.width*cl.scale,cloudImg.height*cl.scale);
+                        ctx.restore();
+                    });
+                }
+                requestAnimationFrame(loop);
+            })();
         }
         cloudImg.onload = animate;
         if(cloudImg.complete) animate();

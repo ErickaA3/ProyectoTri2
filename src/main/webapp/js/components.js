@@ -826,5 +826,17 @@ const PolarisLoading = {
     }
 };
 
+// Shield pill: tap to expand/collapse en mobile
+document.addEventListener('click', function(e) {
+    const pill = e.target.closest('.shield-pill');
+    if (pill) {
+        pill.classList.toggle('expanded');
+    } else {
+        document.querySelectorAll('.shield-pill.expanded').forEach(function(p) {
+            p.classList.remove('expanded');
+        });
+    }
+});
+
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initComponents);
