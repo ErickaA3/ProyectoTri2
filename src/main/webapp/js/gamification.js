@@ -14,7 +14,7 @@
  *   }
  */
 
-const GAMIFICATION_API = '/project-1.0-SNAPSHOT/api/gamification';
+const GAMIFICATION_API = (window.API_BASE || '') + '/api/gamification';
 
 // ─── Obtener userId del localStorage ─────────────────────────────────────
 function getGamificationUserId() {

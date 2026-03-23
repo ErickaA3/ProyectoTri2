@@ -9,7 +9,7 @@
  *  5. openItem navega correctamente según tipo
  */
 
-const API = '/project-1.0-SNAPSHOT/api/historial';
+const API = (window.API_BASE || '') + '/api/historial';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURACIÓN POR TIPO

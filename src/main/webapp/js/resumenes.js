@@ -18,7 +18,7 @@
  * }
  */
 
-const API = '/project-1.0-SNAPSHOT/api/summaries';
+const API = (window.API_BASE || '') + '/api/summaries';
 
 // ─── Auth (mismo patrón que historial.js) ────────────────────
 function getUserId() {

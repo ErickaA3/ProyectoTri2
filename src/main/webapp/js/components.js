@@ -1,3 +1,6 @@
+// ── Context path: ROOT.war se despliega en / tanto en local como en Railway ──
+window.API_BASE = '';
+
 /* ===== COMPONENTES JS - Polaris / Mi ProfesorIA ===== */
 
 // ── Datos del usuario ──
@@ -650,7 +653,7 @@ function autoRefreshStats() {
     }
 
     // Fallback: fetch directo si gamification.js no está en la página
-    const API_BASE = '/project-1.0-SNAPSHOT/api/gamification';
+    const API_BASE = window.API_BASE + '/api/gamification';
     fetch(`${API_BASE}/stats`, {
         headers: { 'X-User-Id': user.id }
     })
@@ -825,7 +828,6 @@ const PolarisLoading = {
         }, intervalMs);
     }
 };
-
 // Shield pill: tap to expand/collapse en mobile
 document.addEventListener('click', function(e) {
     const pill = e.target.closest('.shield-pill');
@@ -837,6 +839,5 @@ document.addEventListener('click', function(e) {
         });
     }
 });
-
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initComponents);
