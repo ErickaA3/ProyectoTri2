@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="../css/styles-shared.css">
 <link rel="stylesheet" href="../css/chat.css">
+<link rel="stylesheet" href="../css/responsive.css">
 </head>
 <body data-page="mi-profesor">
 
@@ -120,6 +121,11 @@
     <!-- ══ CHAT PRINCIPAL ══ -->
     <div class="chat-main">
 
+      <!-- Botón para abrir chats recientes en mobile -->
+      <button class="chat-mobile-toggle" onclick="toggleChatSidebar()">
+        <i class="fas fa-clock-rotate-left"></i>
+      </button>
+
       <!-- Canvas para efectos animados de fondo -->
       <canvas id="galaxyCanvas"  class="chat-canvas"></canvas>
       <canvas id="forestCanvas"  class="chat-canvas"></canvas>
@@ -187,6 +193,9 @@
       </div>
 
     </div><!-- /chat-main -->
+
+    <!-- Overlay para cerrar sidebar en mobile -->
+    <div class="chat-sidebar-overlay" id="chatSidebarOverlay" onclick="toggleChatSidebar()"></div>
   </main>
 
   <!-- Modal: Confirmar eliminar chat -->
@@ -206,6 +215,13 @@
   <script src="../js/components.js"></script>
   <script src="../js/chat.js"></script>
   <script src="../js/backgrounds-fx.js"></script>
+  <script>
+    // Toggle chat sidebar en mobile
+    function toggleChatSidebar() {
+        document.querySelector('.chat-sidebar').classList.toggle('mobile-open');
+        document.getElementById('chatSidebarOverlay').classList.toggle('active');
+    }
+  </script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
         if (typeof PolarisLoading !== 'undefined')

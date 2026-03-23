@@ -1,0 +1,489 @@
+/* ═══════════════════════════════════════════════════════════════
+   responsive.css — Polaris
+   Incluir DESPUÉS del CSS de cada página:
+     <link rel="stylesheet" href="../css/responsive.css">
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1200px ── */
+@media (max-width: 1200px) {
+    .background-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ── 1024px ── */
+@media (max-width: 1024px) {
+    body[data-page="perfil"] .content { padding: 1.5rem; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .objectives-grid { grid-template-columns: 1fr; }
+    .info-grid-content { grid-template-columns: 1fr; }
+    .study-options { grid-template-columns: repeat(2, 1fr); }
+    .chat-sidebar { width: 220px; }
+    .flashcard-wrapper { max-width: 95%; }
+    .favorites-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+}
+
+/* ── 768px ── */
+@media (max-width: 768px) {
+
+    /* NAVBAR: forzar labels ocultas + compactar */
+    .stat-pill .stat-label { display: none !important; }
+
+    /* Shield: deshabilitar hover, usar tap (clase .expanded) */
+    .shield-pill { max-width: 34px; padding: 0 4px; cursor: pointer; }
+    .shield-pill:hover { max-width: 34px; padding: 0 4px; }
+    .shield-pill:hover .shield-expand { opacity: 0; max-width: 0; margin-left: 0; }
+    /* Cuando tiene clase .expanded (tap) → mostrar */
+    .shield-pill.expanded { max-width: 200px; padding: 0 12px 0 4px; }
+    .shield-pill.expanded .shield-expand {
+        display: flex !important;
+        opacity: 1 !important;
+        max-width: 150px !important;
+        margin-left: 8px !important;
+    }
+
+    .stat-pill .fire-gif,
+    .stat-pill .star-gif,
+    .stat-pill .money-gif { width: 16px; height: 16px; }
+
+    /* Layout global */
+    .page-title { font-size: 1.85rem !important; }
+    .page-subtitle { font-size: 0.95rem; }
+    .page-header { flex-direction: column; gap: 1rem; }
+    .page-header-left { width: 100%; }
+    /* Solo imágenes de contenido — NO tocar SVGs de esquemas, canvas de marcos, etc. */
+    .card-preview img,
+    .favorite-card img,
+    .profile-card img { max-width: 100%; height: auto; }
+
+    /* Modals */
+    .modal-overlay { padding: 1rem; }
+    .modal, .modal.large, .modal-card {
+        max-width: calc(100vw - 2rem);
+        max-height: calc(100vh - 4rem);
+        overflow-y: auto;
+    }
+
+    /* Toast: solo ajustar max-width en mobile, no tocar posición */
+    .toast { max-width: calc(100vw - 2rem); white-space: normal; }
+
+    /* Perfil */
+    body[data-page="perfil"] .content { padding: 1.5rem 1rem; }
+    .profile-card { flex-direction: column; text-align: center; gap: 1.25rem; }
+    .profile-badges { justify-content: center; flex-wrap: wrap; }
+    .profile-avatar { width: 80px; height: 80px; }
+    .btn-edit { width: 100%; justify-content: center; }
+    .modal-card { margin: 1rem; max-width: calc(100vw - 2rem); }
+    .marco-container { transform: scale(0.75); transform-origin: center; }
+
+    /* Favoritos */
+    .filter-container { gap: 0.5rem; }
+    .filter-tab { padding: 0.6rem 1rem; font-size: 0.85rem; }
+    .favorites-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+    .search-container { max-width: 100%; }
+
+    /* Historial */
+    .controls-bar { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+    .controls-left { flex-direction: column; gap: 0.75rem; }
+    .historial-search { width: 100%; }
+    .history-item { flex-wrap: wrap; }
+    .history-right { width: 100%; justify-content: flex-end; margin-top: 0.5rem; }
+    .type-cards-grid { grid-template-columns: repeat(2, 1fr); }
+
+    /* Duelos */
+    .tabs-container { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+    .tab-btn { white-space: nowrap; flex-shrink: 0; font-size: 0.85rem; }
+    .friends-grid { grid-template-columns: 1fr; }
+    .friend-card { flex-direction: column; text-align: center; }
+    .friend-actions { width: 100%; justify-content: center; }
+    .form-row { grid-template-columns: 1fr; }
+    .modal.large { max-width: calc(100vw - 2rem); }
+    .victories-badge { font-size: 0.85rem; padding: 0.4rem 1rem 0.4rem 0.4rem; }
+    .challenge-header { flex-wrap: wrap; gap: 0.75rem; }
+    .challenge-actions { flex-wrap: wrap; }
+    .btn-nuevo-duelo { width: 100%; justify-content: center; }
+
+    /* ── CHAT: sidebar deslizable con overlay ── */
+    .chat-sidebar {
+        display: flex !important;
+        position: fixed !important;
+        top: var(--navbar-height, 65px);
+        left: 0;
+        width: 300px;
+        height: calc(100vh - var(--navbar-height, 65px));
+        height: calc(100dvh - var(--navbar-height, 65px));
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: none;
+    }
+    .chat-sidebar.mobile-open {
+        transform: translateX(0);
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+    }
+    .chat-sidebar-overlay {
+        display: none; position: fixed; inset: 0;
+        top: var(--navbar-height, 65px);
+        background: rgba(0, 0, 0, 0.5); z-index: 99;
+    }
+    .chat-sidebar-overlay.active { display: block; }
+
+    /* Botón toggle chats recientes (solo mobile) */
+    .chat-mobile-toggle {
+        display: flex !important;
+        position: absolute; top: 12px; left: 12px; z-index: 10;
+        width: 42px; height: 42px; border-radius: 12px;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        background: rgba(139, 92, 246, 0.12);
+        backdrop-filter: blur(12px);
+        color: #a78bfa; font-size: 1rem;
+        cursor: pointer; align-items: center; justify-content: center;
+        transition: all 0.2s;
+    }
+    .chat-mobile-toggle:hover {
+        background: rgba(139, 92, 246, 0.25);
+        border-color: rgba(139, 92, 246, 0.5);
+    }
+    .msgs { padding: 16px; padding-top: 64px; }
+    .input-area { padding: 8px 16px 14px; }
+    .msg-bubble, .bubble { max-width: 88%; }
+
+    /* Tienda */
+    .background-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .streak-banner { flex-direction: column; text-align: center; gap: 16px; }
+    .streak-action { width: 100%; justify-content: center; }
+    .category-section { padding: 20px; }
+
+    /* Modo estudio */
+    body[data-page="modo-estudio"] .content { padding: 1.5rem 1rem; }
+    .modo-estudio-logo { height: 280px; }
+    .modo-estudio-card { padding: 2rem; }
+    .study-options { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+
+    /* Flashcards */
+    .fc-header { flex-wrap: wrap; justify-content: center; gap: 0.75rem; }
+    .fc-back-btn { width: 38px; height: 38px; }
+    .fc-title { font-size: 1.15rem; }
+    .fc-card-container { min-height: 280px; }
+    .fc-stats-bar { flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
+    .fc-results-grid { grid-template-columns: repeat(2, 1fr); }
+
+    /* Exámenes (quiz + experto) — topbar, preguntas, resultados */
+    .exam-topbar { padding: 0.75rem 1rem; gap: 0.75rem; }
+    .exam-topbar-left { gap: 0.5rem; }
+    .exam-topbar-right { gap: 0.75rem; flex-wrap: wrap; }
+    .timer { padding: 0.4rem 0.75rem; font-size: 0.9rem; }
+    .question-counter { font-size: 0.85rem; }
+    .highscore-display { font-size: 0.8rem; padding: 0.35rem 0.7rem; }
+    .mode-badge-top { font-size: 0.7rem; padding: 0.2rem 0.6rem; }
+    .progress-container { padding: 0 1rem 0.5rem; }
+    .question-area { padding: 1.5rem 1rem; }
+    .question-card { padding: 1.75rem 1.25rem; max-width: 100%; }
+    .question-text { font-size: 1.15rem; padding: 0 0.5rem; margin-bottom: 1.5rem; }
+    .option-btn { padding: 0.85rem 1rem; font-size: 0.92rem; gap: 0.75rem; }
+    .option-letter { width: 32px; height: 32px; font-size: 0.82rem; }
+    .nav-buttons { margin-top: 1.5rem; padding-top: 1rem; }
+    .btn-nav { padding: 0.65rem 1.25rem; font-size: 0.88rem; }
+    .btn-submit-exam { padding: 0.65rem 1.5rem; font-size: 0.88rem; }
+    .results-card { padding: 1.5rem 1.25rem; border-radius: 20px; }
+    .results-stats { grid-template-columns: repeat(2, 1fr); }
+    .results-actions { flex-direction: column; }
+    .results-emoji { width: 65px; height: 65px; }
+    .results-main-title { font-size: 1.4rem; }
+    .grade-circle { width: 130px; height: 130px; }
+    .grade-number { font-size: 2.2rem; }
+    .penalty-warning { font-size: 0.8rem; padding: 0.5rem 0.85rem; }
+    .timer-alert-box { padding: 1.75rem; }
+    .review-item { padding: 0.75rem 0.9rem; gap: 0.7rem; }
+    .review-q-text { font-size: 0.85rem; }
+    .review-a-text { font-size: 0.78rem; }
+
+    /* Resúmenes */
+    .resumen-title { font-size: 1.75rem; }
+    .resumen-content { padding: 1.75rem 1.5rem; }
+    .resumen-actions { flex-direction: column; }
+    .resumen-actions button { width: 100%; }
+    body[data-page="resumenes"] .content { padding: 1rem; }
+
+    /* Sesión estudio */
+    .se-header { padding: 16px 16px 0; flex-wrap: wrap; gap: 0.75rem; }
+    .se-tabs { padding: 16px 16px 0; overflow-x: auto; }
+    .se-panels { padding: 16px 16px 32px; }
+    .se-panel-stats { flex-wrap: wrap; justify-content: center; }
+    .se-stat { min-width: 70px; padding: 10px 16px; }
+    .se-actions { flex-direction: column; }
+    .se-action-btn, .se-fav-btn { width: 100%; justify-content: center; }
+
+    /* Selección esquema */
+    .schema-grid { grid-template-columns: 1fr; }
+
+    /* Landing */
+    .navbar { padding: 0 1.25rem; }
+    .nav-links { gap: 1rem; }
+    .hero p { max-width: 90%; }
+    .cta-group { flex-direction: column; align-items: center; gap: 0.75rem; }
+    .btn-primary, .btn-ghost { width: 240px; text-align: center; justify-content: center; }
+}
+
+/* ── 576px ── */
+@media (max-width: 576px) {
+    .favorites-grid { grid-template-columns: 1fr; }
+    .filter-container {
+        justify-content: flex-start; overflow-x: auto;
+        flex-wrap: nowrap; padding-bottom: 0.5rem;
+        -webkit-overflow-scrolling: touch;
+    }
+    .filter-tab { flex-shrink: 0; }
+    .type-cards-grid { grid-template-columns: 1fr; }
+    .history-icon { width: 40px; height: 40px; font-size: 1rem; }
+    .resumen-title-section { padding: 2.25rem 1.25rem 2rem; }
+    .title-icon { width: 68px; height: 68px; font-size: 1.9rem; }
+    .resumen-content { padding: 1.25rem 1rem; }
+    .challenge-card { padding: 1rem; }
+    .challenge-status { font-size: 0.75rem; padding: 0.3rem 0.7rem; }
+    .topic-mode-btn { font-size: 0.8rem; padding: 0.5rem 0.6rem; }
+    .background-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .chat-sidebar { width: 280px; }
+    .msg-bubble, .bubble { max-width: 92%; }
+    #userInput { font-size: 0.9rem; }
+}
+
+/* ── 480px ── */
+@media (max-width: 480px) {
+    /* Navbar ultra compacto */
+    .navbar-stats { gap: 0.3rem; }
+    .stat-pill { padding: 0.3rem 0.45rem; font-size: 0.7rem; gap: 0.25rem; }
+    .stat-pill .fire-gif,
+    .stat-pill .star-gif,
+    .stat-pill .money-gif { width: 14px; height: 14px; }
+    /* Shield pill: solo icono, sin texto expandible */
+    .shield-pill { max-width: 30px !important; padding: 0 2px !important; }
+    .shield-pill.expanded { max-width: 180px !important; padding: 0 10px 0 2px !important; }
+    .shield-icon-wrap { width: 22px; height: 22px; }
+    .shield-icon-wrap i { font-size: 0.55rem; }
+
+    .page-title { font-size: 1.5rem !important; }
+
+    /* Perfil */
+    .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+    .stat-card { padding: 1rem; }
+    .stats-grid .stat-value { font-size: 1.4rem; }
+    .objective-item { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+    .objective-reward { align-self: flex-end; }
+
+    /* Favoritos */
+    .card-preview { height: 90px; }
+    .card-preview-icon { font-size: 3rem; }
+    .card-content { padding: 0.85rem 1rem 1rem; }
+    .card-title { font-size: 0.95rem; }
+
+    /* Historial */
+    .history-title { font-size: 0.95rem; }
+    .date-picker-wrapper { padding: 0.4rem 0.75rem; }
+    .history-item { padding: 0.85rem; }
+
+    /* Duelos */
+    .invitation-card { flex-direction: column; text-align: center; }
+    .invitation-actions { width: 100%; }
+    .btn-accept { flex: 1; }
+    .challenge-actions { flex-direction: column; align-items: stretch; }
+
+    /* Chat */
+    .msg-bubble, .bubble { max-width: 95%; font-size: 0.88rem; }
+    .input-area { padding: 6px 12px 10px; }
+    .chat-mobile-toggle { width: 38px; height: 38px; font-size: 0.9rem; top: 8px; left: 8px; }
+
+    /* Tienda */
+    .background-preview { height: 90px; }
+    .background-name { font-size: 12px; }
+    .category-title { font-size: 1.1rem; }
+
+    /* Modo estudio */
+    body[data-page="modo-estudio"] .content { padding: 1rem 0.75rem; }
+    .modo-estudio-logo { height: 220px; }
+    .modo-estudio-card { padding: 1.5rem; }
+    .study-options { grid-template-columns: 1fr; }
+    .study-option { padding: 1rem; }
+
+    /* Flashcards */
+    .fc-card-zone { gap: 0.4rem; }
+    .fc-nav-arrow { width: 36px; height: 36px; font-size: 0.9rem; }
+    .fc-card-container { min-height: 250px; }
+    .fc-card-inner { padding: 1.25rem; font-size: 0.9rem; }
+    .fc-results-grid { grid-template-columns: 1fr; }
+
+    /* Exámenes — mobile portrait */
+    .exam-topbar { padding: 0.6rem 0.75rem; gap: 0.5rem; }
+    .exam-topbar-left .exam-title-bar { display: none; }
+    .exam-topbar-left { gap: 0.4rem; }
+    .btn-salir { padding: 0.4rem 0.75rem; font-size: 0.8rem; }
+    .exam-topbar-right { gap: 0.5rem; }
+    .timer { padding: 0.35rem 0.6rem; font-size: 0.82rem; gap: 0.35rem; }
+    .question-counter { font-size: 0.8rem; }
+    .highscore-display { font-size: 0.75rem; padding: 0.3rem 0.6rem; }
+    .mode-badge-top { font-size: 0.65rem; }
+    .progress-container { padding: 0 0.75rem 0.5rem; }
+    .question-area { padding: 1rem 0.75rem; }
+    .question-card { padding: 1.25rem 1rem; border-radius: 16px; }
+    .question-number { font-size: 0.82rem; margin-bottom: 1rem; }
+    .question-text { font-size: 1rem; margin-bottom: 1.25rem; padding: 0; }
+    .option-btn { padding: 0.75rem 0.85rem; font-size: 0.88rem; gap: 0.6rem; border-radius: 12px; }
+    .option-letter { width: 28px; height: 28px; font-size: 0.78rem; border-radius: 8px; }
+    .nav-buttons { margin-top: 1.25rem; padding-top: 0.85rem; gap: 0.5rem; }
+    .btn-nav { padding: 0.55rem 1rem; font-size: 0.82rem; border-radius: 10px; }
+    .btn-submit-exam { padding: 0.55rem 1.25rem; font-size: 0.82rem; }
+    .results-card { padding: 1.25rem 1rem; border-radius: 16px; }
+    .results-emoji { width: 55px; height: 55px; }
+    .results-main-title { font-size: 1.25rem; }
+    .results-main-subtitle { font-size: 0.88rem; }
+    .grade-circle { width: 110px; height: 110px; }
+    .grade-number { font-size: 1.8rem; }
+    .grade-label { font-size: 0.75rem; }
+    .grade-message { font-size: 0.95rem; }
+    .results-stats { gap: 0.6rem; }
+    .stat-card { padding: 0.75rem; border-radius: 12px; }
+    .stat-card-icon { width: 32px; height: 32px; font-size: 0.85rem; margin-bottom: 0.4rem; }
+    .stat-card-value { font-size: 1.2rem; }
+    .stat-card-label { font-size: 0.72rem; }
+    .btn-result { padding: 0.85rem; font-size: 0.9rem; border-radius: 12px; }
+    .review-item { padding: 0.65rem 0.8rem; }
+    .review-icon { width: 24px; height: 24px; font-size: 0.7rem; }
+    .review-q-text { font-size: 0.82rem; }
+    .review-a-text { font-size: 0.75rem; }
+    .penalty-warning { font-size: 0.78rem; padding: 0.45rem 0.75rem; }
+    .timer-alert-box { padding: 1.5rem; }
+    .timer-alert-box h3 { font-size: 1.1rem; }
+    .timer-alert-icon { width: 60px; height: 60px; font-size: 1.7rem; }
+    .question-dots { gap: 0.35rem; }
+    .question-dots .dot { width: 8px; height: 8px; }
+    .modal { padding: 1.5rem; }
+    .modal h3 { font-size: 1.1rem; }
+    .modal-actions { flex-direction: column; }
+    .modal-btn { width: 100%; }
+
+    /* Sesión estudio */
+    .se-title { font-size: 1.1rem; }
+    .se-tab { padding: 8px 14px; font-size: 0.8rem; }
+    .se-fc-preview-card { padding: 14px; }
+    .se-tree-container { padding: 16px 10px; }
+    .se-resumen-content { padding: 16px; font-size: 0.84rem; }
+
+    /* Selección esquema */
+    .schema-card { padding: 1.25rem; }
+    .schema-card-title { font-size: 1rem; }
+
+    /* Landing */
+    .navbar { padding: 0 1rem; height: 56px; }
+    .nav-brand { font-size: 1rem; }
+    .nav-links a { font-size: 0.7rem; }
+    .hero h1 { font-size: 2rem; }
+    .hero p { font-size: 0.9rem; }
+    .btn-primary, .btn-ghost { width: 100%; max-width: 280px; padding: 12px 24px; font-size: 0.78rem; }
+    .marco-container { transform: scale(0.6); }
+}
+
+/* ── 430px — iPhone 14 Pro Max ── */
+@media (max-width: 430px) {
+    .exam-topbar-right { justify-content: flex-end; }
+    .highscore-display { display: none; }
+    .favorites-grid { grid-template-columns: 1fr; }
+    .study-options { grid-template-columns: 1fr; }
+}
+
+/* ── 412px — Samsung Galaxy S20-S23 / Google Pixel ── */
+@media (max-width: 412px) {
+    .stat-pill { padding: 0.28rem 0.4rem; font-size: 0.68rem; }
+    .navbar-stats { gap: 0.25rem; }
+    .question-card { padding: 1.15rem 0.85rem; }
+    .results-stats { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+}
+
+/* ── 390px — iPhone 12/13/14/15 ── */
+@media (max-width: 390px) {
+    .stat-pill { padding: 0.25rem 0.35rem; font-size: 0.65rem; gap: 0.2rem; }
+    .stat-pill .fire-gif,
+    .stat-pill .star-gif,
+    .stat-pill .money-gif { width: 13px; height: 13px; }
+    .shield-pill { max-width: 28px !important; }
+    .shield-icon-wrap { width: 20px; height: 20px; }
+    .shield-icon-wrap i { font-size: 0.5rem; }
+    .question-text { font-size: 0.95rem; }
+    .option-btn { padding: 0.7rem 0.75rem; font-size: 0.85rem; }
+    .option-letter { width: 26px; height: 26px; font-size: 0.75rem; }
+    .grade-circle { width: 100px; height: 100px; }
+    .grade-number { font-size: 1.6rem; }
+    .stat-card-value { font-size: 1.1rem; }
+    .btn-result { padding: 0.75rem; font-size: 0.85rem; }
+    .results-main-title { font-size: 1.15rem; }
+}
+
+/* ── 375px — iPhone SE ── */
+@media (max-width: 375px) {
+    .exam-topbar { padding: 0.5rem 0.6rem; }
+    .btn-salir { padding: 0.35rem 0.6rem; font-size: 0.75rem; }
+    .btn-salir span { display: none; }
+    .timer { padding: 0.3rem 0.5rem; font-size: 0.78rem; }
+    .question-counter { font-size: 0.75rem; }
+    .card-preview { height: 80px; }
+    .card-preview-icon { font-size: 2.5rem; }
+    .card-title { font-size: 0.88rem; }
+    .filter-tab { padding: 0.5rem 0.75rem; font-size: 0.78rem; }
+}
+
+/* ── 360px — Samsung Galaxy S21 / pequeños ── */
+@media (max-width: 360px) {
+    .page-title { font-size: 1.3rem !important; }
+    .fc-results-card { padding: 1rem 0.75rem; }
+    .fc-score-ring-container, .fc-score-ring { width: 90px; height: 90px; }
+    .profile-name { font-size: 1.3rem; }
+    .profile-avatar { width: 70px; height: 70px; }
+    .stats-grid { gap: 0.5rem; }
+    .stat-card { padding: 0.75rem; }
+    .stats-grid .stat-value { font-size: 1.2rem; }
+    .background-grid { grid-template-columns: 1fr; }
+
+    /* Exámenes ultra compacto */
+    .question-area { padding: 0.75rem 0.5rem; }
+    .question-card { padding: 1rem 0.75rem; }
+    .question-text { font-size: 0.92rem; line-height: 1.4; }
+    .option-btn { padding: 0.65rem 0.7rem; font-size: 0.82rem; }
+    .option-letter { width: 24px; height: 24px; font-size: 0.72rem; border-radius: 7px; }
+    .grade-circle { width: 90px; height: 90px; }
+    .grade-number { font-size: 1.5rem; }
+    .results-stats { grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+    .stat-card-value { font-size: 1rem; }
+    .stat-card-label { font-size: 0.68rem; }
+    .results-emoji { width: 48px; height: 48px; }
+    .results-main-title { font-size: 1.1rem; }
+    .review-list { max-height: 200px; }
+
+    .modal { padding: 1.5rem; }
+    .modal h3 { font-size: 1.1rem; }
+    .modal-actions { flex-direction: column; }
+    .modal-btn { width: 100%; }
+    .hero h1 { font-size: 1.75rem; }
+    .cta-group { width: 100%; padding: 0 1rem; }
+    .btn-primary, .btn-ghost { width: 100%; max-width: none; }
+}
+
+/* ── UTILIDADES ── */
+.tabs-container, .filter-container, .se-tabs {
+    scrollbar-width: none; -ms-overflow-style: none;
+}
+.tabs-container::-webkit-scrollbar,
+.filter-container::-webkit-scrollbar,
+.se-tabs::-webkit-scrollbar { display: none; }
+
+/* Toggle chat solo visible en mobile (hidden by default) */
+.chat-mobile-toggle { display: none; }
+.chat-sidebar-overlay { display: none; }
+
+/* iOS safe area */
+@supports (padding: max(0px)) {
+    @media (max-width: 768px) {
+        .main-navbar {
+            padding-left: max(0.75rem, env(safe-area-inset-left));
+            padding-right: max(0.75rem, env(safe-area-inset-right));
+        }
+        .content { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+        .input-area { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+    }
+}
