@@ -128,16 +128,17 @@ let correctCount = 0, incorrectCount = 0;
 // ===== INIT =====
 
 // ── Bloquear navegación del sidebar mientras el examen está activo ──────
+// Usa delegación en document (capture phase) porque el sidebar se inyecta
+// DESPUÉS de que este script se ejecuta (initComponents corre en DOMContentLoaded)
 function blockSidebarNav() {
-    document.querySelectorAll('.nav-card').forEach(card => {
-        card.addEventListener('click', function(e) {
-            if (!examFinished) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                showExitModal();
-            }
-        }, true); // capture phase — se ejecuta antes de initPageTransitions
-    });
+    document.addEventListener('click', function(e) {
+        const navCard = e.target.closest('a.nav-card[href]');
+        if (navCard && !examFinished) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            showExitModal();
+        }
+    }, true); // capture phase — se ejecuta antes de initPageTransitions
 }
 
 function initExam() {

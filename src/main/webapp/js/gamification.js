@@ -135,7 +135,7 @@ function updateLocalStats(data) {
             user.stats.coins = data.coins;
         if (data.streakCurrent !== undefined && data.newStreak === undefined)
             user.stats.streakCurrent = data.streakCurrent;
-        if (data.hasStreakShield !== undefined && data.hasStreakShield === undefined)
+        if (data.hasStreakShield !== undefined && data.shieldUsed === undefined)
             user.stats.hasStreakShield = data.hasStreakShield;
 
         localStorage.setItem('user', JSON.stringify(user));

@@ -191,6 +191,17 @@ public class ModoEstudioServlet extends HttpServlet {
         String aiType = "expert_exam".equals(contentType) ? "quiz" : contentType;
         String aiResponseJson = AIService.generate(aiType, textoBase, moduleConfig);
         JsonObject aiData = JsonParser.parseString(aiResponseJson).getAsJsonObject();
+
+        // ── Verificar si la IA devolvió un error (contenido insuficiente, inapropiado, etc.) ──
+        if (aiData.has("error") && aiData.get("error").getAsBoolean()) {
+            String errorMsg = aiData.has("errorMessage")
+                ? aiData.get("errorMessage").getAsString()
+                : "No se pudo generar el contenido. Intenta con un texto más completo.";
+            JsonObject errorResult = new JsonObject();
+            errorResult.addProperty("error", errorMsg);
+            return errorResult;
+        }
+
         String title = aiData.has("title") ? aiData.get("title").getAsString() : "Sin título";
 
         // Inyectar tipo de módulo en el JSONB para poder recuperarlo después
