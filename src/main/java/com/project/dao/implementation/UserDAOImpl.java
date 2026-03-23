@@ -121,6 +121,18 @@ public class UserDAOImpl implements IUserDAO {
     }
 
     @Override
+    public Optional<User> findByUsername(String username) throws SQLException {
+        String sql = "SELECT * FROM users WHERE username = ?";
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, username);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) return Optional.of(mapUser(rs));
+            return Optional.empty();
+        }
+    }
+
+    @Override
     public Optional<Statistics> getStatsByUserId(UUID userId) throws SQLException {
         String sql = "SELECT * FROM user_stats WHERE user_id = ?::uuid";
         try (Connection c = conn();
@@ -182,16 +194,17 @@ public class UserDAOImpl implements IUserDAO {
     public void updateUser(User user) throws SQLException {
         String sql = """
                 UPDATE users
-                   SET full_name = ?, country = ?, language = ?, birthdate = ?
+                   SET username = ?, full_name = ?, country = ?, language = ?, birthdate = ?
                  WHERE id = ?::uuid
                 """;
         try (Connection c = conn();
              PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, user.getFullName());
-            ps.setString(2, user.getCountry());
-            ps.setString(3, user.getLanguage());
-            ps.setObject(4, user.getBirthdate() != null ? Date.valueOf(user.getBirthdate()) : null);
-            ps.setString(5, user.getId().toString());
+            ps.setString(1, user.getUsername());
+            ps.setString(2, user.getFullName());
+            ps.setString(3, user.getCountry());
+            ps.setString(4, user.getLanguage());
+            ps.setObject(5, user.getBirthdate() != null ? Date.valueOf(user.getBirthdate()) : null);
+            ps.setString(6, user.getId().toString());
             ps.executeUpdate();
         }
     }

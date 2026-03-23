@@ -82,7 +82,7 @@ public class ProfileServlet extends HttpServlet {
         }
     }
 
-    // PUT /api/profile → actualiza full_name, country, language, birthdate
+    // PUT /api/profile → actualiza username, full_name, country, language, birthdate
     @Override
     protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -103,10 +103,11 @@ public class ProfileServlet extends HttpServlet {
             return;
         }
 
-        String body     = request.getReader().lines().collect(Collectors.joining());
-        String fullName = extractJsonField(body, "fullName");
-        String country  = extractJsonField(body, "country");
-        String language = extractJsonField(body, "language");
+        String body      = request.getReader().lines().collect(Collectors.joining());
+        String username  = extractJsonField(body, "username");
+        String fullName  = extractJsonField(body, "fullName");
+        String country   = extractJsonField(body, "country");
+        String language  = extractJsonField(body, "language");
         String birthdate = extractJsonField(body, "birthdate");
 
         try {
@@ -117,9 +118,26 @@ public class ProfileServlet extends HttpServlet {
             }
 
             User user = optUser.get();
+
+            // ── Validar y actualizar username ──
+            if (username != null && !username.isBlank()) {
+                // Validar longitud
+                if (username.length() < 3 || username.length() > 30) {
+                    JsonUtil.sendError(response, 400, "El nombre de usuario debe tener entre 3 y 30 caracteres.");
+                    return;
+                }
+                // Verificar que no esté en uso por OTRO usuario
+                Optional<User> existing = userDAO.findByUsername(username);
+                if (existing.isPresent() && !existing.get().getId().equals(userId)) {
+                    JsonUtil.sendError(response, 409, "Ese nombre de usuario ya está en uso.");
+                    return;
+                }
+                user.setUsername(username);
+            }
+
             if (fullName  != null && !fullName.isBlank())  user.setFullName(fullName);
             if (country   != null && !country.isBlank())   user.setCountry(country);
-            if (language  != null && !language.isBlank())  user.setLanguage(language);
+            if (language  != null && !language.isBlank())   user.setLanguage(language);
             if (birthdate != null && !birthdate.isBlank()) {
                 try {
                     user.setBirthdate(java.time.LocalDate.parse(birthdate));
