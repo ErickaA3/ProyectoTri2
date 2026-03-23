@@ -41,6 +41,7 @@ public class DatabaseConnection {
             props.setProperty("user",     cfg.getProperty("db.username"));
             props.setProperty("password", cfg.getProperty("db.password"));
             props.setProperty("sslmode",  cfg.getProperty("db.sslmode", "require"));
+            props.setProperty("prepareThreshold", "0");
 
             Class.forName(cfg.getProperty("db.driver"));
             Connection conn = DriverManager.getConnection(url, props);
