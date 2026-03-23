@@ -69,11 +69,8 @@ function setupListeners() {
     document.getElementById('deleteModal').addEventListener('click', e => {
         if (e.target === e.currentTarget) closeDeleteModal();
     });
-    document.getElementById('clearModal').addEventListener('click', e => {
-        if (e.target === e.currentTarget) closeClearModal();
-    });
     document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') { closeClearModal(); closeDeleteModal(); }
+        if (e.key === 'Escape') { closeDeleteModal(); }
     });
 }
 
@@ -453,27 +450,6 @@ async function confirmDelete() {
     } catch (err) {
         showToast('Error al eliminar: ' + err.message, 'toast-danger', 'fas fa-circle-xmark');
         console.error('[confirmDelete]', err);
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LIMPIAR TODO
-// ─────────────────────────────────────────────────────────────────────────────
-function showClearModal()  { document.getElementById('clearModal').classList.add('show'); }
-function closeClearModal() { document.getElementById('clearModal').classList.remove('show'); }
-
-async function clearAllHistory() {
-    try {
-        const res  = await fetch(API, { method: 'DELETE', headers: authHeaders() });
-        const json = await res.json();
-        if (!res.ok || !json.success) throw new Error(json.error);
-        allItems = []; visibleCount = PAGE_SIZE;
-        closeClearModal();
-        renderHistory();
-        showToast('Historial limpiado', 'toast-danger', 'fas fa-trash-alt');
-    } catch (err) {
-        showToast('Error al limpiar: ' + err.message, 'toast-danger', 'fas fa-circle-xmark');
-        console.error('[clearAllHistory]', err);
     }
 }
 
