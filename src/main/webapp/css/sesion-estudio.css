@@ -1,71 +1,45 @@
 * { box-sizing:border-box; margin:0; padding:0; }
 
-        /* ——— LOADING SCREEN ——— */
-        .loading-screen {
-            position:fixed; inset:0; z-index:9999;
-            background:radial-gradient(ellipse at 50% 40%, #0d0d2a 0%, #050510 100%);
-            display:flex; align-items:center; justify-content:center;
-            transition:opacity 0.4s;
+        /* ——— LOADING SCREEN — uses polaris-loading from styles-shared ——— */
+        /* Override: sesion-estudio loading covers full viewport (shown before content) */
+        #loadingScreen.polaris-loading {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            z-index: 9999 !important;
         }
-        canvas#loadingStars { position:absolute; inset:0; pointer-events:none; }
-
-        .loading-content {
-            position:relative; z-index:1;
-            display:flex; flex-direction:column; align-items:center; gap:20px;
-            padding:40px 24px; max-width:480px; width:100%; text-align:center;
+        /* Extra styles for progress bar and steps (not in styles-shared) */
+        .polaris-loading .loading-progress-bar {
+            width:100%; max-width:360px; height:4px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;
         }
-        .loading-logo img { height:48px; opacity:0.9; }
-
-        .loading-orb {
-            position:relative; width:100px; height:100px;
-            display:flex; align-items:center; justify-content:center; margin:8px 0;
-        }
-        .loading-orb-ring {
-            position:absolute; border-radius:50%; border:2px solid transparent; animation:spin 3s linear infinite;
-        }
-        .r1 { width:100px;height:100px; border-top-color:rgba(45,212,191,0.6); border-left-color:rgba(45,212,191,0.2); }
-        .r2 { width:78px; height:78px; border-top-color:rgba(139,92,246,0.6); border-right-color:rgba(139,92,246,0.2); animation-duration:2s; animation-direction:reverse; }
-        .r3 { width:56px; height:56px; border-top-color:rgba(236,72,153,0.5); border-bottom-color:rgba(236,72,153,0.2); animation-duration:1.5s; }
-        .loading-orb-core {
-            width:38px;height:38px; border-radius:50%;
-            background:linear-gradient(135deg,#2dd4bf,#8b5cf6);
-            display:flex; align-items:center; justify-content:center;
-            font-size:1rem; color:#fff;
-            box-shadow:0 0 24px rgba(45,212,191,0.5);
-        }
-        @keyframes spin { to { transform:rotate(360deg); } }
-
-        .loading-title    { font-size:1.2rem; font-weight:700; color:#fff; }
-        .loading-subtitle { font-size:0.85rem; color:rgba(255,255,255,0.5); min-height:20px; }
-
-        .loading-progress-bar {
-            width:100%; height:4px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;
-        }
-        .loading-progress-fill {
+        .polaris-loading .loading-progress-fill {
             height:100%; width:0; border-radius:4px;
             background:linear-gradient(90deg,#2dd4bf,#8b5cf6);
             transition:width 0.8s ease;
         }
 
-        .loading-steps { display:flex; flex-direction:column; gap:10px; width:100%; margin-top:8px; }
-        .loading-step {
+        .polaris-loading .loading-steps { display:flex; flex-direction:column; gap:10px; width:100%; max-width:360px; margin-top:8px; }
+        .polaris-loading .loading-step {
             display:flex; align-items:center; gap:12px;
             padding:10px 16px; border-radius:12px;
             background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
             opacity:0.4; transition:all 0.4s;
         }
-        .loading-step.active { opacity:1; border-color:rgba(45,212,191,0.25); background:rgba(45,212,191,0.06); }
-        .loading-step.done   { opacity:0.7; }
-        .loading-step-icon   { color:rgba(255,255,255,0.5); font-size:0.85rem; }
-        .loading-step.active .loading-step-icon { color:#2dd4bf; }
-        .loading-step-label  { font-size:0.82rem; color:rgba(255,255,255,0.6); flex:1; text-align:left; }
-        .loading-step.active .loading-step-label { color:#fff; }
-        .loading-step-status { margin-left:auto; }
-        .loading-dot-spin {
+        .polaris-loading .loading-step.active { opacity:1; border-color:rgba(45,212,191,0.25); background:rgba(45,212,191,0.06); }
+        .polaris-loading .loading-step.done   { opacity:0.7; }
+        .polaris-loading .loading-step-icon   { color:rgba(255,255,255,0.5); font-size:0.85rem; }
+        .polaris-loading .loading-step.active .loading-step-icon { color:#2dd4bf; }
+        .polaris-loading .loading-step-label  { font-size:0.82rem; color:rgba(255,255,255,0.6); flex:1; text-align:left; }
+        .polaris-loading .loading-step.active .loading-step-label { color:#fff; }
+        .polaris-loading .loading-step-status { margin-left:auto; }
+        .polaris-loading .loading-dot-spin {
             width:14px; height:14px; border-radius:50%;
             border:2px solid rgba(45,212,191,0.3); border-top-color:#2dd4bf;
             animation:spin 0.8s linear infinite;
         }
+        @keyframes spin { to { transform:rotate(360deg); } }
 
         /* ——— RESULTS SCREEN ——— */
         canvas#starsCanvas { position:fixed; top:0; left:0; pointer-events:none; z-index:0; opacity:0.5; }

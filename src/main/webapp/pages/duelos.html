@@ -209,12 +209,12 @@
                              ondragover="handleDragOver(event)"
                              ondrop="handleDrop(event)"
                              ondragleave="handleDragLeave(event)">
-                            <input type="file" id="topicFile" accept=".pdf,.doc,.docx,.txt" style="display:none" onchange="handleFileSelect(this)">
+                            <input type="file" id="topicFile" accept=".pdf,.doc,.docx,.pptx,.txt" style="display:none" onchange="handleFileSelect(this)">
                             <div class="file-drop-icon">
                                 <i class="fas fa-cloud-upload-alt"></i>
                             </div>
                             <p class="file-drop-text">Arrastra tu documento aquí o <span class="file-drop-link">haz clic para buscar</span></p>
-                            <p class="file-drop-hint">PDF, Word (.doc, .docx), TXT</p>
+                            <p class="file-drop-hint">PDF, Word (.doc, .docx), PowerPoint (.pptx), TXT</p>
                         </div>
                         <div id="filePreview" class="file-preview" style="display:none;">
                             <div class="file-preview-icon">
@@ -238,6 +238,8 @@
                             Tiempo por pregunta
                         </label>
                         <select id="timePerQuestion" class="form-select">
+                            <option value="5">5 segundos</option>
+                            <option value="10">10 segundos</option>
                             <option value="15">15 segundos</option>
                             <option value="30" selected>30 segundos</option>
                             <option value="45">45 segundos</option>
@@ -253,6 +255,8 @@
                             <option value="5">5 preguntas</option>
                             <option value="10" selected>10 preguntas</option>
                             <option value="15">15 preguntas</option>
+                            <option value="25">25 preguntas</option>
+                            <option value="30">30 preguntas</option>
                         </select>
                     </div>
                 </div>
@@ -263,6 +267,43 @@
                     <i class="fas fa-swords"></i>
                     Crear Duelo
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading: Creando duelo (con pasos) -->
+    <div class="duel-creating-screen" id="duelCreatingScreen">
+        <canvas class="duel-creating-stars" id="creatingStars"></canvas>
+        <div class="duel-creating-content">
+            <div class="polaris-loading-orb">
+                <div class="polaris-orb-ring r1"></div>
+                <div class="polaris-orb-ring r2"></div>
+                <div class="polaris-orb-ring r3"></div>
+                <div class="polaris-orb-core">
+                    <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
+                </div>
+            </div>
+            <div class="duel-creating-title">Creando tu duelo</div>
+            <div class="duel-creating-subtitle" id="creatingSubtitle">Preparando...</div>
+            <div class="duel-creating-progress">
+                <div class="duel-creating-progress-fill" id="creatingProgressFill"></div>
+            </div>
+            <div class="duel-creating-steps">
+                <div class="duel-creating-step" id="step-analyze">
+                    <i class="fas fa-file-alt duel-step-icon"></i>
+                    <span class="duel-step-label">Analizando contenido</span>
+                    <div class="duel-step-status"><div class="loading-dot-spin"></div></div>
+                </div>
+                <div class="duel-creating-step" id="step-generate">
+                    <i class="fas fa-brain duel-step-icon"></i>
+                    <span class="duel-step-label">Generando preguntas con IA</span>
+                    <div class="duel-step-status"><div class="loading-dot-spin"></div></div>
+                </div>
+                <div class="duel-creating-step" id="step-create">
+                    <i class="fas fa-swords duel-step-icon"></i>
+                    <span class="duel-step-label">Creando el duelo</span>
+                    <div class="duel-step-status"><div class="loading-dot-spin"></div></div>
+                </div>
             </div>
         </div>
     </div>

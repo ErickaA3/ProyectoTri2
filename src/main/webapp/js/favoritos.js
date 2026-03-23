@@ -13,13 +13,17 @@ let favorites     = [];
 let currentFilter = 'all';
 let itemToRemove  = null;
 
-// Mapeo tipo BD → nombre de opción en sesion-estudio
-const typeToOption = {
-    flashcard: 'flashcards',
-    schema:    'esquemas',
-    summary:   'resumenes',
-    quiz:      'examenes'
+// Mapeo tipo BD → configuración (mismo patrón que historial.js)
+const TYPE_CONFIG = {
+    flashcard:   { label: 'Flashcard',      icon: 'fas fa-layer-group',     page: '../pages/flashcards.html',      sessionKey: 'flashcards' },
+    schema:      { label: 'Esquema',        icon: 'fas fa-project-diagram', page: '../pages/sesion-estudio.html',  sessionKey: 'esquemas' },
+    summary:     { label: 'Resumen',        icon: 'fas fa-file-alt',        page: '../pages/resumenes.html',       sessionKey: null },
+    quiz:        { label: 'Quiz',           icon: 'fas fa-clipboard-list',  page: '../pages/examen-quiz.html',     sessionKey: 'examenes' },
+    expert_exam: { label: 'Examen Experto', icon: 'fas fa-file-signature',  page: '../pages/examen-experto.html',  sessionKey: 'examenes' },
 };
+
+// Tipos que van directo por URL (summary hace su propio fetch con ?id=)
+const OPEN_BY_URL = new Set(['summary']);
 
 // ─────────────────────────────────────────────────────────────
 //  CARGA INICIAL
@@ -43,13 +47,17 @@ async function loadFavorites() {
             return;
         }
 
-        favorites = data.map(item => ({
-            id:       item.id,
-            type:     item.type,
-            title:    item.title || 'Sin título',
-            category: mapTypeToLabel(item.type),
-            icon:     mapTypeToIcon(item.type)
-        }));
+        favorites = data.map(item => {
+            const cfg = TYPE_CONFIG[item.type] || {};
+            return {
+                id:         item.id,
+                type:       item.type,
+                title:      item.title || 'Sin título',
+                category:   cfg.label || item.type,
+                icon:       cfg.icon || 'fas fa-file',
+                schemaType: item.subtype || item.schemaType || null
+            };
+        });
 
         renderFavorites();
 
@@ -97,6 +105,28 @@ async function removeFavorite(contentId) {
 // ─────────────────────────────────────────────────────────────
 
 async function openItem(id) {
+    // Find the favorite to know its type
+    const fav = favorites.find(f => f.id === id);
+    const type = fav?.type;
+    const cfg = TYPE_CONFIG[type];
+
+    if (!cfg?.page) {
+        showToast('Vista no disponible para este tipo');
+        return;
+    }
+
+    // ── Caso 1: summary → navegar directo con ?id= ──
+    if (OPEN_BY_URL.has(type)) {
+        window.location.href = `${cfg.page}?id=${id}`;
+        return;
+    }
+
+    // ── Caso 2: todos los demás → fetch contenido + sessionStorage ──
+    if (!cfg.sessionKey) {
+        showToast('Tipo de contenido no soportado');
+        return;
+    }
+
     try {
         const response = await fetch(`../api/favoritos/${id}`, {
             headers: { 'X-User-Id': userId }
@@ -108,43 +138,36 @@ async function openItem(id) {
         }
 
         const data = await response.json();
-        // data = { type: "schema", title: "...", isFavorite: true, content: {...} }
-
-        const dbType = data.type;
-        const option = typeToOption[dbType];
-
-        if (!option) {
-            showToast('Tipo de contenido no soportado');
-            return;
-        }
-
-        // Construir studyResults en el formato que espera sesion-estudio
         const contentObj = data.content;
         contentObj.id    = id;
         contentObj.title = data.title;
 
+        // Construir studyResults
         const studyResults = {};
-        studyResults[option] = contentObj;
+        studyResults[cfg.sessionKey] = contentObj;
+        sessionStorage.setItem('studyResults', JSON.stringify(studyResults));
+        sessionStorage.setItem('fromHistorial', 'true');
 
+        // Construir modoEstudioFlow
         const flow = {
             userId:  userId,
-            options: [option],
+            options: [cfg.sessionKey],
             configs: {}
         };
 
-        // Recuperar el tipo específico del contenido (esquema, examen, etc.)
-        if (option === 'esquemas' && contentObj.schemaType) {
+        // Config específica para esquemas (tipo de esquema)
+        if (type === 'schema' && contentObj.schemaType) {
             flow.configs.esquemas = { tipo: contentObj.schemaType };
         }
-        if (option === 'examenes' && contentObj.schemaType) {
+
+        // Config específica para exámenes (quiz vs expert_exam)
+        if ((type === 'quiz' || type === 'expert_exam') && contentObj.schemaType) {
             flow.configs.examenes = { tipo: contentObj.schemaType };
         }
 
-        sessionStorage.setItem('studyResults', JSON.stringify(studyResults));
         sessionStorage.setItem('modoEstudioFlow', JSON.stringify(flow));
-        sessionStorage.setItem('fromHistorial', 'true');
 
-        window.location.href = '../pages/sesion-estudio.html';
+        window.location.href = cfg.page;
 
     } catch (error) {
         console.error('[Favoritos] Error al abrir contenido:', error);
@@ -176,19 +199,37 @@ function renderFavorites() {
     grid.style.display = 'grid';
     emptyState.style.display = 'none';
 
-    grid.innerHTML = filtered.map(item => `
-        <div class="favorite-card ${item.type}" onclick="openItem('${item.id}')">
+    // Nombres bonitos para subtipos de esquema (mismos de historial.js)
+    const SUBTYPE_LABELS = {
+        'jerarquico':   'Jerárquico',
+        'conceptual':   'Mapa Conceptual',
+        'timeline':     'Línea del Tiempo',
+        'causa-efecto': 'Causa y Efecto',
+        'ciclico':      'Cíclico',
+    };
+
+    grid.innerHTML = filtered.map(item => {
+        // Subtipo para esquemas — mostrar como "Esquema · Mapa Conceptual"
+        const rawSub = item.type === 'schema' ? item.schemaType : null;
+        const subtypeLabel = rawSub ? (SUBTYPE_LABELS[rawSub] || rawSub) : '';
+        const categoryText = subtypeLabel ? `${item.category} · ${subtypeLabel}` : item.category;
+
+        // CSS class — expert_exam tiene su propio estilo rojo
+        const cardClass = item.type === 'expert_exam' ? 'expert_exam' : item.type;
+
+        return `
+        <div class="favorite-card ${cardClass}" onclick="openItem('${item.id}')">
             <div class="card-stars">${generateStars()}</div>
-            <span class="card-type-badge ${item.type}">${item.type.toUpperCase()}</span>
+            <span class="card-type-badge ${cardClass}">${item.category.toUpperCase()}</span>
             <i class="fas fa-star card-star"></i>
-            <div class="card-preview ${item.type}">
+            <div class="card-preview ${cardClass}">
                 <i class="${item.icon} card-preview-icon"></i>
             </div>
             <div class="card-content">
                 <h3 class="card-title">${item.title}</h3>
-                <div class="card-category ${item.type}">
+                <div class="card-category ${cardClass}">
                     <i class="${item.icon}"></i>
-                    ${item.category}
+                    ${categoryText}
                 </div>
                 <div class="card-actions">
                     <button class="card-btn-ver" onclick="event.stopPropagation(); openItem('${item.id}')">
@@ -200,7 +241,7 @@ function renderFavorites() {
                 </div>
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -263,23 +304,11 @@ function generateStars() {
 }
 
 function mapTypeToLabel(type) {
-    const labels = {
-        flashcard: 'Flashcard',
-        schema:    'Esquema',
-        summary:   'Resumen',
-        quiz:      'Quiz'
-    };
-    return labels[type] || type;
+    return TYPE_CONFIG[type]?.label || type;
 }
 
 function mapTypeToIcon(type) {
-    const icons = {
-        flashcard: 'fas fa-layer-group',
-        schema:    'fas fa-project-diagram',
-        summary:   'fas fa-file-alt',
-        quiz:      'fas fa-clipboard-list'
-    };
-    return icons[type] || 'fas fa-file';
+    return TYPE_CONFIG[type]?.icon || 'fas fa-file';
 }
 
 function showToast(message) {
