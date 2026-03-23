@@ -55,12 +55,12 @@ function getNavbarHTML(base) {
                 <span class="stat-label">Racha</span>
             </div>
 
-            <div class="stat-pill">
+            <div class="stat-pill" id="xpPill">
                 <img src="${base}images/gifs/star.gif" alt="⭐" class="star-gif" onerror="this.outerHTML='<i class=\\'fas fa-star\\' style=\\'color:#ffd93d\\'></i>'">
                 <span class="stat-value">${xp.toLocaleString()}</span>
                 <span class="stat-label">XP</span>
             </div>
-            <div class="stat-pill">
+            <div class="stat-pill" id="coinsPill">
                 <img src="${base}images/gifs/coin.gif" alt="💵" class="money-gif" onerror="this.outerHTML='<i class=\\'fas fa-coins\\' style=\\'color:#f59e0b\\'></i>'">
                 <span class="stat-value">${monedas.toLocaleString()}</span>
                 <span class="stat-label">Monedas</span>
@@ -422,6 +422,9 @@ function initComponents() {
     // Sincronización reactiva
     listenForUserUpdates();
 
+    // Auto-refrescar stats desde el servidor (no depender solo de localStorage)
+    autoRefreshStats();
+
     // Countdown del escudo protector
     initShieldCountdown();
 
@@ -554,15 +557,10 @@ function refreshNavbarStats() {
     const monedas = user.stats?.coins          ?? 0;
     const racha   = user.stats?.streakCurrent  ?? 0;
 
-    const pills = document.querySelectorAll('.stat-pill');
-    if (pills.length >= 3) {
-        const rachaEl = pills[0].querySelector('.stat-value');
-        const xpEl    = pills[1].querySelector('.stat-value');
-        const coinEl  = pills[2].querySelector('.stat-value');
-        if (rachaEl) rachaEl.textContent = racha + ' Días';
-        if (xpEl)    xpEl.textContent    = xp.toLocaleString();
-        if (coinEl)  coinEl.textContent  = monedas.toLocaleString();
-    }
+    // ── Actualizar por ID (robusto, no depende del orden del DOM) ──
+    animateStatUpdate('streakPill', racha + ' Días');
+    animateStatUpdate('xpPill',     xp.toLocaleString());
+    animateStatUpdate('coinsPill',  monedas.toLocaleString());
 
     // Sincronizar pill del escudo protector (separado)
     const hasShield = user.stats?.hasStreakShield ?? false;
@@ -591,6 +589,31 @@ function refreshNavbarStats() {
     }
 }
 
+/**
+ * Actualiza el .stat-value dentro de un pill por ID.
+ * Si el valor cambió, hace un breve flash visual para que el usuario lo note.
+ */
+function animateStatUpdate(pillId, newValue) {
+    const pill = document.getElementById(pillId);
+    if (!pill) return;
+    const el = pill.querySelector('.stat-value');
+    if (!el) return;
+
+    const oldValue = el.textContent.trim();
+    if (oldValue === String(newValue)) return; // Sin cambio → no animar
+
+    el.textContent = newValue;
+
+    // Flash: scale up brevemente + color highlight
+    pill.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+    pill.style.transform = 'scale(1.12)';
+    pill.style.boxShadow = '0 0 12px rgba(45,212,191,0.35)';
+    setTimeout(() => {
+        pill.style.transform = '';
+        pill.style.boxShadow = '';
+    }, 350);
+}
+
 // Refrescar sidebar (nombre, nivel, marco)
 function refreshSidebarInfo() {
     const user = getUserData();
@@ -604,6 +627,51 @@ function refreshSidebarInfo() {
     if (levelEl) levelEl.textContent = 'Nivel ' + newLevel;
 
     renderSidebarFrame();
+}
+
+/**
+ * Auto-fetch stats del servidor al cargar cada página.
+ * Así el navbar SIEMPRE muestra datos frescos, incluso si cambiaron
+ * desde otra pestaña, otro dispositivo, o por el backend directamente.
+ * Usa gamification.js si está cargado, sino hace el fetch directo.
+ */
+function autoRefreshStats() {
+    // Solo si hay un usuario logueado
+    const user = getUserData();
+    if (!user?.id) return;
+
+    // Si gamification.js está cargado, usar su función
+    if (typeof fetchPlayerStats === 'function') {
+        fetchPlayerStats().then(() => {
+            refreshNavbarStats();
+            refreshSidebarInfo();
+        }).catch(() => {}); // Silencioso si falla (offline, etc.)
+        return;
+    }
+
+    // Fallback: fetch directo si gamification.js no está en la página
+    const API_BASE = '/project-1.0-SNAPSHOT/api/gamification';
+    fetch(`${API_BASE}/stats`, {
+        headers: { 'X-User-Id': user.id }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) return;
+        try {
+            const stored = JSON.parse(localStorage.getItem('user')) || {};
+            if (!stored.stats) stored.stats = {};
+            if (data.xp !== undefined)            stored.stats.xp            = data.xp;
+            if (data.level !== undefined)          stored.stats.level         = data.level;
+            if (data.coins !== undefined)          stored.stats.coins         = data.coins;
+            if (data.streakCurrent !== undefined)  stored.stats.streakCurrent = data.streakCurrent;
+            if (data.streakLongest !== undefined)  stored.stats.streakRecord  = data.streakLongest;
+            if (data.hasStreakShield !== undefined) stored.stats.hasStreakShield = data.hasStreakShield;
+            localStorage.setItem('user', JSON.stringify(stored));
+            refreshNavbarStats();
+            refreshSidebarInfo();
+        } catch (_) {}
+    })
+    .catch(() => {}); // Silencioso — no bloquear la página si falla
 }
 
 

@@ -331,12 +331,19 @@ async function openItem(id, type) {
 
         if (!res.ok || !json.success) throw new Error(json.error || `Error ${res.status}`);
 
-        const contentData = json.data;
+        const rawData = json.data;
 
-        // ── Construir studyResults (mismo patrón que favoritos.js) ──────
-        // Asegurar que tenga id y title
+        // ── Extraer el contenido real ─────────────────────────────
+        // El servidor devuelve { id, type, title, content: { ... } }
+        // Necesitamos el objeto DENTRO de .content (igual que favoritos.js)
+        const contentData = rawData.content || rawData;
         contentData.id    = contentData.id || id;
-        contentData.title = contentData.title || 'Sin título';
+        contentData.title = contentData.title || rawData.title || 'Sin título';
+
+        // Preservar schemaType del nivel superior si existe
+        if (rawData.schemaType && !contentData.schemaType) {
+            contentData.schemaType = rawData.schemaType;
+        }
 
         const studyResults = {};
         studyResults[sessionKey] = contentData;
