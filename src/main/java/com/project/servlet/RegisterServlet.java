@@ -9,6 +9,7 @@ import com.project.dao.interfaces.IUserDAO;
 import com.project.model.users.Statistics;
 import com.project.model.users.User;
 import com.project.util.JsonUtil;
+import com.project.util.JwtUtil;
 import com.project.util.PasswordUtil;
 
 import jakarta.servlet.ServletException;
@@ -65,8 +66,11 @@ public class RegisterServlet extends HttpServlet {
             session.setAttribute("username", created.getUsername());
             session.setMaxInactiveInterval(60 * 60 * 8);
 
+            String token = JwtUtil.generarToken(created.getId(), "student");
+
+            JsonUtil.setJsonHeaders(response);
             response.setStatus(HttpServletResponse.SC_CREATED);
-            JsonUtil.sendSuccess(response, JsonUtil.buildUserJson(created, stats));
+            response.getWriter().write("{\"success\":true,\"token\":\"" + token + "\",\"data\":" + JsonUtil.buildUserJson(created, stats) + "}");
 
         } catch (SQLException e) {
             e.printStackTrace();
