@@ -7,6 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 public class JwtUtil {
 
@@ -15,9 +16,9 @@ public class JwtUtil {
 
     private static final SecretKey KEY = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
 
-    public static String generarToken(int userId, String rol) {
+    public static String generarToken(UUID userId, String rol) {
         return Jwts.builder()
-                .subject(String.valueOf(userId))
+                .subject(userId.toString())
                 .claim("rol", rol)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + EXPIRATION_MS))
@@ -33,8 +34,8 @@ public class JwtUtil {
                 .getPayload();
     }
 
-    public static int getUserId(String token) {
-        return Integer.parseInt(validarToken(token).getSubject());
+    public static String getUserId(String token) {
+        return validarToken(token).getSubject();
     }
 
     public static String getRol(String token) {
