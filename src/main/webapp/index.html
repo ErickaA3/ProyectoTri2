@@ -226,7 +226,7 @@ async function doLogin(){
     const res=await fetch(`${API_BASE}/api/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})});
     const data=await res.json();
     if(data.success){
-      localStorage.setItem('user', JSON.stringify(data.data)); // ← Guarda el usuario
+      localStorage.setItem('user', JSON.stringify(data.data)); localStorage.setItem('token', data.token || ''); // ← Guarda usuario y JWT
       showSuccess('¡Bienvenido de vuelta!');
       setTimeout(()=>window.location.href='pages/perfil.html', 1000);
     } else {
@@ -252,7 +252,7 @@ async function doRegister(){
     const res=await fetch(`${API_BASE}/api/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,email,password,fullName})});
     const data=await res.json();
     if(data.success){
-      localStorage.setItem('user', JSON.stringify(data.data)); // ← Guarda el usuario
+      localStorage.setItem('user', JSON.stringify(data.data)); localStorage.setItem('token', data.token || ''); // ← Guarda usuario y JWT
       showSuccess('¡Cuenta creada! Redirigiendo...');
       setTimeout(()=>window.location.href='pages/perfil.html', 1200);
     } else {

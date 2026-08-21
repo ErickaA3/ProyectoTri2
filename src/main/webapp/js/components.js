@@ -11,6 +11,14 @@ function getUserData() {
     catch { return null; }
 }
 
+// ── Headers con JWT para llamadas a /api/* ──
+function getAuthHeaders(extra) {
+    const token = localStorage.getItem('token');
+    const base = { 'Content-Type': 'application/json' };
+    if (token) base['Authorization'] = 'Bearer ' + token;
+    return Object.assign(base, extra || {});
+}
+
 // ── Ruta base ──
 function getBasePath() {
     const path = window.location.pathname;
@@ -655,7 +663,7 @@ function autoRefreshStats() {
     // Fallback: fetch directo si gamification.js no está en la página
     const API_BASE = window.API_BASE + '/api/gamification';
     fetch(`${API_BASE}/stats`, {
-        headers: { 'X-User-Id': user.id }
+        headers: getAuthHeaders({ 'X-User-Id': user.id })
     })
     .then(r => r.json())
     .then(data => {

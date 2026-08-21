@@ -51,10 +51,7 @@ async function sendReward(activityType, scorePercent = 0, contentId = null,
     try {
         const response = await fetch(`${GAMIFICATION_API}/reward`, {
             method:  'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Id':    userId
-            },
+            headers: getAuthHeaders({ 'X-User-Id': userId }),
             body: JSON.stringify({
                 activityType,
                 scorePercent,
@@ -86,7 +83,7 @@ async function fetchPlayerStats() {
 
     try {
         const response = await fetch(`${GAMIFICATION_API}/stats`, {
-            headers: { 'X-User-Id': userId }
+            headers: getAuthHeaders({ 'X-User-Id': userId })
         });
         const data = await response.json();
 
