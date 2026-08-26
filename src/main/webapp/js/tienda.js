@@ -42,7 +42,8 @@ document.addEventListener('DOMContentLoaded', function () {
 // ============================================================
 async function loadShop() {
     try {
-        const response = await fetch(CTX + "/shop", { headers: getAuthHeaders() });
+        const uid = (() => { try { return JSON.parse(localStorage.getItem('user')||'{}').id || null; } catch(e) { return null; } })();
+        const response = await fetch(CTX + "/shop", { headers: getAuthHeaders(uid ? { 'X-User-Id': uid } : {}) });
         const data     = await response.json();
 
         if (!data.success) {
