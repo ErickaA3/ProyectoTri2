@@ -11,7 +11,6 @@ import com.project.dao.implementation.ShopDAOImpl;
 import com.project.dao.interfaces.IShopDAO;
 import com.project.model.shop.Product;
 import com.project.model.shop.Purchase;
-import com.project.util.JwtUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -162,21 +161,11 @@ public class ShopServlet extends HttpServlet {
      * Fallback: header X-User-Id (útil para pruebas con Thunder Client).
      */
     private String getUserId(HttpServletRequest req) {
-        // 1. Sesión HTTP
         HttpSession session = req.getSession(false);
         if (session != null) {
             Object uid = session.getAttribute("userId");
             if (uid != null) return uid.toString();
         }
-        // 2. JWT Bearer token
-        String auth = req.getHeader("Authorization");
-        if (auth != null && auth.startsWith("Bearer ")) {
-            try {
-                String uid = JwtUtil.getUserId(auth.substring(7));
-                if (uid != null) return uid;
-            } catch (Exception ignored) {}
-        }
-        // 3. Header X-User-Id (fallback)
         String header = req.getHeader("X-User-Id");
         return (header != null && !header.isBlank()) ? header : null;
     }
