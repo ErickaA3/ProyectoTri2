@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ============================================================
 async function loadShop() {
     try {
-        const response = await fetch(CTX + "/shop");
+        const response = await fetch(CTX + "/shop", { headers: getAuthHeaders() });
         const data     = await response.json();
 
         if (!data.success) {
@@ -138,7 +138,7 @@ async function buySelectedBackground() {
     try {
         const response = await fetch(CTX + '/shop/buy', {
             method:  'POST',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ itemId: selectedBackgroundDbId })
         });
         const result = await response.json();
@@ -206,7 +206,7 @@ async function buyProduct(productName, price, btn) {
     try {
         const response = await fetch(CTX + '/shop/buy', {
             method:  'POST',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ itemId: dbId })
         });
         const result = await response.json();
@@ -310,7 +310,7 @@ async function equipBackground(bgClass) {
         if (dbId && !isNaN(dbId)) {
             fetch(CTX + '/shop/equip', {
                 method: 'POST',
-                headers: getAuthHeaders(),
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ itemId: dbId })
             }).catch(() => {});
         }
@@ -326,7 +326,7 @@ async function equipBackground(bgClass) {
     try {
         const res = await fetch(CTX + '/shop/equip', {
             method:  'POST',
-            headers: getAuthHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ itemId: dbId })
         });
         const result = await res.json();
