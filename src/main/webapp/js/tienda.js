@@ -21,15 +21,6 @@ let lastPurchasedBackground   = null;
 // ── Context path dinámico (ej: '/project-1.0-SNAPSHOT') ──────
 const CTX = window.location.pathname.split('/pages')[0];
 
-// ── Helper userId ──────────────────────────────────────────────
-function getShopUid() {
-    try { return JSON.parse(localStorage.getItem('user') || '{}').id || null; } catch(e) { return null; }
-}
-function shopHeaders() {
-    const uid = getShopUid();
-    return getAuthHeaders(uid ? { 'X-User-Id': uid } : {});
-}
-
 // ── Arranque ──────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', function () {
     initGalaxyCanvas();
@@ -51,7 +42,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // ============================================================
 async function loadShop() {
     try {
-        const response = await fetch(CTX + "/shop", { headers: shopHeaders() });
+        const response = await fetch(CTX + "/shop");
         const data     = await response.json();
 
         if (!data.success) {
@@ -147,7 +138,7 @@ async function buySelectedBackground() {
     try {
         const response = await fetch(CTX + '/shop/buy', {
             method:  'POST',
-            headers: shopHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ itemId: selectedBackgroundDbId })
         });
         const result = await response.json();
@@ -215,7 +206,7 @@ async function buyProduct(productName, price, btn) {
     try {
         const response = await fetch(CTX + '/shop/buy', {
             method:  'POST',
-            headers: shopHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ itemId: dbId })
         });
         const result = await response.json();
@@ -319,7 +310,7 @@ async function equipBackground(bgClass) {
         if (dbId && !isNaN(dbId)) {
             fetch(CTX + '/shop/equip', {
                 method: 'POST',
-                headers: shopHeaders(),
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ itemId: dbId })
             }).catch(() => {});
         }
@@ -335,7 +326,7 @@ async function equipBackground(bgClass) {
     try {
         const res = await fetch(CTX + '/shop/equip', {
             method:  'POST',
-            headers: shopHeaders(),
+            headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ itemId: dbId })
         });
         const result = await res.json();
