@@ -37,7 +37,7 @@ async function loadFavorites() {
 
     try {
         const response = await fetch('../api/favoritos', {
-            headers: { 'X-User-Id': userId }
+            headers: getAuthHeaders({ 'X-User-Id': userId })
         });
 
         const data = await response.json();
@@ -74,10 +74,7 @@ async function removeFavorite(contentId) {
     try {
         const response = await fetch('../api/favoritos', {
             method:  'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Id': userId
-            },
+            headers: getAuthHeaders({ 'X-User-Id': userId }),
             body: JSON.stringify({
                 contentId:  contentId,
                 isFavorite: false
@@ -129,7 +126,7 @@ async function openItem(id) {
 
     try {
         const response = await fetch(`../api/favoritos/${id}`, {
-            headers: { 'X-User-Id': userId }
+            headers: getAuthHeaders({ 'X-User-Id': userId })
         });
 
         if (!response.ok) {
