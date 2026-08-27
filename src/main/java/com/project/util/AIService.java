@@ -14,13 +14,6 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-/**
- * Servicio para llamar a OpenAI.
- * Lee la API key desde config/database.properties.
- *
- * Usa patrón System Prompt + User Prompt para resultados consistentes.
- * Cada tipo de contenido tiene prompts optimizados para producción.
- */
 public class AIService {
 
     private static final String API_URL = "https://api.openai.com/v1/chat/completions";
@@ -33,13 +26,10 @@ public class AIService {
 
     private static final Gson gson = new Gson();
 
-    // ── Cargar API key desde properties ──────────────────────────────────────
     private static String loadApiKey() {
-        // 1. Variable de entorno (Railway en producción)
         String envKey = System.getenv("OPENAI_API_KEY");
         if (envKey != null && !envKey.isBlank()) return envKey.trim();
 
-        // 2. Archivo local (desarrollo)
         try (InputStream in = AIService.class
                 .getClassLoader()
                 .getResourceAsStream("config/database.properties")) {
@@ -69,7 +59,6 @@ public class AIService {
         return generate(type, texto, new JsonObject());
     }
 
-    /** Temperatura óptima por tipo */
     private static double getTemperature(String type) {
         return switch (type) {
             case "flashcard" -> 0.3;
@@ -81,7 +70,7 @@ public class AIService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // SYSTEM PROMPTS — Define el ROL y las REGLAS de la IA
+    // SYSTEM PROMPTS
     // ═══════════════════════════════════════════════════════════════════════════
 
     private static String buildSystemPrompt(String type, JsonObject config) {
@@ -221,11 +210,10 @@ public class AIService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // USER PROMPTS — El contenido específico a procesar
+    // USER PROMPTS
     // ═══════════════════════════════════════════════════════════════════════════
 
     private static String buildUserPrompt(String type, String texto, JsonObject config) {
-        // Truncar texto si es demasiado largo para no exceder tokens
         String t = texto.length() > 12000
             ? texto.substring(0, 12000) + "\n[...texto truncado...]"
             : texto;
@@ -316,16 +304,14 @@ public class AIService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // CHAT CON HISTORIAL (para el módulo del chatbot de Hans)
+    // CHAT CON HISTORIAL
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /** Chat SIN contexto (compatibilidad). */
     public static String chat(List<ChatMessage> historial, String nuevoMensaje,
                                String profesorNombre, String personalidad) throws Exception {
         return chat(historial, nuevoMensaje, profesorNombre, personalidad, null);
     }
 
-    /** Chat CON contexto RAG. */
     public static String chat(List<ChatMessage> historial, String nuevoMensaje,
                                String profesorNombre, String personalidad,
                                String contexto) throws Exception {
@@ -368,7 +354,6 @@ public class AIService {
         JsonArray messages = new JsonArray();
         messages.add(systemMsg);
 
-        // Últimos 10 mensajes para no exceder tokens
         int start = Math.max(0, historial.size() - 10);
         for (int i = start; i < historial.size(); i++) {
             ChatMessage m = historial.get(i);
@@ -412,7 +397,6 @@ public class AIService {
             .get("content").getAsString();
     }
 
-    // ── Clase auxiliar para historial ─────────────────────────────────────────
     public static class ChatMessage {
         public String role;
         public String content;
@@ -450,7 +434,6 @@ public class AIService {
         body.add("messages", messages);
         body.addProperty("temperature", temperature);
 
-        // response_format para forzar JSON válido (funciona en gpt-4o-mini y gpt-4o)
         JsonObject responseFormat = new JsonObject();
         responseFormat.addProperty("type", "json_object");
         body.add("response_format", responseFormat);
@@ -476,15 +459,125 @@ public class AIService {
             .getAsJsonObject().getAsJsonObject("message")
             .get("content").getAsString();
 
-        // Limpiar posibles backticks
         aiText = aiText.trim();
         if (aiText.startsWith("```json")) aiText = aiText.substring(7);
         if (aiText.startsWith("```")) aiText = aiText.substring(3);
         if (aiText.endsWith("```")) aiText = aiText.substring(0, aiText.length() - 3);
         aiText = aiText.trim();
 
-        // Validar que sea JSON parseable
         JsonParser.parseString(aiText);
         return aiText;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // EMBEDDINGS — para búsqueda semántica (pgvector) — NUEVO
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private static final String EMBEDDINGS_URL  = "https://api.openai.com/v1/embeddings";
+    private static final String EMBEDDING_MODEL = "text-embedding-3-small";
+
+    /**
+     * Genera el embedding (1536 números) de un texto usando OpenAI.
+     */
+    public static float[] generateEmbedding(String texto) throws Exception {
+        if (API_KEY == null || API_KEY.isBlank()) {
+            throw new Exception("API Key no configurada.");
+        }
+        if (texto == null || texto.isBlank()) {
+            throw new IllegalArgumentException("El texto para embedding no puede estar vacío.");
+        }
+
+        String t = texto.length() > 8000 ? texto.substring(0, 8000) : texto;
+
+        JsonObject body = new JsonObject();
+        body.addProperty("model", EMBEDDING_MODEL);
+        body.addProperty("input", t);
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(EMBEDDINGS_URL))
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + API_KEY)
+            .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body)))
+            .timeout(Duration.ofSeconds(30))
+            .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            throw new Exception("Error API embeddings. Status: " + response.statusCode()
+                + " — " + response.body());
+        }
+
+        JsonObject responseJson = JsonParser.parseString(response.body()).getAsJsonObject();
+        JsonArray embeddingArray = responseJson
+            .getAsJsonArray("data")
+            .get(0).getAsJsonObject()
+            .getAsJsonArray("embedding");
+
+        float[] embedding = new float[embeddingArray.size()];
+        for (int i = 0; i < embeddingArray.size(); i++) {
+            embedding[i] = embeddingArray.get(i).getAsFloat();
+        }
+        return embedding;
+    }
+
+    /**
+     * Aplana un contenido de study_content (tipo + JSON) a texto plano,
+     * listo para generar su embedding.
+     */
+    public static String flattenContentForEmbedding(String type, String title, String jsonContent) {
+        StringBuilder sb = new StringBuilder();
+        if (title != null && !title.isBlank()) sb.append(title).append(". ");
+
+        try {
+            JsonObject obj = JsonParser.parseString(jsonContent).getAsJsonObject();
+            switch (type) {
+                case "flashcard" -> {
+                    if (obj.has("cards")) {
+                        for (var el : obj.getAsJsonArray("cards")) {
+                            var c = el.getAsJsonObject();
+                            sb.append(safeText(c, "front")).append(" ").append(safeText(c, "back")).append(". ");
+                        }
+                    }
+                }
+                case "quiz" -> {
+                    if (obj.has("questions")) {
+                        for (var el : obj.getAsJsonArray("questions")) {
+                            var q = el.getAsJsonObject();
+                            sb.append(safeText(q, "question")).append(" ");
+                        }
+                    }
+                }
+                case "summary" -> {
+                    if (obj.has("sections")) {
+                        for (var el : obj.getAsJsonArray("sections")) {
+                            var s = el.getAsJsonObject();
+                            sb.append(safeText(s, "heading")).append(": ").append(safeText(s, "body")).append(". ");
+                        }
+                    }
+                }
+                case "schema" -> {
+                    if (obj.has("rootNode")) flattenSchemaNode(obj.getAsJsonObject("rootNode"), sb);
+                }
+                default -> sb.append(obj.toString());
+            }
+        } catch (Exception e) {
+            System.err.println("[Embedding] No se pudo aplanar contenido: " + e.getMessage());
+        }
+        return sb.toString();
+    }
+
+    private static void flattenSchemaNode(JsonObject node, StringBuilder sb) {
+        sb.append(safeText(node, "label")).append(" ");
+        if (node.has("detail")) sb.append(safeText(node, "detail")).append(". ");
+        if (node.has("children")) {
+            for (var el : node.getAsJsonArray("children")) {
+                try { flattenSchemaNode(el.getAsJsonObject(), sb); } catch (Exception ignored) {}
+            }
+        }
+    }
+
+    private static String safeText(JsonObject o, String field) {
+        return (o.has(field) && !o.get(field).isJsonNull()) ? o.get(field).getAsString() : "";
     }
 }

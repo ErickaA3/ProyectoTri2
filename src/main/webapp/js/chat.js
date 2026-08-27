@@ -1,5 +1,3 @@
-/* ===== CHAT.JS - Mi ProfesorIA ===== */
-
 const API_BASE = window.API_BASE || '';
 
 let chatHistory   = [];
@@ -69,7 +67,7 @@ async function send() {
             body: JSON.stringify({
                 mensaje: txt,
                 sessionId: currentSession,
-                userId: userId          // ← NUEVO: envía userId desde localStorage
+                userId: userId
             })
         });
 
@@ -81,10 +79,11 @@ async function send() {
             return;
         }
 
-        // Guardar sessionId si es nuevo chat
+        // Guardar sessionId si es nuevo chat y agregar al top del sidebar
         if (!currentSession) {
             currentSession = data.data.sessionId;
-            addSessionToSidebar(txt, currentSession);
+            // [FIX] prepend=true para que el nuevo chat aparezca arriba
+            addSessionToSidebar(txt, currentSession, true);
         }
 
         // Formatear respuesta (convertir **negrita** a <strong>)
@@ -128,12 +127,11 @@ async function loadSessions() {
 
         const sessions = data.data;
         const container = document.querySelector('.recents');
-        const label = container.querySelector('.section-label');
 
         // Limpiar items hardcodeados
         container.querySelectorAll('.chat-item').forEach(el => el.remove());
 
-        if (sessions.length === 0) {
+        if (!sessions || sessions.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'empty-sessions';
             empty.textContent = 'No hay chats recientes.';
@@ -142,8 +140,10 @@ async function loadSessions() {
             return;
         }
 
+        // Las sesiones vienen de la API ordenadas DESC (más recientes primero).
+        // Usamos append (prepend=false) para respetar ese orden en el sidebar.
         sessions.forEach(s => {
-            addSessionToSidebar(s.firstMessage, s.sessionId);
+            addSessionToSidebar(s.firstMessage, s.sessionId, false);
         });
 
     } catch(e) {
@@ -152,7 +152,9 @@ async function loadSessions() {
 }
 
 // ─── Agregar sesión al sidebar ───────────────────────────────
-function addSessionToSidebar(firstMessage, sessionId) {
+// [FIX] prepend=true → inserta arriba (debajo del label) para nuevos chats
+//       prepend=false → append al final (para cargar historial en orden)
+function addSessionToSidebar(firstMessage, sessionId, prepend = false) {
     const container = document.querySelector('.recents');
 
     // Quitar mensaje de "no hay chats"
@@ -167,7 +169,7 @@ function addSessionToSidebar(firstMessage, sessionId) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </div>
         <div class="chat-item-meta">
-            <div class="chat-item-label">${esc(firstMessage.substring(0, 35))}${firstMessage.length > 35 ? '...' : ''}</div>
+            <div class="chat-item-label">${esc(firstMessage ? firstMessage.substring(0, 35) : 'Chat')}${firstMessage && firstMessage.length > 35 ? '...' : ''}</div>
             <div class="chat-item-date">Hoy</div>
         </div>
         <button class="chat-item-delete" title="Eliminar chat">
@@ -176,9 +178,9 @@ function addSessionToSidebar(firstMessage, sessionId) {
             </svg>
         </button>
     `;
+
     // Click en el item → cargar chat
     item.addEventListener('click', (e) => {
-        // No cargar si clickearon el botón de borrar
         if (e.target.closest('.chat-item-delete')) return;
         selectSession(item, sessionId);
     });
@@ -187,7 +189,18 @@ function addSessionToSidebar(firstMessage, sessionId) {
         e.stopPropagation();
         showDeleteConfirm(sessionId, item);
     });
-    container.appendChild(item);
+
+    if (prepend) {
+        // Insertar justo después del label "Chats recientes"
+        const label = container.querySelector('.section-label');
+        if (label && label.nextSibling) {
+            container.insertBefore(item, label.nextSibling);
+        } else {
+            container.appendChild(item);
+        }
+    } else {
+        container.appendChild(item);
+    }
 }
 
 // ─── Eliminar sesión ─────────────────────────────────────────
@@ -270,12 +283,14 @@ async function selectSession(el, sessionId) {
         const typing = document.getElementById('typingRow');
         [...area.children].forEach(c => { if (c !== typing) c.remove(); });
 
-        // Renderizar historial
+        // [FIX] El campo de chat_history en la DB es "message", no "content".
+        // Se usa msg.message con fallback a msg.content para compatibilidad.
         data.data.forEach(msg => {
+            const texto = msg.message || msg.content || '';
             if (msg.role === 'user') {
-                addMsg('user', msg.content);
+                addMsg('user', texto);
             } else {
-                addBotMsg(formatReply(msg.content));
+                addBotMsg(formatReply(texto));
             }
         });
 
@@ -344,11 +359,11 @@ function formatReply(txt) {
 }
 
 function esc(t) {
+    if (!t) return '';
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
 // ─── Cargar fondo equipado ───────────────────────────────────
-// Mapeo nombre BD → clase CSS
 const BG_CLASS_MAP = {
     'Noche Oscura':   'bg-default',
     'Galaxia':        'bg-galaxy',
@@ -373,19 +388,15 @@ async function loadEquippedBackground() {
         const data = await res.json();
         if (!data.success || !data.equippedBackgroundId) return;
 
-        // Buscar el item equipado en la lista
         const item = (data.items || []).find(i => i.id === data.equippedBackgroundId);
         if (!item) return;
 
         const bgClass = BG_CLASS_MAP[item.name];
         if (!bgClass) return;
 
-        // Aplicar al .content (padre de sidebar + chat-main)
         const content = document.querySelector('.content');
         if (content) {
-            // Siempre limpiar clases previas primero
             content.classList.remove('bg-galaxy','bg-volcano','bg-ocean','bg-forest','bg-aurora','bg-sky','bg-rain');
-            // Solo agregar si no es el default
             if (bgClass !== 'bg-default') {
                 content.classList.add(bgClass);
             }

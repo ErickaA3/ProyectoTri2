@@ -39,7 +39,6 @@
                             Flashcards
                         </div>
                     </div>
-                    <!-- "Quizzes" renombrado a "Examen" -->
                     <div class="study-option" onclick="toggleOption(this)" data-type="examenes">
                         <div class="study-option-icon"><i class="fas fa-file-signature"></i></div>
                         <div class="study-option-label">
@@ -122,7 +121,7 @@
         };
 
         // ================================================================
-        // SPARKLES (sin cambios)
+        // SPARKLES
         // ================================================================
         function generateSparkles() {
             const container = document.getElementById('sparklesContainer');
@@ -160,8 +159,15 @@
             updateStepsPreview();
         }
 
+        // [FIX] El botón requiere opciones seleccionadas Y una fuente de datos (archivo o texto)
         function updateGenerateButton() {
-            document.getElementById('generateBtn').disabled = selectedOptions.length === 0;
+            const hasOptions  = selectedOptions.length > 0;
+            const hasData     = selectedDataType === 'file'
+                                    ? uploadedFile !== null
+                                    : selectedDataType === 'text'
+                                        ? userText.trim().length > 0
+                                        : false;
+            document.getElementById('generateBtn').disabled = !(hasOptions && hasData);
         }
 
         // Muestra el resumen de pasos de config que habrá
@@ -199,14 +205,15 @@
                 return;
             }
 
-            // Límite de ~3.5MB por sessionStorage (base64 infla ~33%)
-            if (file.size > 3_500_000) {
-                showToast('Archivo muy grande (máx ~3.5 MB). Intenta con uno más corto.');
+            // [FIX] Límite reducido a 1.5 MB.
+            // Base64 infla ~33%: 1.5 MB → ~2 MB en sessionStorage,
+            // bien dentro del límite de 5 MB.
+            if (file.size > 1_500_000) {
+                showToast('Archivo muy grande (máx 1.5 MB). Intenta con uno más corto o recórtalo.');
                 event.target.value = '';
                 return;
             }
 
-            // Todos los formatos se envían como archivo al servlet (el backend extrae texto)
             uploadedFile     = file;
             selectedDataType = 'file';
             document.getElementById('fileOption').classList.add('selected');
@@ -216,6 +223,9 @@
             document.getElementById('fileSize').textContent = formatFileSize(file.size);
             document.getElementById('fileAttached').classList.add('show');
             showToast('Archivo adjuntado: ' + file.name);
+
+            // Actualizar botón ahora que hay datos
+            updateGenerateButton();
         }
 
         function formatFileSize(bytes) {
@@ -231,6 +241,7 @@
             document.getElementById('fileOption').classList.remove('selected');
             document.getElementById('fileAttached').classList.remove('show');
             showToast('Archivo eliminado');
+            updateGenerateButton();
         }
 
         function toggleTextInput() {
@@ -246,6 +257,7 @@
                 uploadedFile = null; document.getElementById('fileInput').value = '';
                 selectedDataType = 'text'; document.getElementById('textInput').focus();
             }
+            updateGenerateButton();
         }
 
         // ================================================================
@@ -265,7 +277,7 @@
                 showToast('Agrega texto o adjunta un archivo primero'); return;
             }
 
-            // Verificar sesión — Hans guarda el user como objeto JSON bajo la clave 'user'
+            // Verificar sesión
             const userRaw = localStorage.getItem('user');
             let userId = null;
             if (userRaw) {
@@ -276,10 +288,9 @@
                 setTimeout(() => window.location.href = '../index.html', 1200);
                 return;
             }
-            // Sincronizar para que el resto del flujo también lo encuentre
             sessionStorage.setItem('userId', userId);
 
-            // Construir el objeto de flujo y guardarlo
+            // Construir el objeto de flujo
             const configQueue = selectedOptions.filter(o => CONFIG_REQUIRED[o]);
             const flow = {
                 userId,
@@ -295,7 +306,6 @@
             };
 
             const navigate = () => {
-                // Limpiar resultados anteriores para que genere de nuevo
                 sessionStorage.removeItem('studyResults');
                 sessionStorage.setItem('modoEstudioFlow', JSON.stringify(flow));
                 if (configQueue.length > 0) {
@@ -312,14 +322,19 @@
                     try {
                         navigate();
                     } catch(storageErr) {
-                        showToast('El archivo es demasiado grande. Intenta con un PDF más corto.');
+                        showToast('Error guardando el archivo. Intenta con uno más pequeño.');
                         console.error('SessionStorage overflow:', storageErr);
                     }
                 };
                 reader.onerror = () => showToast('Error leyendo el archivo.');
                 reader.readAsDataURL(uploadedFile);
             } else {
-                navigate();
+                try {
+                    navigate();
+                } catch(storageErr) {
+                    showToast('El texto es demasiado largo. Recórtalo un poco.');
+                    console.error('SessionStorage overflow:', storageErr);
+                }
             }
         }
 
@@ -338,6 +353,8 @@
             document.getElementById('textInput').addEventListener('input', function () {
                 userText = this.value;
                 document.getElementById('charCount').textContent = this.value.length.toLocaleString();
+                // Actualizar botón cuando cambia el texto
+                updateGenerateButton();
             });
             generateSparkles();
             updateStepsPreview();

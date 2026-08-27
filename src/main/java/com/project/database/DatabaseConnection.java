@@ -5,16 +5,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Properties;
 
-/**
- * Crea una conexión nueva en cada llamada.
- *
- * PRIORIDAD de configuración:
- *   1. Variables de entorno (Railway en producción)
- *   2. config/database.properties (desarrollo local)
- *
- * En local: seguís usando database.properties normalmente, sin cambiar nada.
- * En Railway: las variables DB_URL, DB_USERNAME, DB_PASSWORD sobreescriben el archivo.
- */
+import com.pgvector.PGvector;
+
 public class DatabaseConnection {
 
     private static Properties fileConfig = null;
@@ -33,11 +25,6 @@ public class DatabaseConnection {
         }
     }
 
-    /**
-     * Lee una propiedad con esta prioridad:
-     *   1. Variable de entorno (ej: DB_URL)
-     *   2. Valor en database.properties (ej: db.url)
-     */
     private static String getProp(String envKey, String fileKey) {
         String envVal = System.getenv(envKey);
         if (envVal != null && !envVal.isBlank()) return envVal.trim();
@@ -59,6 +46,11 @@ public class DatabaseConnection {
 
             Class.forName(driver);
             Connection conn = DriverManager.getConnection(url, props);
+
+            // Registrar el tipo 'vector' de pgvector en esta conexión.
+            // Sin esto, PGvector no se puede usar en setObject().
+            PGvector.addVectorType(conn);
+
             System.out.println("[DB] Conexión OK — " + (System.getenv("DB_URL") != null ? "Railway" : "Local"));
             return conn;
 
