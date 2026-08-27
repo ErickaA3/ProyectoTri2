@@ -74,11 +74,14 @@
             <button class="tab-btn" onclick="switchTab('retos', this)">
                 <i class="fas fa-bolt"></i>
                 Retos Activos
-                <span class="tab-badge" id="badgeRetos" style="display:none"></span>
             </button>
             <button class="tab-btn" onclick="switchTab('notificaciones', this)">
                 <i class="fas fa-bell"></i>
                 Notificaciones
+            </button>
+            <button class="tab-btn" onclick="switchTab('leaderboard', this)">
+                <i class="fas fa-ranking-star"></i>
+                Leaderboard
             </button>
         </div>
 
@@ -125,6 +128,44 @@
                 <i class="fas fa-bell-slash"></i>
                 <h3>Sin notificaciones</h3>
                 <p>Cuando se resuelva un duelo o recibas un reto aparecerá aquí.</p>
+            </div>
+        </div>
+        <!-- Tab Content: Leaderboard -->
+        <div class="tab-content" id="tab-leaderboard">
+            <div class="lb-wrap">
+
+                <!-- Banner: tu posición -->
+                <div class="lb-my-banner" id="lbMyBanner" style="display:none;">
+                    <div class="lb-my-banner-left">
+                        <i class="fas fa-user-circle" style="color:var(--accent-cyan);font-size:18px;"></i>
+                        Tu posición: <strong id="lbMyPos">—</strong>
+                    </div>
+                    <div class="lb-banner-pills">
+                        <span class="lb-pill w"><i class="fas fa-swords"></i>&nbsp;<span id="lbMyWins">0</span> vic</span>
+                        <span class="lb-pill x"><i class="fas fa-star"></i>&nbsp;<span id="lbMyXp">0</span> XP</span>
+                        <span class="lb-pill s"><i class="fas fa-fire"></i>&nbsp;<span id="lbMyStreak">0</span>d</span>
+                    </div>
+                </div>
+
+                <!-- Filtro período -->
+                <div class="lb-period">
+                    <button class="lb-period-btn active" onclick="lbSetPeriod('week', this)">Esta semana</button>
+                    <button class="lb-period-btn" onclick="lbSetPeriod('month', this)">Este mes</button>
+                    <button class="lb-period-btn" onclick="lbSetPeriod('all', this)">Todo el tiempo</button>
+                </div>
+
+                <!-- Podio top 3 -->
+                <div class="lb-podium" id="lbPodium">
+                    <div class="lb-empty" style="grid-column:1/-1;">
+                        <i class="fas fa-spinner fa-spin"></i>&nbsp;Cargando ranking...
+                    </div>
+                </div>
+
+                <div class="lb-div"></div>
+
+                <!-- Lista 4+ -->
+                <div class="lb-list" id="lbList"></div>
+
             </div>
         </div>
     </main>
