@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sessionStorage.removeItem('duelData');
     const _dt = PolarisLoading.rotateMessages('duelLoadingSub',
         ['Obteniendo tus datos...', 'Cargando amigos...', 'Buscando retos activos...']);
-    Promise.allSettled([loadFriends(), loadPendingRequests(), loadActiveDuels(), loadNotifications()])
+    Promise.allSettled([loadFriends(), loadPendingRequests(), loadActiveDuels(), loadNotifications(), loadLeaderboard()])
         .finally(() => { clearInterval(_dt); PolarisLoading.hide('duelLoadingScreen'); });
 });
 
@@ -118,20 +118,14 @@ async function loadNotifications() {
         if (data.success) {
             notifications = data.history || [];
             renderNotifications();
-            // Sin badge para notificaciones — no es necesario
         }
     } catch (e) { console.error('[Duelos] loadHistory:', e); }
 
-    // Contar victorias
     const wins = (notifications || []).filter(n => n.result === 'win').length;
     const el = document.getElementById('victoriesCount');
     if (el) el.textContent = wins;
 }
 
-/**
- * Crear duelo: genera el quiz en el servidor y crea el reto.
- * NO redirige a jugar — el usuario juega cuando quiera desde Retos Activos.
- */
 async function createDuel() {
     const opponentId = document.getElementById('opponentSelect').value;
     const mode = document.getElementById('topicUploadMode').style.display === 'none' ? 'text' : 'upload';
@@ -152,21 +146,17 @@ async function createDuel() {
         topic = file.name;
     }
 
-    // Cerrar modal y mostrar loading con pasos
     closeCreateDuelModal();
     showCreatingScreen();
 
     try {
-        // Step 1: Analizando contenido
         activateStep('step-analyze');
         updateCreatingProgress(20);
         await delay(600);
 
-        // Step 2: Generando preguntas
         activateStep('step-generate');
         updateCreatingProgress(50);
 
-        // Construir request — FormData si hay archivo, JSON si solo texto
         let res;
         if (file) {
             const formData = new FormData();
@@ -175,7 +165,6 @@ async function createDuel() {
             formData.append('topic', topic);
             formData.append('questionCount', questionCount);
             formData.append('timePerQuestion', timePerQuestion);
-
             res = await fetch(CTX + '/api/duels/create', {
                 method: 'POST',
                 headers: { 'X-User-Id': getUserId() },
@@ -190,7 +179,6 @@ async function createDuel() {
 
         const data = await res.json();
 
-        // Step 3: Creando duelo
         activateStep('step-create');
         updateCreatingProgress(90);
         await delay(400);
@@ -213,14 +201,12 @@ async function createDuel() {
     }
 }
 
-// ── Loading screen helpers ──
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function showCreatingScreen() {
     const screen = document.getElementById('duelCreatingScreen');
     if (!screen) return;
     screen.classList.add('show');
-    // Reset steps
     document.querySelectorAll('.duel-creating-step').forEach(s => {
         s.classList.remove('active', 'done');
     });
@@ -235,7 +221,6 @@ function hideCreatingScreen() {
 }
 
 function activateStep(stepId) {
-    // Mark previous steps as done
     document.querySelectorAll('.duel-creating-step.active').forEach(s => {
         s.classList.remove('active');
         s.classList.add('done');
@@ -243,8 +228,6 @@ function activateStep(stepId) {
     });
     const step = document.getElementById(stepId);
     if (step) step.classList.add('active');
-
-    // Update subtitle
     const labels = { 'step-analyze': 'Analizando contenido...', 'step-generate': 'Generando preguntas con IA...', 'step-create': 'Finalizando el duelo...' };
     const sub = document.getElementById('creatingSubtitle');
     if (sub) sub.textContent = labels[stepId] || '';
@@ -255,9 +238,6 @@ function updateCreatingProgress(pct) {
     if (fill) fill.style.width = pct + '%';
 }
 
-/**
- * Jugar un duelo — obtiene preguntas del servidor y redirige a la página de juego.
- */
 async function playChallenge(duelId) {
     showToast('Cargando duelo...', 'info');
     try {
@@ -378,7 +358,6 @@ function renderChallenges() {
             statusHtml = '<i class="fas fa-hourglass-half"></i> Esperando oponente';
             statusClass = 'waiting';
         } else if (d.status === 'in_progress') {
-            // El otro ya jugó, tu turno
             statusHtml = '<i class="fas fa-bolt"></i> ¡Tu turno!';
             statusClass = 'pending';
         } else {
@@ -483,6 +462,7 @@ function switchTab(tab, el) {
     el.classList.add('active');
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.getElementById(`tab-${tab}`).classList.add('active');
+    if (tab === 'leaderboard') loadLeaderboard();
 }
 
 function searchFriends() { renderFriends(); }
@@ -564,7 +544,6 @@ function timeAgo(val) {
         ts = val;
     } else {
         let s = String(val).trim();
-        // Postgres text format without timezone → force UTC
         if (!s.includes('+') && !s.endsWith('Z') && !s.includes('T')) {
             s = s.replace(' ', 'T') + 'Z';
         }
@@ -583,3 +562,227 @@ function timeAgo(val) {
 document.querySelectorAll('.modal-overlay').forEach(m =>
     m.addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); })
 );
+
+// ═══════════════════════════════════════════════════════════
+//  LEADERBOARD
+// ═══════════════════════════════════════════════════════════
+let leaderboardRanking = [];
+let lbPeriod = 'week';
+
+async function loadLeaderboard() {
+    showLeaderboardSkeleton();
+    try {
+        // ★ URL CORREGIDA — apunta al nuevo LeaderboardServlet ★
+        const res = await fetch(
+            CTX + '/api/leaderboard/duels?period=' + lbPeriod + '&scope=friends',
+            { headers: duelHeaders() }
+        );
+        const data = await res.json();
+        if (data.success) {
+            leaderboardRanking = data.leaderboard || [];  // ← campo correcto
+            renderLeaderboard();
+        }
+    } catch (e) { console.error('[Duelos] loadLeaderboard:', e); }
+}
+
+function lbSetPeriod(period, btn) {
+    lbPeriod = period;
+    document.querySelectorAll('.lb-period-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    loadLeaderboard();
+}
+
+function showLeaderboardSkeleton() {
+    const podium = document.getElementById('lbPodium');
+    const list   = document.getElementById('lbList');
+    if (podium) podium.innerHTML = '<div class="lb-empty"><i class="fas fa-spinner fa-spin"></i>&nbsp;Cargando ranking...</div>';
+    if (list) { list.innerHTML = ''; list.classList.remove('has-sticky-me'); }
+}
+
+// ── Tendencia de posición (vs. la última vez que viste este período) ──
+// No requiere cambios de backend: guardamos el ranking anterior en
+// localStorage por período y comparamos contra el nuevo al renderizar.
+function lbGetPrevRanks(period) {
+    try { return JSON.parse(localStorage.getItem('lbPrevRanks_' + period)) || {}; }
+    catch (_) { return {}; }
+}
+function lbSavePrevRanks(period, ranking) {
+    const map = {};
+    ranking.forEach((r, i) => { map[String(r.userId)] = i + 1; });
+    try { localStorage.setItem('lbPrevRanks_' + period, JSON.stringify(map)); }
+    catch (_) { /* localStorage no disponible, se omite silenciosamente */ }
+}
+function lbTrendHtml(userId, rank, prevRanks) {
+    const prev = prevRanks[String(userId)];
+    if (prev === undefined || prev === null || prev === rank) return '';
+    const diff = Math.abs(prev - rank);
+    const dir  = prev > rank ? 'up' : 'down';
+    const label = dir === 'up' ? `Subió ${diff} posición(es)` : `Bajó ${diff} posición(es)`;
+    return `<span class="lb-trend ${dir}" title="${label}">${diff}</span>`;
+}
+
+// ── Animación de conteo (ease-out) para números que suben de golpe ──
+const _lbReduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function lbAnimateValue(el, endValue, opts) {
+    if (!el) return;
+    const format = (opts && opts.format) || (v => Math.round(v));
+    if (_lbReduceMotion) { el.textContent = format(endValue); return; }
+    const duration = (opts && opts.duration) || 700;
+    const start = 0;
+    const t0 = performance.now();
+    function step(now) {
+        const p = Math.min((now - t0) / duration, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = format(start + (endValue - start) * eased);
+        if (p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+function renderLeaderboard() {
+    const podiumEl = document.getElementById('lbPodium');
+    const listEl   = document.getElementById('lbList');
+    const myId     = getUserId();
+
+    if (!podiumEl) return;
+
+    const prevRanks = lbGetPrevRanks(lbPeriod);
+
+    // Banner mi posición
+    const myIdx = leaderboardRanking.findIndex(r => String(r.userId) === String(myId));
+    const banner = document.getElementById('lbMyBanner');
+    if (banner) {
+        if (myIdx >= 0) {
+            const me = leaderboardRanking[myIdx];
+            banner.style.display = 'flex';
+            document.getElementById('lbMyPos').textContent = '#' + (myIdx + 1);
+            lbAnimateValue(document.getElementById('lbMyWins'), me.wins || 0);
+            lbAnimateValue(document.getElementById('lbMyXp'), me.xp || 0, { format: lbFmt });
+            lbAnimateValue(document.getElementById('lbMyStreak'), me.streak || 0);
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    const top3 = leaderboardRanking.slice(0, 3);
+    const rest = leaderboardRanking.slice(3);
+
+    // Podio — orden visual: 2° | 1° | 3°
+    if (top3.length === 0) {
+        podiumEl.innerHTML = '<div class="lb-empty"><i class="fas fa-ghost"></i>Aún no hay datos.<br><small>Juega duelos para aparecer aquí.</small></div>';
+    } else {
+        const visOrder = top3.length === 3 ? [top3[1], top3[0], top3[2]] : top3;
+        const visRanks = top3.length === 3 ? [2, 1, 3] : [1, 2, 3];
+        const visCls   = ['p2', 'p1', 'p3'];
+
+        podiumEl.innerHTML = visOrder.map((row, vi) => {
+            if (!row) return `<div class="lb-pc ${visCls[vi]}"></div>`;
+            const rank = visRanks[vi];
+            const isMe = String(row.userId) === String(myId);
+            const init = lbInitials(row.username);
+            const trend = lbTrendHtml(row.userId, rank, prevRanks);
+            return `
+            <div class="lb-pc ${visCls[vi]}${isMe ? ' lb-me' : ''}" style="animation-delay:${vi * 70}ms">
+                <div class="lb-pc-stars">${generateStars(5)}</div>
+                ${rank === 1 ? '<div class="lb-crown">👑</div>' : ''}
+                <div class="lb-av">
+                    <span class="lb-av-initials">${init}</span>
+                    <div class="lb-badge">${rank}</div>
+                </div>
+                <div class="lb-name">${escHtml(row.username || 'Jugador')}${isMe ? ' <span class="lb-you-tag">tú</span>' : ''}${trend}</div>
+                <div class="lb-handle">#${rank}</div>
+                <div class="lb-metrics">
+                    <div class="lb-mrow">
+                        <i class="fas fa-swords lb-micon" style="color:#eab308;"></i>
+                        <span class="lb-mlabel">Victorias</span>
+                        <span class="lb-mval gold" data-lb-wins>${row.wins || 0}</span>
+                    </div>
+                    <div class="lb-mrow">
+                        <i class="fas fa-star lb-micon" style="color:var(--accent-cyan,#2dd4bf);"></i>
+                        <span class="lb-mlabel">XP</span>
+                        <span class="lb-mval cy" data-lb-xp>${lbFmt(row.xp || 0)}</span>
+                    </div>
+                    <div class="lb-mrow">
+                        <i class="fas fa-fire lb-micon" style="color:#8b5cf6;"></i>
+                        <span class="lb-mlabel">Racha</span>
+                        <span class="lb-mval pu" data-lb-streak>${row.streak || 0}d</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        // Animar los contadores del podio una vez montado el HTML
+        podiumEl.querySelectorAll('.lb-pc').forEach((card, vi) => {
+            const row = visOrder[vi];
+            if (!row) return;
+            lbAnimateValue(card.querySelector('[data-lb-wins]'), row.wins || 0);
+            lbAnimateValue(card.querySelector('[data-lb-xp]'), row.xp || 0, { format: lbFmt });
+            lbAnimateValue(card.querySelector('[data-lb-streak]'), row.streak || 0, { format: v => Math.round(v) + 'd' });
+        });
+    }
+
+    // Lista 4+
+    if (!listEl) { lbSavePrevRanks(lbPeriod, leaderboardRanking); return; }
+    if (rest.length === 0) {
+        listEl.innerHTML = '';
+        listEl.classList.remove('has-sticky-me');
+        lbSavePrevRanks(lbPeriod, leaderboardRanking);
+        return;
+    }
+
+    const buildRow = (row, rank, isMe, extraClass, delayMs) => {
+        const init = lbInitials(row.username);
+        const trend = lbTrendHtml(row.userId, rank, prevRanks);
+        return `
+        <div class="lb-row${isMe ? ' lb-me' : ''}${extraClass ? ' ' + extraClass : ''}" style="animation-delay:${delayMs}ms">
+            <div class="lb-rrank">${rank}</div>
+            <div class="lb-ruser">
+                <div class="lb-rav">${init}</div>
+                <div>
+                    <div class="lb-rname">${escHtml(row.username || 'Jugador')}${isMe ? ' <span class="lb-you-tag">tú</span>' : ''}${trend}</div>
+                    <div class="lb-rhandle">#${rank}</div>
+                </div>
+            </div>
+            <div class="lb-rpills">
+                <span class="lb-pill w"><i class="fas fa-swords"></i>&nbsp;${row.wins || 0}</span>
+                <span class="lb-pill x"><i class="fas fa-star"></i>&nbsp;${lbFmt(row.xp || 0)}</span>
+                <span class="lb-pill s"><i class="fas fa-fire"></i>&nbsp;${row.streak || 0}d</span>
+            </div>
+        </div>`;
+    };
+
+    let html = rest.map((row, i) => {
+        const rank = i + 4;
+        const isMe = String(row.userId) === String(myId);
+        return buildRow(row, rank, isMe, '', Math.min(i, 10) * 30);
+    }).join('');
+
+    // Si "tú" quedaste fuera del podio, clonamos tu fila fijada al fondo
+    // de la lista para que siempre sepas dónde estás sin tener que scrollear.
+    const restMyIdx = myIdx >= 3 ? myIdx - 3 : -1;
+    if (restMyIdx >= 0) {
+        const me = rest[restMyIdx];
+        html += buildRow(me, restMyIdx + 4, true, 'lb-me-sticky', 0);
+        listEl.classList.add('has-sticky-me');
+    } else {
+        listEl.classList.remove('has-sticky-me');
+    }
+
+    listEl.innerHTML = html;
+
+    // Guarda el ranking actual para poder calcular la tendencia la próxima vez
+    lbSavePrevRanks(lbPeriod, leaderboardRanking);
+}
+
+function lbFmt(n) { return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : Math.round(n); }
+function lbInitials(name) {
+    if (!name) return '?';
+    const p = name.trim().split(' ');
+    return p.length >= 2 ? (p[0][0] + p[1][0]).toUpperCase() : p[0].substring(0, 2).toUpperCase();
+}
+
+function escHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
