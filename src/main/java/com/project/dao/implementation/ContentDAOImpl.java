@@ -7,10 +7,12 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.pgvector.PGvector;
 import com.project.dao.interfaces.IContentDAO;
 import com.project.database.DatabaseConnection;
 import com.project.model.content.EducationalContent;
 import com.project.model.content.Summary;
+import com.project.util.AIService;
 
 /**
  * Implementación real del IContentDAO.
@@ -19,16 +21,28 @@ import com.project.model.content.Summary;
  * CORRECCIONES:
  * - [BUG-4 FIX] Se agrega método getMetadata() para que SummaryServlet
  *   pueda obtener created_at y session_id sin duplicar queries
+ * - [RAG VECTORIAL] save() ahora calcula el embedding del contenido
+ *   antes de guardarlo, para búsqueda semántica en el chatbot.
  */
 public class ContentDAOImpl implements IContentDAO {
 
     @Override
     public String save(EducationalContent content, String contentJson, String sourceText) throws Exception {
+
+        float[] embedding = null;
+        try {
+            String textoParaEmbedding = AIService.flattenContentForEmbedding(
+                content.getType(), content.getTitle(), contentJson);
+            embedding = AIService.generateEmbedding(textoParaEmbedding);
+        } catch (Exception e) {
+            System.err.println("[ContentDAO] No se pudo generar embedding: " + e.getMessage());
+        }
+
         String sql = """
             INSERT INTO study_content
-                (user_id, type, title, content, is_favorite, session_id, source_text)
+                (user_id, type, title, content, is_favorite, session_id, source_text, embedding)
             VALUES
-                (?::uuid, ?, ?, ?::jsonb, false, ?::uuid, ?)
+                (?::uuid, ?, ?, ?::jsonb, false, ?::uuid, ?, ?)
             RETURNING id
             """;
 
@@ -41,6 +55,7 @@ public class ContentDAOImpl implements IContentDAO {
             stmt.setString(4, contentJson);
             stmt.setString(5, content.getSessionId());
             stmt.setString(6, sourceText);
+            stmt.setObject(7, embedding != null ? new PGvector(embedding) : null);
 
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
@@ -185,11 +200,6 @@ public class ContentDAOImpl implements IContentDAO {
         }
     }
 
-    // ─── [BUG-4 FIX] Nuevo método para obtener metadatos (created_at, session_id) ───
-    /**
-     * Devuelve [createdAt, sessionId] como String[], o null si no existe.
-     * Usado por SummaryServlet para completar la respuesta JSON.
-     */
     public String[] getMetadata(String contentId, String userId) throws Exception {
         String sql = """
             SELECT created_at::text, session_id::text
@@ -206,8 +216,8 @@ public class ContentDAOImpl implements IContentDAO {
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
                 return new String[] {
-                    rs.getString(1),  // created_at
-                    rs.getString(2)   // session_id
+                    rs.getString(1),
+                    rs.getString(2)
                 };
             }
             return null;
