@@ -826,6 +826,41 @@ const PolarisLoading = {
             i = (i + 1) % messages.length;
             el.textContent = messages[i];
         }, intervalMs);
+    },
+
+    /**
+     * Envuelve una promesa (o varias vía Promise.allSettled) y solo
+     * MUESTRA el loader si la carga tarda más de `delay` ms.
+     * Si se llegó a mostrar, lo mantiene un mínimo de `minDisplay` ms
+     * para evitar el parpadeo de aparecer/desaparecer en 50ms.
+     *
+     * IMPORTANTE: requiere que el div del loader en el HTML ya tenga
+     * la clase `polaris-loading--hidden` puesta desde el marcado
+     * (que empiece oculto), NO visible por defecto.
+     */
+    wrap(id, promise, opts = {}) {
+        const delay      = opts.delay      ?? 250;
+        const minDisplay = opts.minDisplay ?? 400;
+        let shownAt = null;
+
+        const timer = setTimeout(() => {
+            this.show(id);
+            shownAt = Date.now();
+        }, delay);
+
+        return Promise.resolve(promise).finally(() => {
+            clearTimeout(timer);
+            if (shownAt === null) {
+                // Nunca se mostró — nos aseguramos de que quede oculto
+                // sin animación (por si alguna vez quedó visible).
+                const el = document.getElementById(id);
+                if (el) el.classList.add('polaris-loading--hidden');
+                return;
+            }
+            const elapsed = Date.now() - shownAt;
+            const wait = Math.max(0, minDisplay - elapsed);
+            setTimeout(() => this.hide(id), wait);
+        });
     }
 };
 // Shield pill: tap to expand/collapse en mobile

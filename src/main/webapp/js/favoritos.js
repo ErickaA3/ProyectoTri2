@@ -331,6 +331,8 @@ document.addEventListener('keydown', function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
-    const t = PolarisLoading.rotateMessages('favoritosLoadingSub', ['Cargando favoritos...', 'Buscando tu contenido...', 'Casi listo...']);
-    loadFavorites().finally(() => { clearInterval(t); PolarisLoading.hide('favoritosLoading'); });
+    const t = PolarisLoading.rotateMessages('favoritosLoadingSub',
+        ['Cargando favoritos...', 'Buscando tu contenido...', 'Casi listo...']);
+    PolarisLoading.wrap('favoritosLoading', loadFavorites())
+        .finally(() => clearInterval(t));
 });

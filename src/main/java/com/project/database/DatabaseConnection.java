@@ -2,14 +2,17 @@ package com.project.database;
 
 import java.io.InputStream;
 import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Properties;
 
 import com.pgvector.PGvector;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 public class DatabaseConnection {
 
     private static Properties fileConfig = null;
+    private static volatile HikariDataSource dataSource;
 
     private static Properties loadFileConfig() {
         if (fileConfig != null) return fileConfig;
@@ -31,32 +34,62 @@ public class DatabaseConnection {
         return loadFileConfig().getProperty(fileKey);
     }
 
+    /** Inicializa el pool UNA sola vez, la primera vez que se pide una conexión. */
+    private static HikariDataSource getDataSource() {
+        HikariDataSource ds = dataSource;
+        if (ds == null) {
+            synchronized (DatabaseConnection.class) {
+                ds = dataSource;
+                if (ds == null) {
+                    String url      = getProp("DB_URL",     "db.url");
+                    String username = getProp("DB_USERNAME", "db.username");
+                    String password = getProp("DB_PASSWORD", "db.password");
+                    String driver   = getProp("DB_DRIVER",   "db.driver");
+
+                    HikariConfig config = new HikariConfig();
+                    config.setJdbcUrl(url);
+                    config.setUsername(username);
+                    config.setPassword(password);
+                    config.setDriverClassName(driver);
+
+                    // Ajustables según carga real; valores conservadores para
+                    // el límite de conexiones del plan free de Supabase.
+                    config.setMaximumPoolSize(10);
+                    config.setMinimumIdle(2);
+                    config.setConnectionTimeout(10_000);   // 10s esperando conexión libre
+                    config.setIdleTimeout(300_000);         // 5min
+                    config.setMaxLifetime(1_800_000);       // 30min, refresca conexiones viejas
+
+                    config.addDataSourceProperty("sslmode", "require");
+                    config.addDataSourceProperty("prepareThreshold", "0");
+
+                    ds = new HikariDataSource(config);
+                    dataSource = ds;
+                    System.out.println("[DB] Pool HikariCP inicializado — "
+                        + (System.getenv("DB_URL") != null ? "Railway" : "Local"));
+                }
+            }
+        }
+        return ds;
+    }
+
     public static Connection getConnection() {
         try {
-            String url      = getProp("DB_URL",      "db.url");
-            String username = getProp("DB_USERNAME",  "db.username");
-            String password = getProp("DB_PASSWORD",  "db.password");
-            String driver   = getProp("DB_DRIVER",    "db.driver");
-
-            Properties props = new Properties();
-            props.setProperty("user",             username);
-            props.setProperty("password",         password);
-            props.setProperty("sslmode",          "require");
-            props.setProperty("prepareThreshold", "0");
-
-            Class.forName(driver);
-            Connection conn = DriverManager.getConnection(url, props);
-
-            // Registrar el tipo 'vector' de pgvector en esta conexión.
-            // Sin esto, PGvector no se puede usar en setObject().
+            Connection conn = getDataSource().getConnection();
+            // Registro client-side del tipo 'vector' — operación local, sin red.
             PGvector.addVectorType(conn);
-
-            System.out.println("[DB] Conexión OK — " + (System.getenv("DB_URL") != null ? "Railway" : "Local"));
             return conn;
-
-        } catch (Exception e) {
-            System.err.println("[DB] Error conectando: " + e.getMessage());
+        } catch (SQLException e) {
+            System.err.println("[DB] Error obteniendo conexión del pool: " + e.getMessage());
             throw new RuntimeException("No se pudo conectar a la base de datos: " + e.getMessage());
+        }
+    }
+
+    /** Llamar desde AppShutdownListener al redeploy/shutdown de Tomcat. */
+    public static void shutdown() {
+        if (dataSource != null) {
+            dataSource.close();
+            dataSource = null;
         }
     }
 }
