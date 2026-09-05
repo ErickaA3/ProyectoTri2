@@ -319,6 +319,11 @@ public class AIService {
             throw new Exception("API Key no configurada.");
         }
 
+        // Truncar mensajes muy largos para evitar costos/latencia descontrolados
+        String mensajeSeguro = nuevoMensaje.length() > 6000
+            ? nuevoMensaje.substring(0, 6000) + "\n[...mensaje truncado por longitud...]"
+            : nuevoMensaje;
+
         String nombre = (profesorNombre != null && !profesorNombre.isBlank())
             ? profesorNombre : "Búho ProfesorIA";
         String persona = (personalidad != null && !personalidad.isBlank())
@@ -365,7 +370,7 @@ public class AIService {
 
         JsonObject userMsg = new JsonObject();
         userMsg.addProperty("role", "user");
-        userMsg.addProperty("content", nuevoMensaje);
+        userMsg.addProperty("content", mensajeSeguro);
         messages.add(userMsg);
 
         JsonObject body = new JsonObject();
@@ -433,6 +438,7 @@ public class AIService {
         body.addProperty("model", MODEL);
         body.add("messages", messages);
         body.addProperty("temperature", temperature);
+        body.addProperty("max_tokens", 4000);
 
         JsonObject responseFormat = new JsonObject();
         responseFormat.addProperty("type", "json_object");
@@ -470,7 +476,7 @@ public class AIService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    // EMBEDDINGS — para búsqueda semántica (pgvector) — NUEVO
+    // EMBEDDINGS — para búsqueda semántica (pgvector)
     // ═══════════════════════════════════════════════════════════════════════════
 
     private static final String EMBEDDINGS_URL  = "https://api.openai.com/v1/embeddings";

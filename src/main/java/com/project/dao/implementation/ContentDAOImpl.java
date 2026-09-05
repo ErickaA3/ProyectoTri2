@@ -6,6 +6,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import com.pgvector.PGvector;
 import com.project.dao.interfaces.IContentDAO;
@@ -21,31 +24,57 @@ import com.project.util.AIService;
  * CORRECCIONES:
  * - [BUG-4 FIX] Se agrega método getMetadata() para que SummaryServlet
  *   pueda obtener created_at y session_id sin duplicar queries
- * - [RAG VECTORIAL] save() ahora calcula el embedding del contenido
- *   antes de guardarlo, para búsqueda semántica en el chatbot.
+ * - [RAG VECTORIAL] save() ahora guarda el contenido de inmediato y calcula
+ *   el embedding EN SEGUNDO PLANO, actualizándolo después con un UPDATE.
+ *   Esto evita que el usuario espere la llamada a OpenAI para ver su
+ *   contenido guardado. Hay una ventana breve (1-2s) donde el contenido
+ *   recién creado aún no es buscable semánticamente por el chatbot.
+ * - [SHUTDOWN FIX] shutdownEmbeddingExecutor() se llama desde
+ *   AppShutdownListener para evitar que los hilos del pool queden vivos
+ *   tras un redeploy en caliente (classloader leak en Tomcat).
  */
 public class ContentDAOImpl implements IContentDAO {
 
+    // Pool pequeño y dedicado solo a generar embeddings en background.
+    // No usar ForkJoinPool.commonPool() aquí: es compartido por toda la JVM
+    // y no queremos que una lentitud de OpenAI compita con otras tareas.
+    private static final ExecutorService EMBEDDING_EXECUTOR =
+        Executors.newFixedThreadPool(2, r -> {
+            Thread t = new Thread(r, "embedding-worker");
+            t.setDaemon(true); // no debe impedir que Tomcat cierre limpio
+            return t;
+        });
+
+    /**
+     * Apaga el pool de embeddings de forma ordenada. Debe llamarse desde
+     * un ServletContextListener (contextDestroyed) para evitar el warning
+     * de Tomcat "the web application appears to have started a thread...
+     * but has failed to stop it" y el classloader leak asociado.
+     */
+    public static void shutdownEmbeddingExecutor() {
+        EMBEDDING_EXECUTOR.shutdown();
+        try {
+            if (!EMBEDDING_EXECUTOR.awaitTermination(5, TimeUnit.SECONDS)) {
+                EMBEDDING_EXECUTOR.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            EMBEDDING_EXECUTOR.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
     @Override
     public String save(EducationalContent content, String contentJson, String sourceText) throws Exception {
-
-        float[] embedding = null;
-        try {
-            String textoParaEmbedding = AIService.flattenContentForEmbedding(
-                content.getType(), content.getTitle(), contentJson);
-            embedding = AIService.generateEmbedding(textoParaEmbedding);
-        } catch (Exception e) {
-            System.err.println("[ContentDAO] No se pudo generar embedding: " + e.getMessage());
-        }
 
         String sql = """
             INSERT INTO study_content
                 (user_id, type, title, content, is_favorite, session_id, source_text, embedding)
             VALUES
-                (?::uuid, ?, ?, ?::jsonb, false, ?::uuid, ?, ?)
+                (?::uuid, ?, ?, ?::jsonb, false, ?::uuid, ?, NULL)
             RETURNING id
             """;
 
+        String newId;
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
@@ -55,13 +84,50 @@ public class ContentDAOImpl implements IContentDAO {
             stmt.setString(4, contentJson);
             stmt.setString(5, content.getSessionId());
             stmt.setString(6, sourceText);
-            stmt.setObject(7, embedding != null ? new PGvector(embedding) : null);
 
             ResultSet rs = stmt.executeQuery();
             if (rs.next()) {
-                return rs.getString("id");
+                newId = rs.getString("id");
+            } else {
+                throw new Exception("No se pudo guardar el contenido en la BD.");
             }
-            throw new Exception("No se pudo guardar el contenido en la BD.");
+        }
+
+        // Contenido ya guardado y visible para el usuario.
+        // El embedding se genera aparte, sin bloquear la respuesta.
+        scheduleEmbeddingUpdate(newId, content.getType(), content.getTitle(), contentJson);
+
+        return newId;
+    }
+
+    /**
+     * Genera el embedding en un hilo del pool dedicado y actualiza la fila
+     * correspondiente cuando esté listo. Si falla, solo se registra el error:
+     * el contenido ya quedó guardado correctamente, y esa fila simplemente
+     * no aparecerá en resultados de búsqueda semántica hasta que se reintente
+     * (por ejemplo en una futura edición del contenido).
+     */
+    private void scheduleEmbeddingUpdate(String contentId, String type, String title, String contentJson) {
+        EMBEDDING_EXECUTOR.submit(() -> {
+            try {
+                String textoParaEmbedding = AIService.flattenContentForEmbedding(type, title, contentJson);
+                float[] embedding = AIService.generateEmbedding(textoParaEmbedding);
+                updateEmbedding(contentId, embedding);
+            } catch (Exception e) {
+                System.err.println("[ContentDAO] No se pudo generar/guardar embedding para "
+                    + contentId + ": " + e.getMessage());
+            }
+        });
+    }
+
+    private void updateEmbedding(String contentId, float[] embedding) throws SQLException {
+        String sql = "UPDATE study_content SET embedding = ? WHERE id = ?::uuid";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setObject(1, new PGvector(embedding));
+            stmt.setString(2, contentId);
+            stmt.executeUpdate();
         }
     }
 

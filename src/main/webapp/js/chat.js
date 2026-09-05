@@ -16,7 +16,7 @@ function getUserId() {
     }
 }
 
-// ─── Init ────────────────────────────────────────────────────
+// ─── Init ───
 document.addEventListener('DOMContentLoaded', () => {
     // Cargar datos del usuario
     try {
@@ -82,10 +82,11 @@ async function send() {
         if (!currentSession) {
             currentSession = data.data.sessionId;
             // [FIX] prepend=true para que el nuevo chat aparezca arriba
-            addSessionToSidebar(txt, currentSession, true);
+            // [FIX] se pasa la fecha actual real, en vez de dejar "Hoy" fijo en el HTML
+            addSessionToSidebar(txt, currentSession, true, new Date().toISOString());
         }
 
-        // Formatear respuesta (convertir **negrita** a <strong>)
+        // Formatear respuesta (convertir **negrita** a <strong>, escapando antes)
         const reply = formatReply(data.data.reply);
         addBotMsg(reply);
 
@@ -141,8 +142,9 @@ async function loadSessions() {
 
         // Las sesiones vienen de la API ordenadas DESC (más recientes primero).
         // Usamos append (prepend=false) para respetar ese orden en el sidebar.
+        // [FIX] se pasa s.createdAt para calcular la fecha real (Hoy/Ayer/fecha).
         sessions.forEach(s => {
-            addSessionToSidebar(s.firstMessage, s.sessionId, false);
+            addSessionToSidebar(s.firstMessage, s.sessionId, false, s.createdAt);
         });
 
     } catch(e) {
@@ -150,10 +152,38 @@ async function loadSessions() {
     }
 }
 
+// ─── Formatear fecha relativa (Hoy / Ayer / fecha) ────────────
+// [FIX] Antes el sidebar mostraba "Hoy" fijo, sin importar la fecha real
+// de la sesión. Esta función calcula la etiqueta correcta a partir del
+// createdAt real que devuelve el backend.
+function formatSessionDate(isoString) {
+    if (!isoString) return '';
+
+    const fecha = new Date(isoString);
+    if (isNaN(fecha.getTime())) return '';
+
+    const hoy = new Date();
+
+    const esMismoDia = (a, b) =>
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate();
+
+    if (esMismoDia(fecha, hoy)) return 'Hoy';
+
+    const ayer = new Date(hoy);
+    ayer.setDate(hoy.getDate() - 1);
+    if (esMismoDia(fecha, ayer)) return 'Ayer';
+
+    return fecha.toLocaleDateString('es', { day: '2-digit', month: 'short' });
+}
+
 // ─── Agregar sesión al sidebar ───────────────────────────────
 // [FIX] prepend=true → inserta arriba (debajo del label) para nuevos chats
 //       prepend=false → append al final (para cargar historial en orden)
-function addSessionToSidebar(firstMessage, sessionId, prepend = false) {
+// [FIX] createdAt → fecha real de la sesión (ISO string), usada para
+//       calcular la etiqueta Hoy/Ayer/fecha en vez de dejarla fija.
+function addSessionToSidebar(firstMessage, sessionId, prepend = false, createdAt = null) {
     const container = document.querySelector('.recents');
 
     // Quitar mensaje de "no hay chats"
@@ -169,7 +199,7 @@ function addSessionToSidebar(firstMessage, sessionId, prepend = false) {
         </div>
         <div class="chat-item-meta">
             <div class="chat-item-label">${esc(firstMessage ? firstMessage.substring(0, 35) : 'Chat')}${firstMessage && firstMessage.length > 35 ? '...' : ''}</div>
-            <div class="chat-item-date">Hoy</div>
+            <div class="chat-item-date">${formatSessionDate(createdAt)}</div>
         </div>
         <button class="chat-item-delete" title="Eliminar chat">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -350,9 +380,13 @@ function selectChat(el) {
     el.classList.add('active');
 }
 
+// [FIX] Escapa el HTML de la respuesta del bot ANTES de aplicar formato
+// (negrita, saltos de línea). Evita que contenido devuelto por el modelo
+// se ejecute como HTML/script en el navegador.
 function formatReply(txt) {
     if (!txt) return '';
-    return txt
+    let safe = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return safe
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>');
 }
