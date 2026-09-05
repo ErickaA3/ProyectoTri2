@@ -9,10 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ['Cargando tu perfil...', 'Obteniendo estadísticas...', 'Casi listo...']
     );
 
-    loadProfile().finally(() => {
-        clearInterval(msgTimer);
-        PolarisLoading.hide('perfilLoading');
-    });
+    PolarisLoading.wrap('perfilLoading', loadProfile())
+        .finally(() => clearInterval(msgTimer));
 
     document.getElementById('btn-edit-profile').addEventListener('click', openEditModal);
     document.getElementById('btn-modal-close').addEventListener('click', closeEditModal);

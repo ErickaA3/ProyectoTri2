@@ -36,10 +36,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    const _ct = PolarisLoading.rotateMessages('chatLoadingSub',
-        ['Iniciando chat...', 'Cargando historial...', 'Conectando con el búho...']);
-    Promise.allSettled([loadSessions(), loadEquippedBackground()])
-        .finally(() => { clearInterval(_ct); PolarisLoading.hide('chatLoading'); });
+
+        const _ct = PolarisLoading.rotateMessages('chatLoadingSub',
+            ['Iniciando chat...', 'Cargando historial...', 'Conectando con el búho...']);
+        PolarisLoading.wrap('chatLoading',
+            Promise.allSettled([loadSessions(), loadEquippedBackground()])
+        ).finally(() => clearInterval(_ct));
 });
 
 // ─── Enviar mensaje ──────────────────────────────────────────

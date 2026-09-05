@@ -51,7 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupListeners();
     const _ht = PolarisLoading.rotateMessages('historialLoadingSub',
         ['Cargando historial...', 'Obteniendo tu actividad...', 'Casi listo...']);
-    loadHistory().finally(() => { clearInterval(_ht); PolarisLoading.hide('historialLoading'); });
+    PolarisLoading.wrap('historialLoading', loadHistory())
+        .finally(() => clearInterval(_ht));
 });
 
 function setupListeners() {

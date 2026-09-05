@@ -30,8 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
     sessionStorage.removeItem('duelData');
     const _dt = PolarisLoading.rotateMessages('duelLoadingSub',
         ['Obteniendo tus datos...', 'Cargando amigos...', 'Buscando retos activos...']);
-    Promise.allSettled([loadFriends(), loadPendingRequests(), loadActiveDuels(), loadNotifications(), loadLeaderboard()])
-        .finally(() => { clearInterval(_dt); PolarisLoading.hide('duelLoadingScreen'); });
+    PolarisLoading.wrap('duelLoadingScreen',
+        Promise.allSettled([loadFriends(), loadPendingRequests(), loadActiveDuels(), loadNotifications(), loadLeaderboard()])
+    ).finally(() => clearInterval(_dt));
 });
 
 // ═══════════════════════════════════════════════════════════
