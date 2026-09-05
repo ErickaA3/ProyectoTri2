@@ -41,7 +41,7 @@ function getUserId() {
 
 function authHeaders() {
     const uid = getUserId();
-    return { 'Content-Type': 'application/json', ...(uid ? { 'X-User-Id': uid } : {}) };
+    return getAuthHeaders(uid ? { 'X-User-Id': uid } : {});
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

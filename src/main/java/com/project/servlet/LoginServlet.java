@@ -10,6 +10,7 @@ import com.project.dao.interfaces.IUserDAO;
 import com.project.model.users.Statistics;
 import com.project.model.users.User;
 import com.project.util.JsonUtil;
+import com.project.util.JwtUtil;
 import com.project.util.PasswordUtil;
 
 import jakarta.servlet.ServletException;
@@ -64,8 +65,12 @@ public class LoginServlet extends HttpServlet {
             session.setAttribute("username", user.getUsername());
             session.setMaxInactiveInterval(60 * 60 * 8);
 
+            String token = JwtUtil.generarToken(user.getId(), "student");
+
             String userJson = JsonUtil.buildUserJson(user, stats);
-            JsonUtil.sendSuccess(response, userJson);
+            JsonUtil.setJsonHeaders(response);
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.getWriter().write("{\"success\":true,\"token\":\"" + token + "\",\"data\":" + userJson + "}");
 
         } catch (SQLException e) {
             e.printStackTrace();

@@ -23,7 +23,7 @@ async function loadProfile() {
     try {
         const res = await fetch(`${API_BASE}/api/profile`, {
             method: 'GET',
-            credentials: 'include'
+            headers: getAuthHeaders()
         });
 
         if (res.status === 401) {
@@ -193,8 +193,7 @@ async function saveProfile() {
     try {
         const res = await fetch(`${API_BASE}/api/profile`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
+            headers: getAuthHeaders(),
             body: JSON.stringify({ username, fullName, country, language, birthdate })
         });
 
