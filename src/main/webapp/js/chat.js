@@ -62,8 +62,7 @@ async function send() {
     try {
         const res = await fetch(`${API_BASE}/api/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 mensaje: txt,
                 sessionId: currentSession,
@@ -118,7 +117,7 @@ async function loadSessions() {
     try {
         const res = await fetch(`${API_BASE}/api/chat?userId=${userId}`, {
             method: 'GET',
-            credentials: 'include'
+            headers: getAuthHeaders()
         });
 
         if (!res.ok) return;
@@ -231,7 +230,7 @@ async function confirmDeleteChat() {
     try {
         const res = await fetch(`${API_BASE}/api/chat?sessionId=${pendingDeleteSessionId}&userId=${userId}`, {
             method: 'DELETE',
-            credentials: 'include'
+            headers: getAuthHeaders()
         });
         const data = await res.json();
 
@@ -273,7 +272,7 @@ async function selectSession(el, sessionId) {
 
     try {
         const res = await fetch(`${API_BASE}/api/chat?sessionId=${sessionId}&userId=${userId}`, {
-            credentials: 'include'
+            headers: getAuthHeaders()
         });
         const data = await res.json();
         if (!data.success) return;
@@ -381,8 +380,7 @@ async function loadEquippedBackground() {
 
     try {
         const res = await fetch(`${API_BASE}/shop`, {
-            credentials: 'include',
-            headers: { 'X-User-Id': userId }
+            headers: getAuthHeaders({ 'X-User-Id': userId })
         });
         if (!res.ok) return;
         const data = await res.json();
