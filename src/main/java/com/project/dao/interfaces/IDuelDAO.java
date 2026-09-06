@@ -23,6 +23,8 @@ public interface IDuelDAO {
     /** Eliminar amigo (borrar la amistad aceptada). */
     boolean removeFriend(String friendshipId, String userId) throws Exception;
 
+    boolean finishDuelWithWinner(String duelId, String winnerId) throws Exception;
+
     /** Lista de amigos aceptados con sus stats (nivel, username, etc). */
     JsonArray getFriends(String userId) throws Exception;
 

@@ -260,20 +260,7 @@ function updateCreatingProgress(pct) {
  */
 async function playChallenge(duelId) {
     showToast('Cargando duelo...', 'info');
-    try {
-        const res = await fetch(CTX + `/api/duels/play?id=${duelId}`, { headers: duelHeaders() });
-        const data = await res.json();
-        if (data.success) {
-            sessionStorage.setItem('duelData', JSON.stringify({
-                duelId, title: data.title, questions: data.questions,
-                questionCount: data.questionCount, topic: data.topic,
-                timePerQuestion: data.timePerQuestion || 30
-            }));
-            window.location.href = 'duelo-play.html';
-        } else {
-            showToast(data.error || 'Error al cargar duelo', 'error');
-        }
-    } catch (e) { showToast('Error de conexión', 'error'); }
+    window.location.href = `duelo-play.html?duelId=${duelId}`;
 }
 
 async function cancelDuel(duelId) {
