@@ -142,9 +142,6 @@ function resetState() {
     document.getElementById('scoreCorrect').textContent = '0';
     document.getElementById('scoreIncorrect').textContent = '0';
     document.getElementById('streakCount').textContent = '0';
-    // Reset XP display
-    const xpEl = document.getElementById('xpEarned');
-    if (xpEl) xpEl.classList.remove('show');
 }
 
 // ===== RENDER =====
@@ -330,10 +327,7 @@ function finishExam() {
     else if (grade >= 50) msgEl.innerHTML = '<i class="fas fa-book-open" style="color:var(--accent-yellow);margin-right:8px"></i><span style="color:var(--accent-yellow)">Puedes mejorar</span> — Repasa e intenta de nuevo';
     else                  msgEl.innerHTML = '<i class="fas fa-rotate-right" style="color:var(--accent-red);margin-right:8px"></i><span style="color:var(--accent-red)">A seguir practicando</span> — No te desanimes';
 
-    // Construir stats dinámicamente (3 o 4 columnas según timer)
-    const timeUsedForDisplay = examData.hasTimer ? (examData.timeMinutes * 60 - totalSeconds) : 0;
-    const statsEl = document.getElementById('resultsStats');
-    let statsHTML = `
+    document.getElementById('resultsStats').innerHTML = `
         <div class="stat-card">
             <div class="stat-card-icon" style="background:rgba(34,197,94,0.15);color:var(--accent-green)"><i class="fas fa-check-circle"></i></div>
             <div class="stat-card-value" style="color:var(--accent-green)">${correctCount}</div>
@@ -349,20 +343,6 @@ function finishExam() {
             <div class="stat-card-value" style="color:var(--accent-yellow)">${bestStreak}</div>
             <div class="stat-card-label">Mejor racha</div>
         </div>`;
-    if (examData.hasTimer) {
-        const m = Math.floor(timeUsedForDisplay / 60);
-        const s = timeUsedForDisplay % 60;
-        const timeStr = `${m}:${s.toString().padStart(2, '0')}`;
-        statsHTML += `
-        <div class="stat-card">
-            <div class="stat-card-icon" style="background:rgba(139,92,246,0.15);color:var(--accent-purple)"><i class="fas fa-clock"></i></div>
-            <div class="stat-card-value" style="color:var(--accent-purple)">${timeStr}</div>
-            <div class="stat-card-label">Tiempo usado</div>
-        </div>`;
-    }
-    statsEl.innerHTML = statsHTML;
-    // Ajustar grid: 3 columnas sin timer, 4 con timer
-    statsEl.style.gridTemplateColumns = examData.hasTimer ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)';
 
     const reviewList = document.getElementById('reviewList');
     reviewList.innerHTML = examData.questions.map((q, i) => {
@@ -397,33 +377,16 @@ function finishExam() {
     // ── GAMIFICACIÓN: enviar resultado al servidor ──
     const timeUsed = examData.hasTimer ? (examData.timeMinutes * 60 - totalSeconds) : 0;
     const fallbackXP = correctCount * 10;
-    const xpEl  = document.getElementById('xpEarned');
-    const xpTxt = document.getElementById('xpEarnedText');
 
     // Solo enviar reward en el primer intento — bloquea XP farming
     if (!rewardSent) {
         rewardSent = true;
-        if (typeof sendReward === 'function') {
-            sendReward('quiz', grade, examData.id, timeUsed, examData.questions.length)
-                .then(result => {
-                    const earned = result.success ? result.xpEarned : fallbackXP;
-                    const earnedCoins = result.success ? (result.coinsEarned || 0) : 0;
-                    if (xpTxt) xpTxt.textContent = earnedCoins > 0
-                        ? `+${earned} XP · +${earnedCoins} monedas`
-                        : `+${earned} XP ganados`;
-                    if (xpEl) xpEl.classList.add('show');
-                })
-                .catch(() => {
-                    if (xpTxt) xpTxt.textContent = `+${fallbackXP} XP ganados`;
-                    if (xpEl) xpEl.classList.add('show');
-                });
-        } else {
-            if (xpTxt) xpTxt.textContent = `+${fallbackXP} XP ganados`;
-            if (xpEl) xpEl.classList.add('show');
-        }
-    } else {
-        if (xpTxt) xpTxt.textContent = 'XP ya registrado en el primer intento';
-        if (xpEl) xpEl.classList.add('show');
+        sendReward('quiz', grade, examData.id, timeUsed, examData.questions.length)
+            .then(result => {
+                const earned = result.success ? result.xpEarned : fallbackXP;
+            })
+            .catch(() => {
+            });
     }
 }
 
@@ -431,9 +394,10 @@ function finishExam() {
 function updateReviewButton() {
     const reviewBtn = document.querySelector('.btn-result.btn-review');
     if (!reviewBtn) return;
-    const errorCount = questionResults.filter(r => r === 'incorrect' || r === null).length;
-    reviewBtn.style.display = errorCount > 0 ? 'inline-flex' : 'none';
-    if (errorCount > 0) reviewBtn.innerHTML = `<i class="fas fa-search"></i> Repasar errores (${errorCount})`;
+    const hasErrors = questionResults.some(r => r === 'incorrect');
+    const errorCount = questionResults.filter(r => r === 'incorrect').length;
+    reviewBtn.style.display = hasErrors ? 'inline-flex' : 'none';
+    if (hasErrors) reviewBtn.innerHTML = `<i class="fas fa-search"></i> Repasar errores (${errorCount})`;
 }
 
 // ===== HELPERS =====
@@ -472,8 +436,6 @@ function launchConfetti() {
 
 // CORREGIDO: Reintentar con todas las preguntas originales
 function retryExam() {
-    clearInterval(timerInterval);
-    
     // Restaurar preguntas originales (limitadas por config)
     const flow = JSON.parse(sessionStorage.getItem('modoEstudioFlow') || 'null');
     const cfg = flow?.configs?.examenes || {};
@@ -487,7 +449,6 @@ function retryExam() {
     document.getElementById('resultsScreen').classList.remove('active');
     document.getElementById('examScreen').classList.remove('hidden');
     document.getElementById('totalQ').textContent = examData.questions.length;
-    document.getElementById('examTitleBar').textContent = examData.title;
     
     // Reset state
     resetState();
@@ -496,22 +457,24 @@ function retryExam() {
     renderQuestion(); 
     renderDots();
     
+    clearInterval(timerInterval);
     if (examData.hasTimer) startTimer();
 }
 
 // Repasar solo errores (como flashcards)
 function reviewMistakes() {
-    // Filtrar preguntas incorrectas Y sin responder
+    // Filtrar solo las preguntas que se respondieron incorrectamente
     const mistakeQuestions = [];
     examData.questions.forEach((q, i) => {
-        if (questionResults[i] === 'incorrect' || questionResults[i] === null) {
+        if (questionResults[i] === 'incorrect') {
             mistakeQuestions.push(q);
         }
     });
     
-    if (mistakeQuestions.length === 0) return;
-    
-    clearInterval(timerInterval);
+    if (mistakeQuestions.length === 0) {
+        // No hay errores que repasar
+        return;
+    }
     
     // Actualizar preguntas a solo los errores
     examData.questions = mistakeQuestions;
@@ -531,6 +494,7 @@ function reviewMistakes() {
     renderQuestion(); 
     renderDots();
     
+    clearInterval(timerInterval);
     if (examData.hasTimer) startTimer();
 }
 
@@ -560,7 +524,7 @@ function toggleFavorite() {
     const userId   = typeof getGamificationUserId === 'function' ? getGamificationUserId() : null;
     if (!userId) return;
 
-    fetch('/project-1.0-SNAPSHOT/api/summaries/favorite', {
+    fetch((window.API_BASE || '') + '/api/summaries/favorite', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', 'X-HTTP-Method-Override': 'PATCH', 'X-User-Id': userId },
         body:    JSON.stringify({ contentId: examData.id, isFavorite: newValue })

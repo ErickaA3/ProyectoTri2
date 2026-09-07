@@ -9,7 +9,7 @@
  *  5. openItem navega correctamente según tipo
  */
 
-const API = '/project-1.0-SNAPSHOT/api/historial';
+const API = (window.API_BASE || '') + '/api/historial';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CONFIGURACIÓN POR TIPO
@@ -41,7 +41,7 @@ function getUserId() {
 
 function authHeaders() {
     const uid = getUserId();
-    return { 'Content-Type': 'application/json', ...(uid ? { 'X-User-Id': uid } : {}) };
+    return getAuthHeaders(uid ? { 'X-User-Id': uid } : {});
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,7 +51,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupListeners();
     const _ht = PolarisLoading.rotateMessages('historialLoadingSub',
         ['Cargando historial...', 'Obteniendo tu actividad...', 'Casi listo...']);
-    loadHistory().finally(() => { clearInterval(_ht); PolarisLoading.hide('historialLoading'); });
+    PolarisLoading.wrap('historialLoading', loadHistory())
+        .finally(() => clearInterval(_ht));
 });
 
 function setupListeners() {

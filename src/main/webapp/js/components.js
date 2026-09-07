@@ -1,3 +1,6 @@
+// ── Context path: ROOT.war se despliega en / tanto en local como en Railway ──
+window.API_BASE = '';
+
 /* ===== COMPONENTES JS - Polaris / Mi ProfesorIA ===== */
 
 // ── Datos del usuario ──
@@ -6,6 +9,14 @@ function getUserData() {
     if (!raw) return null;
     try { return JSON.parse(raw); }
     catch { return null; }
+}
+
+// ── Headers con JWT para llamadas a /api/* ──
+function getAuthHeaders(extra) {
+    const token = localStorage.getItem('token');
+    const base = { 'Content-Type': 'application/json' };
+    if (token) base['Authorization'] = 'Bearer ' + token;
+    return Object.assign(base, extra || {});
 }
 
 // ── Ruta base ──
@@ -650,9 +661,9 @@ function autoRefreshStats() {
     }
 
     // Fallback: fetch directo si gamification.js no está en la página
-    const API_BASE = '/project-1.0-SNAPSHOT/api/gamification';
+    const API_BASE = window.API_BASE + '/api/gamification';
     fetch(`${API_BASE}/stats`, {
-        headers: { 'X-User-Id': user.id }
+        headers: getAuthHeaders({ 'X-User-Id': user.id })
     })
     .then(r => r.json())
     .then(data => {
@@ -823,9 +834,43 @@ const PolarisLoading = {
             i = (i + 1) % messages.length;
             el.textContent = messages[i];
         }, intervalMs);
+    },
+
+    /**
+     * Envuelve una promesa (o varias vía Promise.allSettled) y solo
+     * MUESTRA el loader si la carga tarda más de `delay` ms.
+     * Si se llegó a mostrar, lo mantiene un mínimo de `minDisplay` ms
+     * para evitar el parpadeo de aparecer/desaparecer en 50ms.
+     *
+     * IMPORTANTE: requiere que el div del loader en el HTML ya tenga
+     * la clase `polaris-loading--hidden` puesta desde el marcado
+     * (que empiece oculto), NO visible por defecto.
+     */
+    wrap(id, promise, opts = {}) {
+        const delay      = opts.delay      ?? 250;
+        const minDisplay = opts.minDisplay ?? 400;
+        let shownAt = null;
+
+        const timer = setTimeout(() => {
+            this.show(id);
+            shownAt = Date.now();
+        }, delay);
+
+        return Promise.resolve(promise).finally(() => {
+            clearTimeout(timer);
+            if (shownAt === null) {
+                // Nunca se mostró — nos aseguramos de que quede oculto
+                // sin animación (por si alguna vez quedó visible).
+                const el = document.getElementById(id);
+                if (el) el.classList.add('polaris-loading--hidden');
+                return;
+            }
+            const elapsed = Date.now() - shownAt;
+            const wait = Math.max(0, minDisplay - elapsed);
+            setTimeout(() => this.hide(id), wait);
+        });
     }
 };
-
 // Shield pill: tap to expand/collapse en mobile
 document.addEventListener('click', function(e) {
     const pill = e.target.closest('.shield-pill');
@@ -837,6 +882,5 @@ document.addEventListener('click', function(e) {
         });
     }
 });
-
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', initComponents);

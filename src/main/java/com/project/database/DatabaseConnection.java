@@ -2,55 +2,94 @@ package com.project.database;
 
 import java.io.InputStream;
 import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Properties;
 
-/**
- * Crea una conexión nueva en cada llamada.
- * La versión anterior guardaba una sola conexión estática que expiraba
- * por timeout de Supabase y nunca se reconectaba ("This connection has been closed").
- *
- * Cada DAO debe usar try-with-resources para cerrar la conexión automáticamente:
- *   try (Connection conn = DatabaseConnection.getConnection()) { ... }
- */
+import com.pgvector.PGvector;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
 public class DatabaseConnection {
 
-    private static Properties config = null;
+    private static Properties fileConfig = null;
+    private static volatile HikariDataSource dataSource;
 
-    private static Properties loadConfig() {
-        if (config != null) return config;
+    private static Properties loadFileConfig() {
+        if (fileConfig != null) return fileConfig;
         try (InputStream in = DatabaseConnection.class
                 .getClassLoader()
                 .getResourceAsStream("config/database.properties")) {
             if (in == null) throw new RuntimeException("No se encontró config/database.properties");
-            config = new Properties();
-            config.load(in);
-            return config;
+            fileConfig = new Properties();
+            fileConfig.load(in);
+            return fileConfig;
         } catch (Exception e) {
             throw new RuntimeException("Error cargando database.properties: " + e.getMessage());
         }
     }
 
+    private static String getProp(String envKey, String fileKey) {
+        String envVal = System.getenv(envKey);
+        if (envVal != null && !envVal.isBlank()) return envVal.trim();
+        return loadFileConfig().getProperty(fileKey);
+    }
+
+    /** Inicializa el pool UNA sola vez, la primera vez que se pide una conexión. */
+    private static HikariDataSource getDataSource() {
+        HikariDataSource ds = dataSource;
+        if (ds == null) {
+            synchronized (DatabaseConnection.class) {
+                ds = dataSource;
+                if (ds == null) {
+                    String url      = getProp("DB_URL",     "db.url");
+                    String username = getProp("DB_USERNAME", "db.username");
+                    String password = getProp("DB_PASSWORD", "db.password");
+                    String driver   = getProp("DB_DRIVER",   "db.driver");
+
+                    HikariConfig config = new HikariConfig();
+                    config.setJdbcUrl(url);
+                    config.setUsername(username);
+                    config.setPassword(password);
+                    config.setDriverClassName(driver);
+
+                    // Ajustables según carga real; valores conservadores para
+                    // el límite de conexiones del plan free de Supabase.
+                    config.setMaximumPoolSize(10);
+                    config.setMinimumIdle(2);
+                    config.setConnectionTimeout(10_000);   // 10s esperando conexión libre
+                    config.setIdleTimeout(300_000);         // 5min
+                    config.setMaxLifetime(1_800_000);       // 30min, refresca conexiones viejas
+
+                    config.addDataSourceProperty("sslmode", "require");
+                    config.addDataSourceProperty("prepareThreshold", "0");
+
+                    ds = new HikariDataSource(config);
+                    dataSource = ds;
+                    System.out.println("[DB] Pool HikariCP inicializado — "
+                        + (System.getenv("DB_URL") != null ? "Railway" : "Local"));
+                }
+            }
+        }
+        return ds;
+    }
+
     public static Connection getConnection() {
         try {
-            Properties cfg = loadConfig();
-
-            String url = cfg.getProperty("db.url");
-
-            Properties props = new Properties();
-            props.setProperty("user",     cfg.getProperty("db.username"));
-            props.setProperty("password", cfg.getProperty("db.password"));
-            props.setProperty("sslmode",  cfg.getProperty("db.sslmode", "require"));
-            props.setProperty("prepareThreshold", "0");
-
-            Class.forName(cfg.getProperty("db.driver"));
-            Connection conn = DriverManager.getConnection(url, props);
-            System.out.println("Conexión nueva a Supabase OK");
+            Connection conn = getDataSource().getConnection();
+            // Registro client-side del tipo 'vector' — operación local, sin red.
+            PGvector.addVectorType(conn);
             return conn;
-
-        } catch (Exception e) {
-            System.err.println("Error conectando a Supabase: " + e.getMessage());
+        } catch (SQLException e) {
+            System.err.println("[DB] Error obteniendo conexión del pool: " + e.getMessage());
             throw new RuntimeException("No se pudo conectar a la base de datos: " + e.getMessage());
+        }
+    }
+
+    /** Llamar desde AppShutdownListener al redeploy/shutdown de Tomcat. */
+    public static void shutdown() {
+        if (dataSource != null) {
+            dataSource.close();
+            dataSource = null;
         }
     }
 }

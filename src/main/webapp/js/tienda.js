@@ -33,7 +33,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const _tt = PolarisLoading.rotateMessages('tiendaLoadingSub',
         ['Cargando la tienda...', 'Obteniendo tu inventario...', 'Casi listo...']);
-    loadShop().finally(() => { clearInterval(_tt); PolarisLoading.hide('tiendaLoading'); });
+    PolarisLoading.wrap('tiendaLoading', loadShop())
+        .finally(() => clearInterval(_tt));
 });
 
 // ============================================================

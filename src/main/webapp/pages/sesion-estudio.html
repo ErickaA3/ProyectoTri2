@@ -359,8 +359,8 @@
                 })
             };
         }
-
-        const response = await fetch('/project-1.0-SNAPSHOT/modo-estudio/generar', requestInit);
+        const _apiBase = window.API_BASE !== undefined ? window.API_BASE : '';
+        const response = await fetch(_apiBase + '/modo-estudio/generar', requestInit);
 
         if (!response.ok) throw new Error(`Error del servidor: ${response.status}`);
         const data = await response.json();

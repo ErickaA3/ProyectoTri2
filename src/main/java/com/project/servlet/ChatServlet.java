@@ -36,6 +36,7 @@ public class ChatServlet extends HttpServlet {
         String body = request.getReader().lines().collect(Collectors.joining());
 
         // Obtener userId: primero de la sesión HTTP, luego del body como fallback
+        // NOTA: el fallback por body/query sigue pendiente de reemplazo por JWT.
         UUID userId = getUserIdFromSession(request);
 
         if (userId == null) {
@@ -69,18 +70,22 @@ public class ChatServlet extends HttpServlet {
         if (sessionId == null || sessionId.isBlank() || "null".equals(sessionId)) {
             sessionId = UUID.randomUUID().toString();
         }
+        final String finalSessionId = sessionId;
 
-        try (Connection conn = DatabaseConnection.getConnection()) {
+        try {
+            List<AIService.ChatMessage> historial;
+            String profesorNombre, personalidad;
 
-            List<AIService.ChatMessage> historial = loadHistory(conn, userId, sessionId);
+            // ── Bloque 1: BD corta, solo lectura + guardar mensaje del usuario ──
+            try (Connection conn = DatabaseConnection.getConnection()) {
+                historial = loadHistory(conn, userId, finalSessionId);
+                String[] profesorConfig = loadProfesorConfig(conn, userId);
+                profesorNombre = profesorConfig[0];
+                personalidad   = profesorConfig[1];
+                saveMessage(conn, userId, finalSessionId, "user", mensaje);
+            }
 
-            String[] profesorConfig = loadProfesorConfig(conn, userId);
-            String profesorNombre  = profesorConfig[0];
-            String personalidad    = profesorConfig[1];
-
-            // ── RAG: construir búsqueda con contexto conversacional ──
-            // Usar los últimos mensajes + el actual para que la búsqueda
-            // entienda de qué se está hablando (no solo el último mensaje)
+            // ── Fuera de la conexión: construir contexto RAG + llamar a OpenAI ──
             StringBuilder searchContext = new StringBuilder();
             int start = Math.max(0, historial.size() - 6);
             for (int i = start; i < historial.size(); i++) {
@@ -89,16 +94,16 @@ public class ChatServlet extends HttpServlet {
             searchContext.append(mensaje);
 
             String contexto = UserContextService.buildContext(userId, searchContext.toString());
-
-            saveMessage(conn, userId, sessionId, "user", mensaje);
-
             String respuesta = AIService.chat(historial, mensaje, profesorNombre, personalidad, contexto);
 
-            saveMessage(conn, userId, sessionId, "assistant", respuesta);
+            // ── Bloque 2: BD corta, solo guardar respuesta del asistente ──
+            try (Connection conn = DatabaseConnection.getConnection()) {
+                saveMessage(conn, userId, finalSessionId, "assistant", respuesta);
+            }
 
             String json = "{" +
                 "\"reply\":" + toJsonString(respuesta) + "," +
-                "\"sessionId\":\"" + sessionId + "\"" +
+                "\"sessionId\":\"" + finalSessionId + "\"" +
                 "}";
             JsonUtil.sendSuccess(response, json);
 
@@ -240,7 +245,7 @@ public class ChatServlet extends HttpServlet {
         String sql = """
                 SELECT role, message FROM chat_history
                 WHERE user_id = ? AND session_id = ?
-                ORDER BY created_at ASC
+                ORDER BY created_at DESC
                 LIMIT 20
                 """;
         List<AIService.ChatMessage> list = new ArrayList<>();
@@ -252,6 +257,7 @@ public class ChatServlet extends HttpServlet {
                 list.add(new AIService.ChatMessage(rs.getString("role"), rs.getString("message")));
             }
         }
+        java.util.Collections.reverse(list); // vuelve a orden cronológico ascendente
         return list;
     }
 
@@ -286,17 +292,28 @@ public class ChatServlet extends HttpServlet {
 
     private List<String[]> loadSessions(Connection conn, UUID userId) throws SQLException {
         String sql = """
-                SELECT DISTINCT ON (session_id)
-                    session_id::text,
-                    message,
-                    created_at::text
-                FROM chat_history
-                WHERE user_id = ? AND role = 'user'
-                ORDER BY session_id, created_at ASC
+                WITH first_msgs AS (
+                    SELECT DISTINCT ON (session_id)
+                        session_id, message, created_at
+                    FROM chat_history
+                    WHERE user_id = ? AND role = 'user'
+                    ORDER BY session_id, created_at ASC
+                ),
+                last_activity AS (
+                    SELECT session_id, MAX(created_at) AS last_at
+                    FROM chat_history
+                    WHERE user_id = ?
+                    GROUP BY session_id
+                )
+                SELECT f.session_id::text, f.message, f.created_at::text
+                FROM first_msgs f
+                JOIN last_activity l ON l.session_id = f.session_id
+                ORDER BY l.last_at DESC
                 """;
         List<String[]> list = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
+            ps.setObject(2, userId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 list.add(new String[]{
@@ -309,7 +326,7 @@ public class ChatServlet extends HttpServlet {
         return list;
     }
 
-    // ── Parser JSON robusto ───────────────────────────────────────────────────
+    // ── Parser JSON manual (pendiente: migrar a Gson) ─────────────────────────
 
     private String extractJsonValue(String json, String field) {
         if (json == null) return null;

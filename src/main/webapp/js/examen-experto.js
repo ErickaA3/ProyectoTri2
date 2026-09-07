@@ -82,8 +82,6 @@ function loadExamData() {
             // FIX: Usar timerMinutos de la configuración (siempre tiene timer)
             // ══════════════════════════════════════════════════════════════
             timeMinutes: cfg.timerMinutos ?? 15,
-            // FIX: Guardar config de penalización
-            penalty:     cfg.penalty ?? true,
             questions:   allQuestions,
             // Guardar preguntas originales para reinicio completo
             originalQuestions: results.examenes.questions
@@ -128,17 +126,16 @@ let correctCount = 0, incorrectCount = 0;
 // ===== INIT =====
 
 // ── Bloquear navegación del sidebar mientras el examen está activo ──────
-// Usa delegación en document (capture phase) porque el sidebar se inyecta
-// DESPUÉS de que este script se ejecuta (initComponents corre en DOMContentLoaded)
 function blockSidebarNav() {
-    document.addEventListener('click', function(e) {
-        const navCard = e.target.closest('a.nav-card[href]');
-        if (navCard && !examFinished) {
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            showExitModal();
-        }
-    }, true); // capture phase — se ejecuta antes de initPageTransitions
+    document.querySelectorAll('.nav-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+            if (!examFinished) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                showExitModal();
+            }
+        }, true); // capture phase — se ejecuta antes de initPageTransitions
+    });
 }
 
 function initExam() {
@@ -291,23 +288,7 @@ function closeTimerAlert(){
 }
 
 // ===== EXIT =====
-// ── Mostrar modal de salida — adaptar según config de penalización ──────
-function showExitModal(){
-    const hasPenalty = examData?.penalty ?? true;
-    const penaltyWarning = document.querySelector('#exitModal .penalty-warning');
-    if (penaltyWarning) penaltyWarning.style.display = hasPenalty ? 'flex' : 'none';
-    
-    const modalP = document.querySelector('#exitModal .modal p');
-    if (modalP) modalP.textContent = hasPenalty 
-        ? 'Esta acción no se puede deshacer.' 
-        : 'Tu progreso no se guardará.';
-    
-    // Cambiar texto del botón según penalización
-    const confirmBtn = document.querySelector('#exitModal .modal-btn.confirm-red');
-    if (confirmBtn) confirmBtn.textContent = hasPenalty ? 'Abandonar' : 'Salir';
-    
-    document.getElementById('exitModal').classList.add('show');
-}
+function showExitModal(){document.getElementById('exitModal').classList.add('show');}
 function closeExitModal(){document.getElementById('exitModal').classList.remove('show');}
 function exitExam(){clearInterval(timerInterval);closeExitModal();window.history.back();}
 
@@ -475,8 +456,7 @@ function updateResultButtons() {
     const actionsContainer = document.querySelector('.results-actions');
     if (!actionsContainer) return;
     
-    const errorCount = examData.questions.filter((q, i) => answers[i] !== q.correct).length;
-    const hasErrors = errorCount > 0;
+    const hasErrors = examData.questions.some((q, i) => answers[i] !== q.correct);
     
     let buttonsHTML = `
         <button class="btn-result btn-retry" onclick="retryExam()">
@@ -484,13 +464,11 @@ function updateResultButtons() {
         </button>
     `;
     
-    // Mostrar "Repasar errores" siempre que haya errores
-    // En review mode, solo si quedan errores (permite filtrar de nuevo)
-    if (hasErrors) {
-        const label = isReviewMode ? 'Repasar errores restantes' : 'Repasar errores';
+    // Solo mostrar "Repasar errores" si hay errores y NO estamos ya en modo repaso
+    if (hasErrors && !isReviewMode) {
         buttonsHTML += `
             <button class="btn-result btn-review" onclick="reviewMistakes()">
-                <i class="fas fa-search"></i> ${label} (${errorCount})
+                <i class="fas fa-search"></i> Repasar errores (${incorrectCount + answers.filter(a => a === null).length})
             </button>
         `;
     }
@@ -525,16 +503,18 @@ function reviewMistakes() {
         }
     });
     
-    if (wrongQuestions.length === 0) return;
-    
-    clearInterval(timerInterval);
+    if (wrongQuestions.length === 0) {
+        alert('¡No tienes errores que repasar!');
+        return;
+    }
     
     // Activar modo repaso
     isReviewMode = true;
     
-    // Actualizar preguntas a solo los errores
-    // IMPORTANTE: no tocar originalExamData — se usa para restartFullExam
+    // Guardar las preguntas incorrectas en originalExamData para que
+    // retryExam en modo repaso use las mismas preguntas
     examData.questions = wrongQuestions;
+    // IMPORTANTE: no tocar originalExamData — se usa para restartFullExam
     
     // Resetear estado
     currentQuestion = 0;
@@ -556,8 +536,10 @@ function reviewMistakes() {
     document.getElementById('examTitleBar').textContent = `${originalExamData.title} — Repaso de errores 🔄`;
     document.getElementById('totalQ').textContent = examData.questions.length;
     
+    clearInterval(timerInterval);
     renderQuestion(); 
     renderDots();
+    clearInterval(timerInterval);
     startTimer();
 }
 
@@ -565,8 +547,6 @@ function reviewMistakes() {
 // FIX: Función para reiniciar el examen actual (mismo set de preguntas)
 // ══════════════════════════════════════════════════════════════
 function retryExam() {
-    clearInterval(timerInterval);
-    
     currentQuestion = 0;
     answers = new Array(examData.questions.length).fill(null);
     totalSeconds = examData.timeMinutes * 60;
@@ -580,7 +560,6 @@ function retryExam() {
     document.getElementById('gradeNumber').textContent = '0%';
     document.getElementById('resultsScreen').classList.remove('active');
     document.getElementById('examScreen').classList.remove('hidden');
-    document.getElementById('totalQ').textContent = examData.questions.length;
     
     // Mantener título según modo
     if (isReviewMode) {
@@ -589,8 +568,10 @@ function retryExam() {
         document.getElementById('examTitleBar').textContent = examData.title;
     }
     
+    clearInterval(timerInterval);
     renderQuestion(); 
     renderDots();
+    clearInterval(timerInterval);
     startTimer();
 }
 
@@ -598,8 +579,6 @@ function retryExam() {
 // FIX: Función para reiniciar examen completo desde modo repaso
 // ══════════════════════════════════════════════════════════════
 function restartFullExam() {
-    clearInterval(timerInterval);
-    
     // Restaurar datos originales
     isReviewMode = false;
     rewardSent = false; // Nuevo examen completo — permite un nuevo reward
@@ -621,8 +600,10 @@ function restartFullExam() {
     document.getElementById('examTitleBar').textContent = examData.title;
     document.getElementById('totalQ').textContent = examData.questions.length;
     
+    clearInterval(timerInterval);
     renderQuestion(); 
     renderDots();
+    clearInterval(timerInterval);
     startTimer();
 }
 
@@ -667,13 +648,12 @@ function launchConfetti() {
 
 
 
-// ── Abandonar con penalización (solo si está habilitada en config) ──────
+// ── Abandonar con penalización ──────────────────────────────────────────
 function exitWithPenalty() {
     clearInterval(timerInterval);
     closeExitModal();
-    const hasPenalty = examData?.penalty ?? true;
-    // Solo enviar penalización si está habilitada en la configuración
-    if (hasPenalty && !isRewardSent() && typeof sendReward === 'function') {
+    // Registrar abandono en el servidor (−25 XP según GamificationService)
+    if (!isRewardSent() && typeof sendReward === 'function') {
         markRewardSent();
         sendReward('abandon_exam', 0, examData?.id || null, 0, 0)
             .catch(e => console.warn('[exitWithPenalty]', e));
@@ -708,7 +688,7 @@ function toggleFavorite() {
     const userId   = typeof getGamificationUserId === 'function' ? getGamificationUserId() : null;
     if (!userId) return;
 
-    fetch('/project-1.0-SNAPSHOT/api/summaries/favorite', {
+    fetch((window.API_BASE || '') + '/api/summaries/favorite', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json', 'X-HTTP-Method-Override': 'PATCH', 'X-User-Id': userId },
         body:    JSON.stringify({ contentId: examData.id, isFavorite: newValue })

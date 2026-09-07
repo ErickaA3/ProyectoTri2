@@ -1,6 +1,4 @@
-/* ===== CHAT.JS - Mi ProfesorIA ===== */
-
-const API_BASE = 'http://localhost:8080/project-1.0-SNAPSHOT';
+const API_BASE = window.API_BASE || '';
 
 let chatHistory   = [];
 let currentSession = null;
@@ -18,7 +16,7 @@ function getUserId() {
     }
 }
 
-// ─── Init ────────────────────────────────────────────────────
+// ─── Init ───
 document.addEventListener('DOMContentLoaded', () => {
     // Cargar datos del usuario
     try {
@@ -38,10 +36,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-    const _ct = PolarisLoading.rotateMessages('chatLoadingSub',
-        ['Iniciando chat...', 'Cargando historial...', 'Conectando con el búho...']);
-    Promise.allSettled([loadSessions(), loadEquippedBackground()])
-        .finally(() => { clearInterval(_ct); PolarisLoading.hide('chatLoading'); });
+
+        const _ct = PolarisLoading.rotateMessages('chatLoadingSub',
+            ['Iniciando chat...', 'Cargando historial...', 'Conectando con el búho...']);
+        PolarisLoading.wrap('chatLoading',
+            Promise.allSettled([loadSessions(), loadEquippedBackground()])
+        ).finally(() => clearInterval(_ct));
 });
 
 // ─── Enviar mensaje ──────────────────────────────────────────
@@ -64,12 +64,11 @@ async function send() {
     try {
         const res = await fetch(`${API_BASE}/api/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 mensaje: txt,
                 sessionId: currentSession,
-                userId: userId          // ← NUEVO: envía userId desde localStorage
+                userId: userId
             })
         });
 
@@ -81,13 +80,15 @@ async function send() {
             return;
         }
 
-        // Guardar sessionId si es nuevo chat
+        // Guardar sessionId si es nuevo chat y agregar al top del sidebar
         if (!currentSession) {
             currentSession = data.data.sessionId;
-            addSessionToSidebar(txt, currentSession);
+            // [FIX] prepend=true para que el nuevo chat aparezca arriba
+            // [FIX] se pasa la fecha actual real, en vez de dejar "Hoy" fijo en el HTML
+            addSessionToSidebar(txt, currentSession, true, new Date().toISOString());
         }
 
-        // Formatear respuesta (convertir **negrita** a <strong>)
+        // Formatear respuesta (convertir **negrita** a <strong>, escapando antes)
         const reply = formatReply(data.data.reply);
         addBotMsg(reply);
 
@@ -119,7 +120,7 @@ async function loadSessions() {
     try {
         const res = await fetch(`${API_BASE}/api/chat?userId=${userId}`, {
             method: 'GET',
-            credentials: 'include'
+            headers: getAuthHeaders()
         });
 
         if (!res.ok) return;
@@ -128,12 +129,11 @@ async function loadSessions() {
 
         const sessions = data.data;
         const container = document.querySelector('.recents');
-        const label = container.querySelector('.section-label');
 
         // Limpiar items hardcodeados
         container.querySelectorAll('.chat-item').forEach(el => el.remove());
 
-        if (sessions.length === 0) {
+        if (!sessions || sessions.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'empty-sessions';
             empty.textContent = 'No hay chats recientes.';
@@ -142,8 +142,11 @@ async function loadSessions() {
             return;
         }
 
+        // Las sesiones vienen de la API ordenadas DESC (más recientes primero).
+        // Usamos append (prepend=false) para respetar ese orden en el sidebar.
+        // [FIX] se pasa s.createdAt para calcular la fecha real (Hoy/Ayer/fecha).
         sessions.forEach(s => {
-            addSessionToSidebar(s.firstMessage, s.sessionId);
+            addSessionToSidebar(s.firstMessage, s.sessionId, false, s.createdAt);
         });
 
     } catch(e) {
@@ -151,8 +154,38 @@ async function loadSessions() {
     }
 }
 
+// ─── Formatear fecha relativa (Hoy / Ayer / fecha) ────────────
+// [FIX] Antes el sidebar mostraba "Hoy" fijo, sin importar la fecha real
+// de la sesión. Esta función calcula la etiqueta correcta a partir del
+// createdAt real que devuelve el backend.
+function formatSessionDate(isoString) {
+    if (!isoString) return '';
+
+    const fecha = new Date(isoString);
+    if (isNaN(fecha.getTime())) return '';
+
+    const hoy = new Date();
+
+    const esMismoDia = (a, b) =>
+        a.getFullYear() === b.getFullYear() &&
+        a.getMonth() === b.getMonth() &&
+        a.getDate() === b.getDate();
+
+    if (esMismoDia(fecha, hoy)) return 'Hoy';
+
+    const ayer = new Date(hoy);
+    ayer.setDate(hoy.getDate() - 1);
+    if (esMismoDia(fecha, ayer)) return 'Ayer';
+
+    return fecha.toLocaleDateString('es', { day: '2-digit', month: 'short' });
+}
+
 // ─── Agregar sesión al sidebar ───────────────────────────────
-function addSessionToSidebar(firstMessage, sessionId) {
+// [FIX] prepend=true → inserta arriba (debajo del label) para nuevos chats
+//       prepend=false → append al final (para cargar historial en orden)
+// [FIX] createdAt → fecha real de la sesión (ISO string), usada para
+//       calcular la etiqueta Hoy/Ayer/fecha en vez de dejarla fija.
+function addSessionToSidebar(firstMessage, sessionId, prepend = false, createdAt = null) {
     const container = document.querySelector('.recents');
 
     // Quitar mensaje de "no hay chats"
@@ -167,8 +200,8 @@ function addSessionToSidebar(firstMessage, sessionId) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </div>
         <div class="chat-item-meta">
-            <div class="chat-item-label">${esc(firstMessage.substring(0, 35))}${firstMessage.length > 35 ? '...' : ''}</div>
-            <div class="chat-item-date">Hoy</div>
+            <div class="chat-item-label">${esc(firstMessage ? firstMessage.substring(0, 35) : 'Chat')}${firstMessage && firstMessage.length > 35 ? '...' : ''}</div>
+            <div class="chat-item-date">${formatSessionDate(createdAt)}</div>
         </div>
         <button class="chat-item-delete" title="Eliminar chat">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -176,9 +209,9 @@ function addSessionToSidebar(firstMessage, sessionId) {
             </svg>
         </button>
     `;
+
     // Click en el item → cargar chat
     item.addEventListener('click', (e) => {
-        // No cargar si clickearon el botón de borrar
         if (e.target.closest('.chat-item-delete')) return;
         selectSession(item, sessionId);
     });
@@ -187,7 +220,18 @@ function addSessionToSidebar(firstMessage, sessionId) {
         e.stopPropagation();
         showDeleteConfirm(sessionId, item);
     });
-    container.appendChild(item);
+
+    if (prepend) {
+        // Insertar justo después del label "Chats recientes"
+        const label = container.querySelector('.section-label');
+        if (label && label.nextSibling) {
+            container.insertBefore(item, label.nextSibling);
+        } else {
+            container.appendChild(item);
+        }
+    } else {
+        container.appendChild(item);
+    }
 }
 
 // ─── Eliminar sesión ─────────────────────────────────────────
@@ -218,7 +262,7 @@ async function confirmDeleteChat() {
     try {
         const res = await fetch(`${API_BASE}/api/chat?sessionId=${pendingDeleteSessionId}&userId=${userId}`, {
             method: 'DELETE',
-            credentials: 'include'
+            headers: getAuthHeaders()
         });
         const data = await res.json();
 
@@ -260,7 +304,7 @@ async function selectSession(el, sessionId) {
 
     try {
         const res = await fetch(`${API_BASE}/api/chat?sessionId=${sessionId}&userId=${userId}`, {
-            credentials: 'include'
+            headers: getAuthHeaders()
         });
         const data = await res.json();
         if (!data.success) return;
@@ -270,12 +314,14 @@ async function selectSession(el, sessionId) {
         const typing = document.getElementById('typingRow');
         [...area.children].forEach(c => { if (c !== typing) c.remove(); });
 
-        // Renderizar historial
+        // [FIX] El campo de chat_history en la DB es "message", no "content".
+        // Se usa msg.message con fallback a msg.content para compatibilidad.
         data.data.forEach(msg => {
+            const texto = msg.message || msg.content || '';
             if (msg.role === 'user') {
-                addMsg('user', msg.content);
+                addMsg('user', texto);
             } else {
-                addBotMsg(formatReply(msg.content));
+                addBotMsg(formatReply(texto));
             }
         });
 
@@ -336,19 +382,23 @@ function selectChat(el) {
     el.classList.add('active');
 }
 
+// [FIX] Escapa el HTML de la respuesta del bot ANTES de aplicar formato
+// (negrita, saltos de línea). Evita que contenido devuelto por el modelo
+// se ejecute como HTML/script en el navegador.
 function formatReply(txt) {
     if (!txt) return '';
-    return txt
+    let safe = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return safe
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>');
 }
 
 function esc(t) {
+    if (!t) return '';
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
 // ─── Cargar fondo equipado ───────────────────────────────────
-// Mapeo nombre BD → clase CSS
 const BG_CLASS_MAP = {
     'Noche Oscura':   'bg-default',
     'Galaxia':        'bg-galaxy',
@@ -366,26 +416,21 @@ async function loadEquippedBackground() {
 
     try {
         const res = await fetch(`${API_BASE}/shop`, {
-            credentials: 'include',
-            headers: { 'X-User-Id': userId }
+            headers: getAuthHeaders({ 'X-User-Id': userId })
         });
         if (!res.ok) return;
         const data = await res.json();
         if (!data.success || !data.equippedBackgroundId) return;
 
-        // Buscar el item equipado en la lista
         const item = (data.items || []).find(i => i.id === data.equippedBackgroundId);
         if (!item) return;
 
         const bgClass = BG_CLASS_MAP[item.name];
         if (!bgClass) return;
 
-        // Aplicar al .content (padre de sidebar + chat-main)
         const content = document.querySelector('.content');
         if (content) {
-            // Siempre limpiar clases previas primero
             content.classList.remove('bg-galaxy','bg-volcano','bg-ocean','bg-forest','bg-aurora','bg-sky','bg-rain');
-            // Solo agregar si no es el default
             if (bgClass !== 'bg-default') {
                 content.classList.add(bgClass);
             }

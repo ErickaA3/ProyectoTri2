@@ -1,6 +1,6 @@
 /* ===== PERFIL.JS - Mi ProfesorIA ===== */
 
-const API_BASE = 'http://localhost:8080/project-1.0-SNAPSHOT';
+const API_BASE = window.API_BASE || '';
 
 // ─── Init ───────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,10 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ['Cargando tu perfil...', 'Obteniendo estadísticas...', 'Casi listo...']
     );
 
-    loadProfile().finally(() => {
-        clearInterval(msgTimer);
-        PolarisLoading.hide('perfilLoading');
-    });
+    PolarisLoading.wrap('perfilLoading', loadProfile())
+        .finally(() => clearInterval(msgTimer));
 
     document.getElementById('btn-edit-profile').addEventListener('click', openEditModal);
     document.getElementById('btn-modal-close').addEventListener('click', closeEditModal);
@@ -25,7 +23,7 @@ async function loadProfile() {
     try {
         const res = await fetch(`${API_BASE}/api/profile`, {
             method: 'GET',
-            credentials: 'include'
+            headers: getAuthHeaders()
         });
 
         if (res.status === 401) {
@@ -195,8 +193,7 @@ async function saveProfile() {
     try {
         const res = await fetch(`${API_BASE}/api/profile`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
+            headers: getAuthHeaders(),
             body: JSON.stringify({ username, fullName, country, language, birthdate })
         });
 
