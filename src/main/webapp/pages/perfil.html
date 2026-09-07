@@ -11,19 +11,29 @@
     <link rel="stylesheet" href="../css/styles-shared.css">
     <link rel="stylesheet" href="../css/responsive.css">
     <style>
-        /* Fix: el .badge de marcos.css usa position:absolute, 
-           resetear eso para el badge de nivel en la profile card */
-        .profile-badges .badge {
-            position: static !important;
-            transform: none !important;
-            bottom: auto !important;
-            left: auto !important;
-            box-shadow: none !important;
-            border: none !important;
-            font-family: inherit !important;
-            font-size: 0.85rem !important;
-            letter-spacing: normal !important;
-            text-transform: none !important;
+        .info-card-header {
+             position: relative;
+        }
+        .info-card-header .btn-edit {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        .info-grid-edit {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px 24px;
+            margin-top: 8px;
+        }
+        .info-grid-edit .form-group {
+            margin-bottom: 0;
+        }
+        .info-card-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 20px;
         }
     </style>
 </head>
@@ -75,10 +85,6 @@
                     </span>
                 </div>
             </div>
-            <button class="btn-edit" id="btn-edit-profile">
-                <i class="fas fa-pen"></i>
-                Editar Perfil
-            </button>
         </section>
 
         <!-- Stats Grid -->
@@ -160,8 +166,18 @@
                     <i class="fas fa-id-card"></i>
                 </div>
                 <h3 class="info-card-title">Información Personal</h3>
+                <button class="btn-edit" id="btn-edit-profile">
+                    <i class="fas fa-pen"></i>
+                    Editar
+                </button>
             </div>
-            <div class="info-grid-content">
+
+            <!-- Vista normal -->
+            <div class="info-grid-content" id="info-grid-view">
+                <div class="info-row">
+                    <span class="info-label">Nombre de usuario</span>
+                    <span class="info-value" id="info-username">—</span>
+                </div>
                 <div class="info-row">
                     <span class="info-label">Nombre completo</span>
                     <span class="info-value" id="info-fullname">—</span>
@@ -183,19 +199,9 @@
                     <span class="info-value" id="info-createdat">—</span>
                 </div>
             </div>
-        </section>
-    </main>
 
-    <!-- Modal Editar Perfil -->
-    <div class="modal-overlay" id="modal-edit" style="display:none;">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3><i class="fas fa-pen"></i> Editar Perfil</h3>
-                <button class="modal-close" id="btn-modal-close">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
+            <!-- Modo edición (oculto por defecto) -->
+            <div class="info-grid-edit" id="info-grid-edit" style="display:none;">
                 <div class="form-group">
                     <label>Nombre de usuario</label>
                     <input type="text" id="edit-username" placeholder="Tu nombre de usuario" maxlength="30">
@@ -203,6 +209,10 @@
                 <div class="form-group">
                     <label>Nombre completo</label>
                     <input type="text" id="edit-fullname" placeholder="Tu nombre completo">
+                </div>
+                <div class="form-group">
+                    <label>Fecha de nacimiento</label>
+                    <input type="date" id="edit-birthdate">
                 </div>
                 <div class="form-group">
                     <label>País</label>
@@ -216,20 +226,18 @@
                         <option value="pt">Português</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Fecha de nacimiento</label>
-                    <input type="date" id="edit-birthdate">
-                </div>
             </div>
-            <div class="modal-footer">
-                <button class="btn-cancel" id="btn-modal-cancel">Cancelar</button>
-                <button class="btn-save" id="btn-modal-save">
+
+            <p class="modal-error" id="modal-error-msg" style="display:none;"></p>
+
+            <div class="info-card-actions" id="info-card-actions" style="display:none;">
+                <button class="btn-cancel" id="btn-edit-cancel">Cancelar</button>
+                <button class="btn-save" id="btn-edit-save">
                     <i class="fas fa-check"></i> Guardar
                 </button>
             </div>
-            <p class="modal-error" id="modal-error-msg" style="display:none;"></p>
-        </div>
-    </div>
+        </section>
+    </main>
 
     <script src="../js/components.js"></script>
     <script src="../js/marcos.js"></script>

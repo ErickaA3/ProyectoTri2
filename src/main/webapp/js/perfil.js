@@ -12,10 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
     PolarisLoading.wrap('perfilLoading', loadProfile())
         .finally(() => clearInterval(msgTimer));
 
-    document.getElementById('btn-edit-profile').addEventListener('click', openEditModal);
-    document.getElementById('btn-modal-close').addEventListener('click', closeEditModal);
-    document.getElementById('btn-modal-cancel').addEventListener('click', closeEditModal);
-    document.getElementById('btn-modal-save').addEventListener('click', saveProfile);
+    document.getElementById('btn-edit-profile').addEventListener('click', openEditMode);
+    document.getElementById('btn-edit-cancel').addEventListener('click', closeEditMode);
+    document.getElementById('btn-edit-save').addEventListener('click', saveProfile);
 });
 
 // ─── Cargar perfil desde el backend ─────────────────────────
@@ -60,6 +59,7 @@ function renderProfile(profile) {
     document.getElementById('stat-streak-record').textContent = profile.stats?.streakRecord ?? 0;
 
     // Info personal
+    document.getElementById('info-username').textContent  = profile.username  || '—';
     document.getElementById('info-fullname').textContent  = profile.fullName  || '—';
     document.getElementById('info-birthdate').textContent = formatDate(profile.birthdate);
     document.getElementById('info-birthdate').dataset.raw = profile.birthdate || '';
@@ -156,22 +156,25 @@ function renderDailyMissions(missions) {
 }
 
 // ─── Modal Editar ────────────────────────────────────────────
-function openEditModal() {
-    document.getElementById('edit-username').value  = document.getElementById('profile-username').textContent.replace('—', '');
+function openEditMode() {
+    document.getElementById('edit-username').value  = document.getElementById('info-username').textContent.replace('—', '');
     document.getElementById('edit-fullname').value  = document.getElementById('info-fullname').textContent.replace('—', '');
     document.getElementById('edit-country').value   = document.getElementById('info-country').textContent.replace('—', '');
     document.getElementById('edit-birthdate').value = getRawBirthdate();
 
-    const langSelect = document.getElementById('edit-language');
     const currentLang = document.getElementById('info-language').dataset.raw ?? 'es';
-    langSelect.value = currentLang;
+    document.getElementById('edit-language').value = currentLang;
 
     document.getElementById('modal-error-msg').style.display = 'none';
-    document.getElementById('modal-edit').style.display = 'flex';
+    document.getElementById('info-grid-view').style.display    = 'none';
+    document.getElementById('info-grid-edit').style.display    = 'grid';
+    document.getElementById('info-card-actions').style.display = 'flex';
 }
 
-function closeEditModal() {
-    document.getElementById('modal-edit').style.display = 'none';
+function closeEditMode() {
+    document.getElementById('info-grid-view').style.display    = 'grid';
+    document.getElementById('info-grid-edit').style.display    = 'none';
+    document.getElementById('info-card-actions').style.display = 'none';
 }
 
 async function saveProfile() {
@@ -208,6 +211,7 @@ async function saveProfile() {
         // ── Actualizar vista de la página ──
         document.getElementById('profile-username').textContent = username;
         document.getElementById('profile-fullname').textContent = fullName;
+        document.getElementById('info-username').textContent    = username;
         document.getElementById('info-fullname').textContent    = fullName || '—';
         document.getElementById('info-country').textContent     = country  || '—';
         document.getElementById('info-language').textContent    = formatLanguage(language);
@@ -226,11 +230,10 @@ async function saveProfile() {
             stored.language = language;
             if (birthdate) stored.birthdate = birthdate;
             localStorage.setItem('user', JSON.stringify(stored));
-            // Dispara refreshNavbarStats() + refreshSidebarInfo() en components.js
             if (typeof notifyUserUpdate === 'function') notifyUserUpdate();
         } catch (_) {}
 
-        closeEditModal();
+        closeEditMode();
 
     } catch (err) {
         errorEl.textContent = 'Error de conexión.';
