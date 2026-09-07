@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
  * GET  /api/favoritos/{id}           → contenido completo de un ítem (para "Ver")
  * PUT  /api/favoritos                → toggle favorito
  *
- * Auth: HttpSession → fallback header X-User-Id
+ * Auth: JWT (req.getAttribute) → HttpSession
  */
 @WebServlet("/api/favoritos/*")
 public class FavoritesServlet extends HttpServlet {
@@ -45,13 +45,11 @@ public class FavoritesServlet extends HttpServlet {
         String userId = getUserId(req);
         if (userId == null) { sendError(res, 401, "Sesión no válida."); return; }
 
-        // Detectar si viene un ID en el path: /api/favoritos/{id}
         String pathInfo = req.getPathInfo();
         String contentId = extractId(pathInfo);
 
         try {
             if (contentId != null) {
-                // ── GET /api/favoritos/{id} — contenido completo ──
                 String json = contentDAO.getContentJson(contentId, userId);
                 if (json == null) {
                     sendError(res, 404, "Contenido no encontrado.");
@@ -60,7 +58,6 @@ public class FavoritesServlet extends HttpServlet {
                 res.getWriter().write(json);
 
             } else {
-                // ── GET /api/favoritos — lista de favoritos ──
                 String type = req.getParameter("type");
                 List<EducationalContent> favorites = contentDAO.getFavorites(userId);
 
@@ -70,7 +67,6 @@ public class FavoritesServlet extends HttpServlet {
                             .collect(Collectors.toList());
                 }
 
-                // Pre-cargar schemaType de todos los esquemas en UNA sola query
                 java.util.Map<String, String> schemaTypes = new java.util.HashMap<>();
                 List<String> schemaIds = favorites.stream()
                         .filter(f -> "schema".equals(f.getType()))
@@ -103,7 +99,6 @@ public class FavoritesServlet extends HttpServlet {
                     obj.addProperty("title", item.getTitle());
                     obj.addProperty("isFavorite", item.isFavorite());
 
-                    // Agregar schemaType si existe (ya pre-cargado)
                     String st = schemaTypes.get(item.getId());
                     if (st != null) {
                         obj.addProperty("schemaType", st);
@@ -159,10 +154,6 @@ public class FavoritesServlet extends HttpServlet {
         }
     }
 
-    // -----------------------------------------------------------------------
-    // HELPERS
-    // -----------------------------------------------------------------------
-
     private String extractId(String pathInfo) {
         if (pathInfo == null || pathInfo.equals("/")) return null;
         String cleaned = pathInfo.replaceFirst("^/", "");
@@ -172,13 +163,14 @@ public class FavoritesServlet extends HttpServlet {
     }
 
     private String getUserId(HttpServletRequest req) {
+        Object attr = req.getAttribute("userId");
+        if (attr != null) return attr.toString();
         HttpSession session = req.getSession(false);
         if (session != null) {
             Object uid = session.getAttribute("userId");
             if (uid != null) return uid.toString();
         }
-        String header = req.getHeader("X-User-Id");
-        return (header != null && !header.isBlank()) ? header : null;
+        return null;
     }
 
     private void sendError(HttpServletResponse res, int status, String message) throws IOException {
