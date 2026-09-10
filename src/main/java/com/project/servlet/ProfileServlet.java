@@ -37,18 +37,9 @@ public class ProfileServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        // Verificar sesión activa
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("userId") == null) {
+        UUID userId = resolveUserId(request);
+        if (userId == null) {
             JsonUtil.sendError(response, 401, "No autenticado.");
-            return;
-        }
-
-        UUID userId;
-        try {
-            userId = UUID.fromString((String) session.getAttribute("userId"));
-        } catch (IllegalArgumentException e) {
-            JsonUtil.sendError(response, 400, "ID de usuario inválido.");
             return;
         }
 
@@ -85,17 +76,9 @@ public class ProfileServlet extends HttpServlet {
     protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("userId") == null) {
+        UUID userId = resolveUserId(request);
+        if (userId == null) {
             JsonUtil.sendError(response, 401, "No autenticado.");
-            return;
-        }
-
-        UUID userId;
-        try {
-            userId = UUID.fromString((String) session.getAttribute("userId"));
-        } catch (IllegalArgumentException e) {
-            JsonUtil.sendError(response, 400, "ID de usuario inválido.");
             return;
         }
 
@@ -152,6 +135,26 @@ public class ProfileServlet extends HttpServlet {
     }
 
     // CORS y preflight OPTIONS los maneja el CorsFilter global (@WebFilter("/*")).
+
+    // Identidad del usuario: prioriza el userId puesto por JwtFilter tras validar el
+    // JWT (req.getAttribute), y cae a HttpSession por compatibilidad. Devuelve null si
+    // no hay identidad válida.
+    private UUID resolveUserId(HttpServletRequest request) {
+        String uid = (String) request.getAttribute("userId");
+        if (uid == null) {
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                Object attr = session.getAttribute("userId");
+                if (attr != null) uid = attr.toString();
+            }
+        }
+        if (uid == null) return null;
+        try {
+            return UUID.fromString(uid);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
 
     private String extractJsonField(String json, String field) {
         if (json == null) return null;
