@@ -30,27 +30,14 @@ public class ChatServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        setCorsHeaders(response);
-
         // Leer body completo primero
         String body = request.getReader().lines().collect(Collectors.joining());
 
-        // Obtener userId: primero de la sesión HTTP, luego del body como fallback
-        // NOTA: el fallback por body/query sigue pendiente de reemplazo por JWT.
-        UUID userId = getUserIdFromSession(request);
-
+        // Identidad únicamente desde el JWT validado por JwtFilter (sin fallback de cliente).
+        UUID userId = resolveUserId(request);
         if (userId == null) {
-            String userIdStr = extractJsonValue(body, "userId");
-            if (userIdStr == null || userIdStr.isBlank()) {
-                JsonUtil.sendError(response, 401, "No autenticado. Inicia sesión de nuevo.");
-                return;
-            }
-            try {
-                userId = UUID.fromString(userIdStr);
-            } catch (IllegalArgumentException e) {
-                JsonUtil.sendError(response, 400, "ID de usuario inválido: " + userIdStr);
-                return;
-            }
+            JsonUtil.sendError(response, 401, "No autenticado. Inicia sesión de nuevo.");
+            return;
         }
 
         String mensaje   = extractJsonValue(body, "mensaje");
@@ -117,21 +104,7 @@ public class ChatServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        setCorsHeaders(response);
-
-        UUID userId = getUserIdFromSession(request);
-        if (userId == null) {
-            String userIdStr = request.getParameter("userId");
-            if (userIdStr != null && !userIdStr.isBlank()) {
-                try {
-                    userId = UUID.fromString(userIdStr);
-                } catch (IllegalArgumentException e) {
-                    JsonUtil.sendError(response, 400, "ID de usuario inválido.");
-                    return;
-                }
-            }
-        }
-
+        UUID userId = resolveUserId(request);
         if (userId == null) {
             JsonUtil.sendError(response, 401, "No autenticado.");
             return;
@@ -175,29 +148,10 @@ public class ChatServlet extends HttpServlet {
     }
 
     @Override
-    protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        setCorsHeaders(res);
-        res.setStatus(HttpServletResponse.SC_OK);
-    }
-
-    @Override
     protected void doDelete(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        setCorsHeaders(response);
-
-        UUID userId = getUserIdFromSession(request);
-        if (userId == null) {
-            String userIdStr = request.getParameter("userId");
-            if (userIdStr != null && !userIdStr.isBlank()) {
-                try { userId = UUID.fromString(userIdStr); }
-                catch (IllegalArgumentException e) {
-                    JsonUtil.sendError(response, 400, "ID de usuario inválido.");
-                    return;
-                }
-            }
-        }
-
+        UUID userId = resolveUserId(request);
         if (userId == null) {
             JsonUtil.sendError(response, 401, "No autenticado.");
             return;
@@ -224,15 +178,20 @@ public class ChatServlet extends HttpServlet {
         }
     }
 
-    // ── Helper: obtener userId de la sesión HTTP ──────────────────────────────
+    // ── Helper: identidad desde el JWT (JwtFilter) con fallback a sesión ───────
 
-    private UUID getUserIdFromSession(HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("userId") == null) {
-            return null;
+    private UUID resolveUserId(HttpServletRequest request) {
+        String uid = (String) request.getAttribute("userId");
+        if (uid == null) {
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                Object attr = session.getAttribute("userId");
+                if (attr != null) uid = attr.toString();
+            }
         }
+        if (uid == null) return null;
         try {
-            return UUID.fromString((String) session.getAttribute("userId"));
+            return UUID.fromString(uid);
         } catch (IllegalArgumentException e) {
             return null;
         }
@@ -375,10 +334,5 @@ public class ChatServlet extends HttpServlet {
                        .replace("\t", "\\t") + "\"";
     }
 
-    private void setCorsHeaders(HttpServletResponse response) {
-        response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-        response.setHeader("Access-Control-Allow-Credentials", "true");
-    }
+    // CORS y preflight OPTIONS los maneja el CorsFilter global (@WebFilter("/*")).
 }
