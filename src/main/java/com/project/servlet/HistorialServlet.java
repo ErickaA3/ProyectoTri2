@@ -195,20 +195,15 @@ public class HistorialServlet extends HttpServlet {
         return id.isBlank() ? null : id;
     }
 
-    /**
-     * Obtiene userId desde la sesión HTTP (establecida por LoginServlet).
-     * Si la sesión no tiene el atributo, intenta leerlo del header X-User-Id
-     * como fallback para llamadas directas desde el frontend.
-     */
     private String getUserIdFromSession(HttpServletRequest req) {
+        Object attr = req.getAttribute("userId");
+        if (attr != null) return attr.toString();
         HttpSession session = req.getSession(false);
         if (session != null) {
             Object uid = session.getAttribute("userId");
             if (uid != null) return uid.toString();
         }
-        // Fallback: header enviado por el frontend
-        String header = req.getHeader("X-User-Id");
-        return (header != null && !header.isBlank()) ? header : null;
+        return null;
     }
 
     private void sendSuccess(HttpServletResponse res, JsonObject data) throws IOException {
