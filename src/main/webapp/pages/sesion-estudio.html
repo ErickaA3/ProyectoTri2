@@ -343,16 +343,20 @@
 
             const formData = new FormData();
             formData.append('file',    blob, flow.fileName || 'archivo');
-            formData.append('userId',  flow.userId);
             formData.append('options', JSON.stringify(flow.options));
             formData.append('configs', JSON.stringify(flow.configs || {}));
-            requestInit = { method: 'POST', body: formData };
+            // FormData: no forzar Content-Type (el navegador pone el boundary); solo el Bearer.
+            const _token = localStorage.getItem('token');
+            requestInit = {
+                method: 'POST',
+                headers: _token ? { 'Authorization': 'Bearer ' + _token } : {},
+                body: formData
+            };
         } else {
             requestInit = {
                 method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: getAuthHeaders(),
                 body:    JSON.stringify({
-                    userId:  flow.userId,
                     options: flow.options,
                     text:    flow.text,
                     configs: flow.configs
