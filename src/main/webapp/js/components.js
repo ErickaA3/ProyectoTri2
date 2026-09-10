@@ -406,8 +406,26 @@ function ejecutarLogout() {
     window.location.href = getBasePath() + 'index.html';
 }
 
+// ── Sesión antigua sin JWT ──
+// Una sesión iniciada antes de que el login guardara el token deja 'user' en
+// localStorage pero no 'token'. Sin token, toda llamada a /api/* responde
+// 401 "Token requerido". Se fuerza un login limpio en vez de dejar la app a medias.
+function verificarSesion() {
+    try {
+        if (localStorage.getItem('user') && !localStorage.getItem('token')) {
+            localStorage.removeItem('user');
+            localStorage.removeItem('supabase.auth.token');
+            window.location.href = getBasePath() + 'index.html';
+            return false;
+        }
+    } catch (_) { }
+    return true;
+}
+
 // ── Inicializar componentes ──
 function initComponents() {
+    if (!verificarSesion()) return;
+
     const base = getBasePath();
 
     injectSidebarStyles();
@@ -663,7 +681,7 @@ function autoRefreshStats() {
     // Fallback: fetch directo si gamification.js no está en la página
     const API_BASE = window.API_BASE + '/api/gamification';
     fetch(`${API_BASE}/stats`, {
-        headers: getAuthHeaders({ 'X-User-Id': user.id })
+        headers: getAuthHeaders()
     })
     .then(r => r.json())
     .then(data => {

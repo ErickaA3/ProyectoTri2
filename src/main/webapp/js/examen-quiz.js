@@ -526,7 +526,7 @@ function toggleFavorite() {
 
     fetch((window.API_BASE || '') + '/api/summaries/favorite', {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json', 'X-HTTP-Method-Override': 'PATCH', 'X-User-Id': userId },
+        headers: getAuthHeaders({ 'X-HTTP-Method-Override': 'PATCH' }),
         body:    JSON.stringify({ contentId: examData.id, isFavorite: newValue })
     })
     .then(r => r.json())
