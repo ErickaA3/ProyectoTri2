@@ -37,8 +37,6 @@ public class ProfileServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        setCorsHeaders(response);
-
         // Verificar sesión activa
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("userId") == null) {
@@ -86,8 +84,6 @@ public class ProfileServlet extends HttpServlet {
     @Override
     protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-
-        setCorsHeaders(response);
 
         HttpSession session = request.getSession(false);
         if (session == null || session.getAttribute("userId") == null) {
@@ -155,18 +151,7 @@ public class ProfileServlet extends HttpServlet {
         }
     }
 
-    @Override
-    protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        setCorsHeaders(res);
-        res.setStatus(HttpServletResponse.SC_OK);
-    }
-
-    private void setCorsHeaders(HttpServletResponse response) {
-        response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
-        response.setHeader("Access-Control-Allow-Methods", "GET, PUT, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type, X-User-Id");
-        response.setHeader("Access-Control-Allow-Credentials", "true");
-    }
+    // CORS y preflight OPTIONS los maneja el CorsFilter global (@WebFilter("/*")).
 
     private String extractJsonField(String json, String field) {
         if (json == null) return null;
