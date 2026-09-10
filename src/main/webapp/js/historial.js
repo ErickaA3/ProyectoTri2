@@ -40,8 +40,7 @@ function getUserId() {
 }
 
 function authHeaders() {
-    const uid = getUserId();
-    return { 'Content-Type': 'application/json', ...(uid ? { 'X-User-Id': uid } : {}) };
+    return getAuthHeaders();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -51,7 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupListeners();
     const _ht = PolarisLoading.rotateMessages('historialLoadingSub',
         ['Cargando historial...', 'Obteniendo tu actividad...', 'Casi listo...']);
-    loadHistory().finally(() => { clearInterval(_ht); PolarisLoading.hide('historialLoading'); });
+    PolarisLoading.wrap('historialLoading', loadHistory())
+        .finally(() => clearInterval(_ht));
 });
 
 function setupListeners() {

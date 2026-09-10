@@ -11,6 +11,14 @@ function getUserData() {
     catch { return null; }
 }
 
+// ── Headers con JWT para llamadas a /api/* ──
+function getAuthHeaders(extra) {
+    const token = localStorage.getItem('token');
+    const base = { 'Content-Type': 'application/json' };
+    if (token) base['Authorization'] = 'Bearer ' + token;
+    return Object.assign(base, extra || {});
+}
+
 // ── Ruta base ──
 function getBasePath() {
     const path = window.location.pathname;
@@ -398,8 +406,26 @@ function ejecutarLogout() {
     window.location.href = getBasePath() + 'index.html';
 }
 
+// ── Sesión antigua sin JWT ──
+// Una sesión iniciada antes de que el login guardara el token deja 'user' en
+// localStorage pero no 'token'. Sin token, toda llamada a /api/* responde
+// 401 "Token requerido". Se fuerza un login limpio en vez de dejar la app a medias.
+function verificarSesion() {
+    try {
+        if (localStorage.getItem('user') && !localStorage.getItem('token')) {
+            localStorage.removeItem('user');
+            localStorage.removeItem('supabase.auth.token');
+            window.location.href = getBasePath() + 'index.html';
+            return false;
+        }
+    } catch (_) { }
+    return true;
+}
+
 // ── Inicializar componentes ──
 function initComponents() {
+    if (!verificarSesion()) return;
+
     const base = getBasePath();
 
     injectSidebarStyles();
@@ -655,7 +681,7 @@ function autoRefreshStats() {
     // Fallback: fetch directo si gamification.js no está en la página
     const API_BASE = window.API_BASE + '/api/gamification';
     fetch(`${API_BASE}/stats`, {
-        headers: { 'X-User-Id': user.id }
+        headers: getAuthHeaders()
     })
     .then(r => r.json())
     .then(data => {
@@ -826,6 +852,41 @@ const PolarisLoading = {
             i = (i + 1) % messages.length;
             el.textContent = messages[i];
         }, intervalMs);
+    },
+
+    /**
+     * Envuelve una promesa (o varias vía Promise.allSettled) y solo
+     * MUESTRA el loader si la carga tarda más de `delay` ms.
+     * Si se llegó a mostrar, lo mantiene un mínimo de `minDisplay` ms
+     * para evitar el parpadeo de aparecer/desaparecer en 50ms.
+     *
+     * IMPORTANTE: requiere que el div del loader en el HTML ya tenga
+     * la clase `polaris-loading--hidden` puesta desde el marcado
+     * (que empiece oculto), NO visible por defecto.
+     */
+    wrap(id, promise, opts = {}) {
+        const delay      = opts.delay      ?? 250;
+        const minDisplay = opts.minDisplay ?? 400;
+        let shownAt = null;
+
+        const timer = setTimeout(() => {
+            this.show(id);
+            shownAt = Date.now();
+        }, delay);
+
+        return Promise.resolve(promise).finally(() => {
+            clearTimeout(timer);
+            if (shownAt === null) {
+                // Nunca se mostró — nos aseguramos de que quede oculto
+                // sin animación (por si alguna vez quedó visible).
+                const el = document.getElementById(id);
+                if (el) el.classList.add('polaris-loading--hidden');
+                return;
+            }
+            const elapsed = Date.now() - shownAt;
+            const wait = Math.max(0, minDisplay - elapsed);
+            setTimeout(() => this.hide(id), wait);
+        });
     }
 };
 // Shield pill: tap to expand/collapse en mobile

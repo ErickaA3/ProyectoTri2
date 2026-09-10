@@ -4,7 +4,7 @@
  *
  * Flujo:
  *   1. La página llega con ?id=UUID (desde sesion-estudio o historial)
- *   2. GET /api/summaries?id=UUID  con header X-User-Id
+ *   2. GET /api/summaries?id=UUID  con header Authorization Bearer
  *   3. Renderiza el JSON devuelto por el servlet
  *
  * Estructura del JSON del servidor:
@@ -27,8 +27,7 @@ function getUserId() {
 }
 
 function authHeaders() {
-    const uid = getUserId();
-    return { 'Content-Type': 'application/json', ...(uid ? { 'X-User-Id': uid } : {}) };
+    return getAuthHeaders();
 }
 
 // ─── Init ─────────────────────────────────────────────────────

@@ -3,11 +3,114 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi ProfesorIA - Duelo</title>
+    <title>Polaris - Duelo</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles-shared.css">
     <link rel="stylesheet" href="../css/examen-experto.css">
     <link rel="stylesheet" href="../css/responsive.css">
+    <style>
+        #rivalPanel {
+            position: fixed;
+            top: calc(var(--navbar-height, 65px) + 12px);
+            right: 1.5rem;
+            background: rgba(7,11,24,0.92);
+            border: 1px solid rgba(45,212,191,0.25);
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: .82rem;
+            color: #94a3b8;
+            z-index: 50;
+            min-width: 130px;
+            backdrop-filter: blur(10px);
+            transition: opacity 0.2s;
+        }
+        #rivalPanel .rival-name {
+            color: #2dd4bf;
+            font-weight: 600;
+            margin-bottom: 3px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 110px;
+        }
+        #rivalPanel .rival-score {
+            color: #e2e8f0;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+        #rivalPanel .rival-score span {
+            color: #94a3b8;
+            font-size: .72rem;
+            font-weight: 400;
+        }
+
+        #waitingOverlay, #fatalOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(5,6,15,0.97);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+            z-index: 999;
+            font-family: inherit;
+            color: #e2e8f0;
+            text-align: center;
+            padding: 0 1.5rem;
+        }
+        #fatalOverlay { display: none; z-index: 1000; }
+        #waitingOverlay .spinner {
+            width: 48px;
+            height: 48px;
+            border: 3px solid rgba(45,212,191,0.2);
+            border-top-color: #2dd4bf;
+            border-radius: 50%;
+            animation: ws-spin .8s linear infinite;
+        }
+        #waitingMsg {
+            font-size: 1.1rem;
+            color: #2dd4bf;
+            letter-spacing: .05em;
+            text-align: center;
+            padding: 0 1.5rem;
+        }
+        @keyframes ws-spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 768px) {
+            #rivalPanel {
+                top: calc(var(--navbar-height, 65px) + 8px);
+                right: 0.75rem;
+                min-width: 110px;
+                padding: 8px 10px;
+                border-radius: 10px;
+            }
+            #rivalPanel .rival-name { font-size: 0.75rem; max-width: 90px; }
+            #rivalPanel .rival-score { font-size: 0.9rem; }
+            #waitingMsg { font-size: 0.95rem; }
+        }
+
+        @media (max-width: 480px) {
+            #rivalPanel {
+                top: calc(var(--navbar-height, 65px) + 6px);
+                right: 0.5rem;
+                min-width: 90px;
+                padding: 6px 8px;
+                border-radius: 8px;
+            }
+            #rivalPanel .rival-name { font-size: 0.7rem; max-width: 75px; }
+            #rivalPanel .rival-score { font-size: 0.82rem; }
+            #waitingOverlay .spinner { width: 38px; height: 38px; }
+            #waitingMsg { font-size: 0.88rem; }
+        }
+
+        @media (max-width: 390px) {
+            #rivalPanel { min-width: 80px; padding: 5px 7px; }
+            #rivalPanel .rival-name { font-size: 0.65rem; max-width: 65px; }
+            #rivalPanel .rival-score { font-size: 0.78rem; }
+        }
+    </style>
 </head>
 <body data-page="duelos">
 
@@ -16,7 +119,7 @@
 
     <canvas id="starsCanvas"></canvas>
     <main class="content" style="padding: 0; overflow-x: hidden;">
-    <div class="exam-wrapper">
+    <div class="exam-wrapper" id="examWrapper" style="opacity:0;pointer-events:none;">
         <div class="exam-topbar">
             <div class="exam-topbar-left">
                 <button class="btn-salir" onclick="confirmExit()"><i class="fas fa-arrow-left"></i> Salir</button>
@@ -53,10 +156,6 @@
                 <div class="xp-earned" id="xpEarned" style="display:none;"><i class="fas fa-bolt"></i><span id="xpAmount"></span></div>
                 <p class="grade-message" id="gradeMessage"></p>
                 <div class="results-stats" id="resultsStats"></div>
-                <div class="results-review" id="reviewSection" style="display:none;">
-                    <div class="review-title"><i class="fas fa-list-check"></i> Revisión</div>
-                    <div class="review-list" id="reviewList"></div>
-                </div>
                 <div class="results-actions">
                     <button class="btn-result btn-retry" onclick="window.location.href='duelos.html'"><i class="fas fa-arrow-left"></i> Volver a Duelos</button>
                 </div>
@@ -64,208 +163,397 @@
         </div>
     </div>
     </main>
+
     <div class="modal-overlay" id="exitModal"><div class="modal">
         <div class="modal-icon exit"><i class="fas fa-door-open"></i></div>
         <h3>¿Salir del duelo?</h3><p>Si sales se contará como <span class="highlight">derrota</span>.</p>
         <div class="modal-actions"><button class="modal-btn cancel" onclick="closeExitModal()">Continuar</button><button class="modal-btn confirm-red" onclick="window.location.href='duelos.html'">Salir</button></div>
     </div></div>
+
+    <!-- Overlay de espera -->
+    <div id="waitingOverlay">
+        <div class="spinner"></div>
+        <div id="waitingMsg">Conectando...</div>
+    </div>
+
+    <!-- Overlay de error fatal — NO destruye el DOM del juego, solo lo cubre -->
+    <div id="fatalOverlay">
+        <i class="fas fa-exclamation-triangle" style="font-size:3rem;color:#fbbf24;"></i>
+        <h2 style="margin:0;" id="fatalMsg"></h2>
+        <a href="duelos.html" style="padding:12px 28px;background:#2dd4bf;color:#0f0f23;
+            border-radius:12px;text-decoration:none;font-weight:600;">Ir a Duelos</a>
+    </div>
+
     <script src="../js/components.js"></script>
     <script src="../js/gamification.js"></script>
+    <script src="../js/marcos.js"></script>
     <script>
-    const CTX=window.location.pathname.split('/pages')[0];
-    function getUserId(){try{return JSON.parse(localStorage.getItem('user'))?.id||null}catch(_){return null}}
-    function duelHeaders(){const u=getUserId();return{'Content-Type':'application/json',...(u?{'X-User-Id':u}:{})}}
+    const CTX = window.location.pathname.split('/pages')[0];
+    function getUserId() { try { return JSON.parse(localStorage.getItem('user'))?.id || null; } catch(_) { return null; } }
 
-    const duelData=JSON.parse(sessionStorage.getItem('duelData')||'null');
+    const params   = new URLSearchParams(window.location.search);
+    const duelId   = params.get('duelId');
+    const userId   = getUserId();
+    const myUserId = userId;
 
-    // ── VALIDACIÓN: si no hay datos, NO redirigir (evita loops) ──
-    if(!duelData || !duelData.questions || duelData.questions.length===0){
-        sessionStorage.removeItem('duelData');
-        document.querySelector('.exam-wrapper').innerHTML=`
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:1.5rem;text-align:center;padding:2rem;">
-                <i class="fas fa-exclamation-triangle" style="font-size:3rem;color:var(--accent-yellow,#fbbf24);"></i>
-                <h2 style="margin:0;">No hay datos de duelo</h2>
-                <p style="color:var(--text-secondary,#a0a0c0);margin:0;">Vuelve a la página de duelos y selecciona "Jugar Ahora" desde un reto activo.</p>
-                <a href="duelos.html" style="padding:12px 28px;background:var(--accent-cyan,#2dd4bf);color:#0f0f23;border-radius:12px;text-decoration:none;font-weight:600;font-family:inherit;">Ir a Duelos</a>
-            </div>`;
-    } else {
-    // ── FLUJO NORMAL ──
+    const WS_URL = `ws://localhost:8080/project-1.0-SNAPSHOT/ws/duelo/${duelId}`;
+    let ws = null;
+    let totalQ        = 0;
+    let currentQ      = 0;
+    let score         = 0;
+    let timePerQ      = 30;
+    let secondsLeft   = 30;
+    let countdownInterval = null;
+    let selectedIdx   = null;
+    let questionStart = Date.now();
+    let startTime     = Date.now();
+    let players       = {};
 
-    const questions=duelData.questions||[],totalQ=questions.length,duelId=duelData.duelId;
-    const TIME_PER_Q=duelData.timePerQuestion||30;
-    let currentQ=0,score=0,answers=[],startTime=Date.now(),questionStart=Date.now();
-    let countdownInterval=null,secondsLeft=TIME_PER_Q,selectedIdx=null;
-
-    document.getElementById('duelTitle').textContent=duelData.title||'Duelo';
-    document.getElementById('qTotal').textContent=totalQ;
-    document.getElementById('qDots').innerHTML=questions.map((_,i)=>`<div class="q-dot ${i===0?'current':''}" id="dot-${i}"></div>`).join('');
-
-    initStars();showQuestion(0);
-
-    function startCountdown(){
-        secondsLeft=TIME_PER_Q;
-        updateTimerDisplay();
-        const timerBox=document.getElementById('timerBox');
-        timerBox.classList.remove('warning','danger');
-        clearInterval(countdownInterval);
-        countdownInterval=setInterval(()=>{
-            secondsLeft--;
-            updateTimerDisplay();
-            // Clases de urgencia
-            if(secondsLeft<=5){timerBox.classList.remove('warning');timerBox.classList.add('danger');}
-            else if(secondsLeft<=10){timerBox.classList.add('warning');}
-            // Se acabó el tiempo → auto-fail
-            if(secondsLeft<=0){
-                clearInterval(countdownInterval);
-                timeUpForQuestion();
-            }
-        },1000);
+    // ── Helper seguro: nunca crashea si el elemento no existe ──
+    function setText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+        else console.warn('[duelo-play] Elemento no encontrado:', id);
+    }
+    function setHtml(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = value;
+        else console.warn('[duelo-play] Elemento no encontrado:', id);
+    }
+    function setStyle(id, prop, value) {
+        const el = document.getElementById(id);
+        if (el) el.style[prop] = value;
     }
 
-    function updateTimerDisplay(){
-        const s=Math.max(0,secondsLeft);
-        document.getElementById('timerDisplay').textContent=String(s);
+    // showFatal ya NO destruye el DOM del juego — solo muestra un overlay encima.
+    // Así, si llega un mensaje tardío del servidor (QUESTION, TIMEOUT, etc.)
+    // después de un error, los elementos siguen existiendo y no crashea.
+    function showFatal(msg) {
+        hideWaiting();
+        setText('fatalMsg', msg);
+        const overlay = document.getElementById('fatalOverlay');
+        if (overlay) overlay.style.display = 'flex';
     }
 
-    function timeUpForQuestion(){
-        if(selectedIdx!==null)return; // ya respondió
-        selectedIdx=-1; // marca como timeout
-        const q=questions[currentQ],correct=q.correct,timeMs=TIME_PER_Q*1000;
-        answers.push({questionIndex:currentQ,answerGiven:'-1',isCorrect:false,timeMs});
-        document.getElementById(`dot-${currentQ}`).classList.add('answered');
-        // Mostrar correcta
-        document.querySelectorAll('.option-btn').forEach((btn,i)=>{
-            btn.style.pointerEvents='none';
-            const letter=btn.querySelector('.option-letter');
-            if(i===correct){btn.style.borderColor='var(--accent-green)';btn.style.background='rgba(34,197,94,0.15)';letter.style.background='var(--accent-green)';letter.style.color='#0f0f23';letter.style.borderColor='var(--accent-green)';}
-        });
-        document.getElementById('btnNext').disabled=false;
-        // Auto-avanzar después de 1.2s
-        setTimeout(()=>{
-            if(currentQ<totalQ-1)showQuestion(currentQ+1);
-            else finishDuel();
-        },1200);
+    if (!duelId || !userId) {
+        showFatal('Faltan datos del duelo. Volvé a la página de duelos.');
     }
 
-    function showQuestion(idx){
-        const q=questions[idx];if(!q)return;currentQ=idx;selectedIdx=null;questionStart=Date.now();
-        clearInterval(countdownInterval);
-        document.querySelectorAll('.q-dot').forEach((d,i)=>d.classList.toggle('current',i===idx));
-        const card=document.getElementById('questionCard');
-        card.classList.add('exit');
-        setTimeout(()=>{
-            card.classList.remove('exit');
-            document.getElementById('qNumber').textContent=`Pregunta ${idx+1}`;
-            document.getElementById('qText').textContent=q.question;
-            document.getElementById('qCurrent').textContent=idx+1;
-            document.getElementById('progressFill').style.width=`${((idx+1)/totalQ)*100}%`;
-            document.getElementById('optionsList').innerHTML=(q.options||[]).map((opt,i)=>`<button class="option-btn" onclick="selectOption(${i},this)"><span class="option-letter">${String.fromCharCode(65+i)}</span><span class="option-text">${opt}</span></button>`).join('');
-            const btn=document.getElementById('btnNext');btn.disabled=true;
-            btn.innerHTML=idx<totalQ-1?'Siguiente <i class="fas fa-arrow-right"></i>':'<i class="fas fa-flag-checkered"></i> Finalizar';
-            if(idx===totalQ-1){btn.classList.remove('btn-siguiente');btn.classList.add('btn-entregar');}
-            else{btn.classList.remove('btn-entregar');btn.classList.add('btn-siguiente');}
-            startCountdown();
-        },idx===0?0:300);
+    function showWaiting(msg) {
+        const overlay = document.getElementById('waitingOverlay');
+        const msgEl   = document.getElementById('waitingMsg');
+        if (overlay) overlay.style.display = 'flex';
+        if (msgEl)   msgEl.textContent = msg;
+        const wrapper = document.getElementById('examWrapper');
+        if (wrapper) { wrapper.style.opacity = '0'; wrapper.style.pointerEvents = 'none'; }
     }
 
-    function selectOption(idx,el){
-        if(selectedIdx!==null)return;selectedIdx=idx;
-        clearInterval(countdownInterval);
-        const q=questions[currentQ],correct=q.correct,isCorrect=idx===correct,timeMs=Date.now()-questionStart;
-        if(isCorrect)score++;
-        answers.push({questionIndex:currentQ,answerGiven:String(idx),isCorrect,timeMs});
-        document.getElementById(`dot-${currentQ}`).classList.add('answered');
-        document.querySelectorAll('.option-btn').forEach((btn,i)=>{
-            btn.style.pointerEvents='none';
-            const letter=btn.querySelector('.option-letter');
-            if(i===correct){btn.style.borderColor='var(--accent-green)';btn.style.background='rgba(34,197,94,0.15)';letter.style.background='var(--accent-green)';letter.style.color='#0f0f23';letter.style.borderColor='var(--accent-green)';}
-            if(i===idx&&!isCorrect){btn.style.borderColor='var(--accent-red)';btn.style.background='rgba(239,68,68,0.15)';letter.style.background='var(--accent-red)';letter.style.color='#fff';letter.style.borderColor='var(--accent-red)';}
-        });
-        document.getElementById('btnNext').disabled=false;
+    function hideWaiting() {
+        const overlay = document.getElementById('waitingOverlay');
+        if (overlay) overlay.style.display = 'none';
+        const wrapper = document.getElementById('examWrapper');
+        if (wrapper) { wrapper.style.opacity = '1'; wrapper.style.pointerEvents = 'auto'; }
     }
 
-    function nextQuestion(){if(selectedIdx===null)return;clearInterval(countdownInterval);if(currentQ<totalQ-1)showQuestion(currentQ+1);else finishDuel();}
-
-    async function finishDuel(){
-        clearInterval(countdownInterval);
-        const totalTime=Math.floor((Date.now()-startTime)/1000);
-        document.getElementById('examScreen').classList.add('hidden');
-        document.getElementById('resultsScreen').classList.add('active');
-
-        const pct=totalQ>0?(score/totalQ)*100:0;
-        const circ=2*Math.PI*75,offset=circ-(circ*pct/100);
-        const circle=document.getElementById('gradeCircle');
-        circle.style.stroke=pct>=80?'var(--accent-green)':pct>=50?'var(--accent-yellow)':'var(--accent-red)';
-        setTimeout(()=>{circle.style.strokeDashoffset=offset;},200);
-        document.getElementById('gradeNumber').textContent=score;
-        document.getElementById('gradeLabel').textContent=`/ ${totalQ}`;
-
-        const m=Math.floor(totalTime/60),s=totalTime%60;
-        document.getElementById('resultsStats').innerHTML=`
-            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(34,197,94,0.2);color:var(--accent-green)"><i class="fas fa-check"></i></div><div class="stat-card-value">${score}</div><div class="stat-card-label">Correctas</div></div>
-            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(239,68,68,0.2);color:var(--accent-red)"><i class="fas fa-times"></i></div><div class="stat-card-value">${totalQ-score}</div><div class="stat-card-label">Incorrectas</div></div>
-            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(45,212,191,0.2);color:var(--accent-cyan)"><i class="fas fa-clock"></i></div><div class="stat-card-value">${m}:${String(s).padStart(2,'0')}</div><div class="stat-card-label">Tiempo</div></div>
-            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(251,191,36,0.2);color:var(--accent-yellow)"><i class="fas fa-percentage"></i></div><div class="stat-card-value">${Math.round(pct)}%</div><div class="stat-card-label">Acierto</div></div>`;
-
-        document.getElementById('reviewSection').style.display='block';
-        document.getElementById('reviewList').innerHTML=answers.map((a,i)=>{
-            const q=questions[a.questionIndex],cls=a.isCorrect?'correct':'incorrect',icon=a.isCorrect?'fa-check':'fa-times';
-            return `<div class="review-item ${cls}"><div class="review-icon"><i class="fas ${icon}"></i></div><div class="review-q"><div class="review-q-text">${i+1}. ${q.question}</div><div class="review-a-text">Tu: ${q.options[parseInt(a.answerGiven)]||'—'}${!a.isCorrect?' · Correcta: '+q.options[q.correct]:''}</div></div></div>`;
-        }).join('');
-
-        try{
-            const res=await fetch(CTX+'/api/duels/submit',{method:'POST',headers:duelHeaders(),body:JSON.stringify({duelId,score,maxScore:totalQ,timeSecs:totalTime,answers})});
-            const data=await res.json();
-            console.log('[Duelo] Submit:',data);
-            if(data.success)showDuelResult(data,totalTime);
-            else{document.getElementById('resultsTitle').textContent='Completado';document.getElementById('resultsSubtitle').textContent=data.error||'Error al enviar resultado';}
-        }catch(e){console.error('[Duelo]',e);document.getElementById('resultsTitle').textContent='Completado';document.getElementById('resultsSubtitle').textContent='Error de conexión';}
-        sessionStorage.removeItem('duelData');
+    function connect() {
+        ws = new WebSocket(WS_URL);
+        ws.onopen = () => {
+            console.log('[WS] Conectado');
+            send({ type: 'JOIN', duelId, userId });
+            showWaiting('Conectando...');
+        };
+        ws.onmessage = (e) => {
+            const msg = JSON.parse(e.data);
+            console.log('[WS] ←', msg.type, msg);
+            handleMessage(msg);
+        };
+        ws.onclose = (e) => {
+            console.warn('[WS] Cerrado', e.code);
+            if (e.code !== 1000) setTimeout(reconnect, 2000);
+        };
+        ws.onerror = (e) => console.error('[WS] Error', e);
     }
 
-    function showDuelResult(data){
-        const title=document.getElementById('resultsTitle'),sub=document.getElementById('resultsSubtitle'),msg=document.getElementById('gradeMessage');
-        if(data.duelFinished){
-            if(data.result==='win'){title.textContent='🏆 ¡Victoria!';title.style.color='var(--accent-yellow)';msg.textContent=`Oponente: ${data.otherScore}/${totalQ}`;msg.style.color='var(--accent-green)';}
-            else if(data.result==='loss'){title.textContent='😞 Derrota';title.style.color='var(--accent-red)';msg.textContent=`Oponente: ${data.otherScore}/${totalQ}`;msg.style.color='var(--accent-red)';}
-            else{title.textContent='🤝 Empate';title.style.color='var(--accent-cyan)';msg.textContent=`Ambos: ${score}/${totalQ}`;msg.style.color='var(--accent-cyan)';}
-            sub.textContent=`Tiempo oponente: ${Math.floor(data.otherTime/60)}m ${data.otherTime%60}s`;
-            if(data.reward){
-                const xpEarned=data.reward.xpEarned||0;
-                const coinsEarned=data.reward.coinsEarned||0;
-                if(xpEarned>0||coinsEarned>0){
-                    document.getElementById('xpEarned').style.display='flex';
-                    document.getElementById('xpAmount').textContent=`+${xpEarned} XP · +${coinsEarned} monedas`;
-                }
-                // Actualizar localStorage con los nuevos stats
-                try{
-                    const u=JSON.parse(localStorage.getItem('user'))||{};
-                    if(!u.stats)u.stats={};
-                    if(data.reward.newXp!==undefined)u.stats.xp=data.reward.newXp;
-                    if(data.reward.newCoins!==undefined)u.stats.coins=data.reward.newCoins;
-                    if(data.reward.newLevel!==undefined)u.stats.level=data.reward.newLevel;
-                    localStorage.setItem('user',JSON.stringify(u));
-                }catch(_){}
-            }
-        }else{
-            title.textContent='⏳ ¡Resultado enviado!';title.style.color='var(--accent-cyan)';
-            sub.textContent='Tu resultado fue guardado';
-            msg.innerHTML='<span style="color:var(--accent-yellow)"><i class="fas fa-hourglass-half"></i> Esperando a que tu oponente juegue...</span><br><small style="color:var(--text-secondary)">Podrás ver el resultado en Notificaciones cuando termine.</small>';
+    function send(msg) {
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    }
+
+    function reconnect() {
+        send({ type: 'RECONNECT', duelId, userId });
+    }
+
+    function handleMessage(msg) {
+        switch (msg.type) {
+            case 'WAITING':        showWaiting(msg.message); break;
+            case 'READY':          onReady(msg); break;
+            case 'QUESTION':       onQuestion(msg); break;
+            case 'ANSWER_RESULT':  onAnswerResult(msg); break;
+            case 'SCORE_UPDATE':   onScoreUpdate(msg); break;
+            case 'GAME_OVER':      onGameOver(msg); break;
+            case 'TIMEOUT':        onTimeout(msg); break;
+            case 'OPPONENT_LEFT':  showWaiting(`Tu oponente se desconectó. Esperando (${msg.graceSecs}s)...`); break;
+            case 'STATE_SYNC':     onStateSync(msg); break;
+            case 'INFO':           console.info('[WS]', msg.message); break;
+            case 'ERROR':          console.error('[WS] ERROR del servidor:', msg.message); showFatal(msg.message); break;
         }
     }
 
-    function confirmExit(){document.getElementById('exitModal').classList.add('show');}
-    function closeExitModal(){document.getElementById('exitModal').classList.remove('show');}
-    document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');}));
+    function onReady(msg) {
+        totalQ   = msg.totalQuestions;
+        timePerQ = msg.timePerQuestion || 30;
+        players  = {};
+        msg.players.forEach(p => { players[p.userId] = p; });
 
-    function initStars(){
-        const c=document.getElementById('starsCanvas');if(!c)return;const ctx=c.getContext('2d');
-        c.width=window.innerWidth;c.height=window.innerHeight;
-        const stars=Array.from({length:150},()=>({x:Math.random()*c.width,y:Math.random()*c.height,r:Math.random()*1.5+0.3,o:Math.random()*0.5+0.1,d:(Math.random()-0.5)*0.01}));
-        function draw(){ctx.clearRect(0,0,c.width,c.height);stars.forEach(s=>{s.o+=s.d;if(s.o<0.05||s.o>0.6)s.d*=-1;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(200,180,255,${s.o})`;ctx.fill();});requestAnimationFrame(draw);}
-        draw();window.addEventListener('resize',()=>{c.width=window.innerWidth;c.height=window.innerHeight;});
+        setText('qTotal', totalQ);
+        setText('duelTitle', 'Duelo en vivo');
+        setHtml('qDots', Array.from({length: totalQ}, (_, i) =>
+            `<div class="q-dot ${i === 0 ? 'current' : ''}" id="dot-${i}"></div>`).join(''));
+
+        const rival = Object.values(players).find(p => p.userId !== myUserId);
+        if (rival) updateRivalPanel(rival.username, 0);
+        initStars();
+        startTime = Date.now();
     }
-    } // end else (duelData exists)
+
+    function onQuestion(msg) {
+        hideWaiting();
+        currentQ      = msg.index;
+        timePerQ      = msg.timeLimit || timePerQ;
+        selectedIdx   = null;
+        questionStart = Date.now();
+
+        setText('qNumber', `Pregunta ${currentQ + 1}`);
+        setText('qCurrent', currentQ + 1);
+        setText('qText', msg.text || msg.question || '');
+        setStyle('progressFill', 'width', `${((currentQ + 1) / totalQ) * 100}%`);
+
+        const opts = msg.options || [];
+        setHtml('optionsList', opts.map((opt, i) =>
+            `<button class="option-btn" onclick="selectOption(${i}, this)">
+                <span class="option-letter">${String.fromCharCode(65 + i)}</span>
+                <span class="option-text">${opt}</span>
+            </button>`).join(''));
+
+        document.querySelectorAll('.q-dot').forEach((d, i) => d.classList.toggle('current', i === currentQ));
+
+        const btn = document.getElementById('btnNext');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = currentQ < totalQ - 1
+                ? 'Siguiente <i class="fas fa-arrow-right"></i>'
+                : '<i class="fas fa-flag-checkered"></i> Finalizar';
+        }
+
+        startCountdown();
+    }
+
+    function onAnswerResult(msg) {
+        const correct       = msg.correct;
+        const correctIdx    = msg.correctIdx;
+        const yourAnswerIdx = msg.yourAnswerIdx;
+
+        document.querySelectorAll('.option-btn').forEach((btn, i) => {
+            btn.style.pointerEvents = 'none';
+            const letter = btn.querySelector('.option-letter');
+            if (i === correctIdx) {
+                btn.style.borderColor   = 'var(--accent-green)';
+                btn.style.background    = 'rgba(34,197,94,0.15)';
+                if (letter) { letter.style.background = 'var(--accent-green)'; letter.style.color = '#0f0f23'; }
+            }
+            if (i === yourAnswerIdx && !correct) {
+                btn.style.borderColor   = 'var(--accent-red)';
+                btn.style.background    = 'rgba(239,68,68,0.15)';
+                if (letter) { letter.style.background = 'var(--accent-red)'; letter.style.color = '#fff'; }
+            }
+        });
+
+        if (correct) score++;
+    }
+
+    function onScoreUpdate(msg) {
+        const rivalId = msg.userId;
+        if (rivalId && rivalId !== myUserId && players[rivalId]) {
+            updateRivalPanel(players[rivalId].username, msg.score);
+        }
+    }
+
+    function onTimeout(msg) {
+        clearInterval(countdownInterval);
+        if (selectedIdx === null) {
+            selectedIdx = -1;
+            document.querySelectorAll('.option-btn').forEach(btn => btn.style.pointerEvents = 'none');
+        }
+    }
+
+    function onGameOver(msg) {
+        clearInterval(countdownInterval);
+        hideWaiting();
+        if (ws) ws.close(1000);
+        showResults(msg, Math.floor((Date.now() - startTime) / 1000));
+    }
+
+    function onStateSync(msg) {
+        currentQ = msg.currentQuestion;
+        totalQ   = msg.totalQuestions;
+        score    = msg.myScore || 0;
+    }
+
+    function updateRivalPanel(username, rivalScore) {
+        let panel = document.getElementById('rivalPanel');
+        if (!panel) {
+            panel = document.createElement('div');
+            panel.id = 'rivalPanel';
+            document.body.appendChild(panel);
+        }
+        panel.innerHTML = `
+            <div class="rival-name"><i class="fas fa-user" style="font-size:.7rem;margin-right:4px;"></i>${username}</div>
+            <div class="rival-score">${rivalScore} <span>puntos</span></div>`;
+    }
+
+    function startCountdown() {
+        secondsLeft = timePerQ;
+        updateTimerDisplay();
+        const timerBox = document.getElementById('timerBox');
+        if (timerBox) timerBox.classList.remove('warning', 'danger');
+        clearInterval(countdownInterval);
+        countdownInterval = setInterval(() => {
+            secondsLeft--;
+            updateTimerDisplay();
+            if (timerBox) {
+                if (secondsLeft <= 5)       { timerBox.classList.add('danger'); timerBox.classList.remove('warning'); }
+                else if (secondsLeft <= 10) { timerBox.classList.add('warning'); }
+            }
+            if (secondsLeft <= 0) { clearInterval(countdownInterval); autoSubmitTimeout(); }
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        setText('timerDisplay', Math.max(0, secondsLeft));
+    }
+
+    function autoSubmitTimeout() {
+        if (selectedIdx !== null) return;
+        selectedIdx = -1;
+        document.querySelectorAll('.option-btn').forEach(btn => btn.style.pointerEvents = 'none');
+        send({ type: 'ANSWER', questionIndex: currentQ, answerIdx: -1, timeSecs: timePerQ });
+    }
+
+    function selectOption(idx, el) {
+        if (selectedIdx !== null) return;
+        selectedIdx = idx;
+        clearInterval(countdownInterval);
+        const timeSecs = Math.round((Date.now() - questionStart) / 1000);
+
+        document.querySelectorAll('.option-btn').forEach((btn, i) => {
+            btn.style.pointerEvents = 'none';
+            if (i === idx) {
+                btn.style.borderColor = 'var(--accent-cyan)';
+                btn.style.background  = 'rgba(45,212,191,0.15)';
+            }
+        });
+
+        const dot = document.getElementById(`dot-${currentQ}`);
+        if (dot) dot.classList.add('answered');
+        const btn = document.getElementById('btnNext');
+        if (btn) btn.disabled = false;
+
+        send({ type: 'ANSWER', questionIndex: currentQ, answerIdx: idx, timeSecs });
+    }
+
+    function nextQuestion() {
+        // El servidor controla el avance
+    }
+
+    function showResults(msg, totalTime) {
+        const examScreen    = document.getElementById('examScreen');
+        const resultsScreen = document.getElementById('resultsScreen');
+        if (examScreen)    examScreen.classList.add('hidden');
+        if (resultsScreen) resultsScreen.classList.add('active');
+
+        const panel = document.getElementById('rivalPanel');
+        if (panel) panel.style.display = 'none';
+
+        const finalScores = msg.finalScores || {};
+        const myScore     = finalScores[myUserId] ?? score;
+        const rivalId     = Object.keys(finalScores).find(id => id !== myUserId);
+        const rivalScore  = rivalId ? finalScores[rivalId] : 0;
+        const total       = totalQ || 1;
+        const winnerId    = msg.winner;
+        const isWin       = winnerId === myUserId;
+        const isDraw      = winnerId === 'draw';
+        const isAbandoned = msg.reason === 'opponent_abandoned';
+
+        const title = document.getElementById('resultsTitle');
+        const sub   = document.getElementById('resultsSubtitle');
+
+        if (title && sub) {
+            if (isAbandoned)  { title.textContent = '🏆 ¡Victoria!'; title.style.color = 'var(--accent-yellow)'; sub.textContent = 'Tu oponente abandonó.'; }
+            else if (isDraw)  { title.textContent = '🤝 Empate';     title.style.color = 'var(--accent-cyan)';   sub.textContent = `Ambos: ${myScore}/${total}`; }
+            else if (isWin)   { title.textContent = '🏆 ¡Victoria!'; title.style.color = 'var(--accent-yellow)'; sub.textContent = `Rival: ${rivalScore}/${total}`; }
+            else              { title.textContent = '😞 Derrota';    title.style.color = 'var(--accent-red)';    sub.textContent = `Rival: ${rivalScore}/${total}`; }
+        }
+
+        const pct    = (myScore / total) * 100;
+        const circ   = 2 * Math.PI * 75;
+        const offset = circ - (circ * pct / 100);
+        const circle = document.getElementById('gradeCircle');
+        if (circle) {
+            circle.style.stroke = pct >= 80 ? 'var(--accent-green)' : pct >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+            setTimeout(() => { circle.style.strokeDashoffset = offset; }, 200);
+        }
+        setText('gradeNumber', myScore);
+        setText('gradeLabel', `/ ${total}`);
+
+        const m = Math.floor(totalTime / 60), s = totalTime % 60;
+        setHtml('resultsStats', `
+            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(34,197,94,0.2);color:var(--accent-green)"><i class="fas fa-check"></i></div><div class="stat-card-value">${myScore}</div><div class="stat-card-label">Correctas</div></div>
+            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(239,68,68,0.2);color:var(--accent-red)"><i class="fas fa-times"></i></div><div class="stat-card-value">${total - myScore}</div><div class="stat-card-label">Incorrectas</div></div>
+            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(45,212,191,0.2);color:var(--accent-cyan)"><i class="fas fa-clock"></i></div><div class="stat-card-value">${m}:${String(s).padStart(2,'0')}</div><div class="stat-card-label">Tiempo</div></div>
+            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(251,191,36,0.2);color:var(--accent-yellow)"><i class="fas fa-trophy"></i></div><div class="stat-card-value">${rivalScore}</div><div class="stat-card-label">Rival</div></div>`);
+
+        if (msg.xpEarned > 0 || msg.coinsEarned > 0) {
+            const xpEl = document.getElementById('xpEarned');
+            if (xpEl) xpEl.style.display = 'flex';
+            setText('xpAmount', `+${msg.xpEarned} XP · +${msg.coinsEarned} monedas`);
+        }
+
+        try {
+            const u = JSON.parse(localStorage.getItem('user')) || {};
+            if (!u.stats) u.stats = {};
+            if (msg.newLevel) u.stats.level = msg.newLevel;
+            localStorage.setItem('user', JSON.stringify(u));
+        } catch(_) {}
+    }
+
+    function confirmExit()    { const m = document.getElementById('exitModal'); if (m) m.classList.add('show'); }
+    function closeExitModal() { const m = document.getElementById('exitModal'); if (m) m.classList.remove('show'); }
+    document.querySelectorAll('.modal-overlay').forEach(m =>
+        m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('show'); })
+    );
+
+    function initStars() {
+        const c = document.getElementById('starsCanvas'); if (!c) return;
+        const ctx = c.getContext('2d');
+        c.width = window.innerWidth; c.height = window.innerHeight;
+        const stars = Array.from({length: 150}, () => ({
+            x: Math.random() * c.width, y: Math.random() * c.height,
+            r: Math.random() * 1.5 + 0.3, o: Math.random() * 0.5 + 0.1,
+            d: (Math.random() - 0.5) * 0.01
+        }));
+        function draw() {
+            ctx.clearRect(0, 0, c.width, c.height);
+            stars.forEach(s => {
+                s.o += s.d; if (s.o < 0.05 || s.o > 0.6) s.d *= -1;
+                ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(200,180,255,${s.o})`; ctx.fill();
+            });
+            requestAnimationFrame(draw);
+        }
+        draw();
+        window.addEventListener('resize', () => { c.width = window.innerWidth; c.height = window.innerHeight; });
+    }
+
+    if (duelId && userId) setTimeout(connect, 300);
     </script>
 </body>
 </html>

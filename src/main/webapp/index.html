@@ -227,6 +227,7 @@ async function doLogin(){
     const data=await res.json();
     if(data.success){
       localStorage.setItem('user', JSON.stringify(data.data)); // ← Guarda el usuario
+      if(data.token) localStorage.setItem('token', data.token); // ← Guarda el JWT que devuelve LoginServlet
       showSuccess('¡Bienvenido de vuelta!');
       setTimeout(()=>window.location.href='pages/perfil.html', 1000);
     } else {
@@ -253,6 +254,7 @@ async function doRegister(){
     const data=await res.json();
     if(data.success){
       localStorage.setItem('user', JSON.stringify(data.data)); // ← Guarda el usuario
+      if(data.token) localStorage.setItem('token', data.token); // ← Guarda el JWT que devuelve RegisterServlet
       showSuccess('¡Cuenta creada! Redirigiendo...');
       setTimeout(()=>window.location.href='pages/perfil.html', 1200);
     } else {
