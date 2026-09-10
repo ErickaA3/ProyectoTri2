@@ -13,6 +13,7 @@ import com.project.model.users.DailyMission;
 import com.project.model.users.Statistics;
 import com.project.model.users.User;
 import com.project.model.users.WeeklyObjective;
+import com.project.util.GamificationService;
 import com.project.util.JsonUtil;
 
 import jakarta.servlet.ServletException;
@@ -37,20 +38,9 @@ public class ProfileServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        setCorsHeaders(response);
-
-        // Verificar sesión activa
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("userId") == null) {
+        UUID userId = resolveUserId(request);
+        if (userId == null) {
             JsonUtil.sendError(response, 401, "No autenticado.");
-            return;
-        }
-
-        UUID userId;
-        try {
-            userId = UUID.fromString((String) session.getAttribute("userId"));
-        } catch (IllegalArgumentException e) {
-            JsonUtil.sendError(response, 400, "ID de usuario inválido.");
             return;
         }
 
@@ -64,6 +54,19 @@ public class ProfileServlet extends HttpServlet {
             User user                       = optUser.get();
             Optional<Statistics> optStats  = userDAO.getStatsByUserId(userId);
             Statistics stats               = optStats.orElse(null);
+
+            // ── Recalcular racha real (arregla Bug B: racha "congelada" en el perfil) ──
+            // Si ya pasó más de 1 día (o 2 con escudo sin usar) desde la última
+            // actividad, la racha mostrada debe ser 0, sin esperar a que el usuario
+            // vuelva a hacer una actividad para que se "refresque" en la base.
+            if (stats != null) {
+                int rachaReal = GamificationService.effectiveStreak(
+                        stats.getStreakCurrent(),
+                        stats.getStreakLastActivity(),
+                        stats.isHasStreakShield()
+                );
+                stats.setStreakCurrent(rachaReal);
+            }
 
             // ── AUTO-CREAR misiones/objetivos si no existen para hoy/esta semana ──
             userDAO.ensureWeeklyObjectives(userId);
@@ -87,19 +90,9 @@ public class ProfileServlet extends HttpServlet {
     protected void doPut(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        setCorsHeaders(response);
-
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("userId") == null) {
+        UUID userId = resolveUserId(request);
+        if (userId == null) {
             JsonUtil.sendError(response, 401, "No autenticado.");
-            return;
-        }
-
-        UUID userId;
-        try {
-            userId = UUID.fromString((String) session.getAttribute("userId"));
-        } catch (IllegalArgumentException e) {
-            JsonUtil.sendError(response, 400, "ID de usuario inválido.");
             return;
         }
 
@@ -155,17 +148,26 @@ public class ProfileServlet extends HttpServlet {
         }
     }
 
-    @Override
-    protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        setCorsHeaders(res);
-        res.setStatus(HttpServletResponse.SC_OK);
-    }
+    // CORS y preflight OPTIONS los maneja el CorsFilter global (@WebFilter("/*")).
 
-    private void setCorsHeaders(HttpServletResponse response) {
-        response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
-        response.setHeader("Access-Control-Allow-Methods", "GET, PUT, OPTIONS");
-        response.setHeader("Access-Control-Allow-Headers", "Content-Type, X-User-Id");
-        response.setHeader("Access-Control-Allow-Credentials", "true");
+    // Identidad del usuario: prioriza el userId puesto por JwtFilter tras validar el
+    // JWT (req.getAttribute), y cae a HttpSession por compatibilidad. Devuelve null si
+    // no hay identidad válida.
+    private UUID resolveUserId(HttpServletRequest request) {
+        String uid = (String) request.getAttribute("userId");
+        if (uid == null) {
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                Object attr = session.getAttribute("userId");
+                if (attr != null) uid = attr.toString();
+            }
+        }
+        if (uid == null) return null;
+        try {
+            return UUID.fromString(uid);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private String extractJsonField(String json, String field) {
