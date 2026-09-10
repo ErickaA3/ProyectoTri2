@@ -74,16 +74,19 @@ public class DatabaseConnection {
     }
 
     public static Connection getConnection() {
-        try {
-            Connection conn = getDataSource().getConnection();
-            // Registro client-side del tipo 'vector' — operación local, sin red.
-            PGvector.addVectorType(conn);
-            return conn;
-        } catch (SQLException e) {
-            System.err.println("[DB] Error obteniendo conexión del pool: " + e.getMessage());
-            throw new RuntimeException("No se pudo conectar a la base de datos: " + e.getMessage());
+    try {
+        Connection conn = getDataSource().getConnection();
+        PGvector.addVectorType(conn);
+        return conn;
+    } catch (SQLException e) {
+        System.err.println("[DB] Error obteniendo conexión del pool: " + e.getMessage());
+        e.printStackTrace(); // ← agregar esta línea temporalmente
+        if (e.getCause() != null) {
+            System.err.println("[DB] Causa raíz: " + e.getCause());
         }
+        throw new RuntimeException("No se pudo conectar a la base de datos: " + e.getMessage());
     }
+}
 
     /** Llamar desde AppShutdownListener al redeploy/shutdown de Tomcat. */
     public static void shutdown() {
