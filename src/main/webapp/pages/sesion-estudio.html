@@ -867,10 +867,7 @@
         try {
             const response = await fetch('../api/favoritos', {
                 method:  'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-User-Id': flow.userId
-                },
+                headers: getAuthHeaders(),
                 body: JSON.stringify({
                     contentId:  contentId,
                     isFavorite: newState

@@ -16,8 +16,7 @@ function getUserId() {
     catch (_) { return null; }
 }
 function duelHeaders() {
-    const uid = getUserId();
-    return getAuthHeaders(uid ? { 'X-User-Id': uid } : {});
+    return getAuthHeaders();
 }
 
 let friends = [], invitations = [], activeDuels = [], notifications = [];
@@ -168,7 +167,7 @@ async function createDuel() {
             formData.append('timePerQuestion', timePerQuestion);
             res = await fetch(CTX + '/api/duels/create', {
                 method: 'POST',
-                headers: { 'X-User-Id': getUserId() },
+                headers: { ...(localStorage.getItem('token') ? { 'Authorization': 'Bearer ' + localStorage.getItem('token') } : {}) },
                 body: formData
             });
         } else {
