@@ -4,17 +4,17 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.project.database.DatabaseConnection;
 import com.project.util.AIService;
 import com.project.util.JsonUtil;
-import com.project.util.UserContextService;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -23,84 +23,84 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
+// Servlet del chat con el profesor IA: recibe mensajes del usuario, mantiene
+// el historial por sesión en BD y delega la generación de respuestas a AIService.
+// POST envía un mensaje y obtiene la respuesta; GET consulta el historial o la
+// lista de sesiones previas del usuario autenticado.
 @WebServlet("/api/chat")
 public class ChatServlet extends HttpServlet {
 
+    // POST /api/chat → recibe mensaje, llama a IA, guarda en BD, responde
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
         setCorsHeaders(response);
 
-        // Leer body completo primero
-        String body = request.getReader().lines().collect(Collectors.joining());
-
-        // Obtener userId: primero de la sesión HTTP, luego del body como fallback
-        UUID userId = getUserIdFromSession(request);
-
-        if (userId == null) {
-            String userIdStr = extractJsonValue(body, "userId");
-            if (userIdStr == null || userIdStr.isBlank()) {
-                JsonUtil.sendError(response, 401, "No autenticado. Inicia sesión de nuevo.");
-                return;
-            }
-            try {
-                userId = UUID.fromString(userIdStr);
-            } catch (IllegalArgumentException e) {
-                JsonUtil.sendError(response, 400, "ID de usuario inválido: " + userIdStr);
-                return;
-            }
+        // Verificar sesión
+        HttpSession session = request.getSession(false);
+        if (session == null || session.getAttribute("userId") == null) {
+            JsonUtil.sendError(response, 401, "No autenticado.");
+            return;
         }
 
-        String mensaje   = extractJsonValue(body, "mensaje");
-        String sessionId = extractJsonValue(body, "sessionId");
+        UUID userId;
+        try {
+            userId = UUID.fromString((String) session.getAttribute("userId"));
+        } catch (IllegalArgumentException e) {
+            JsonUtil.sendError(response, 400, "ID de usuario inválido.");
+            return;
+        }
 
-        processChat(response, userId, mensaje, sessionId);
-    }
-
-    private void processChat(HttpServletResponse response, UUID userId,
-                              String mensaje, String sessionId) throws IOException {
+        // Leer body con Gson en vez de buscar comillas a mano — así un mensaje
+        // con comillas, saltos de línea o barras invertidas no rompe el parseo.
+        String body = request.getReader().lines().collect(Collectors.joining());
+        String mensaje;
+        String sessionId;
+        try {
+            JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+            mensaje   = json.has("mensaje")   && !json.get("mensaje").isJsonNull()   ? json.get("mensaje").getAsString()   : null;
+            sessionId = json.has("sessionId") && !json.get("sessionId").isJsonNull() ? json.get("sessionId").getAsString() : null;
+        } catch (Exception e) {
+            JsonUtil.sendError(response, 400, "Body inválido, se esperaba JSON.");
+            return;
+        }
 
         if (mensaje == null || mensaje.isBlank()) {
             JsonUtil.sendError(response, 400, "El mensaje no puede estar vacío.");
             return;
         }
 
-        if (sessionId == null || sessionId.isBlank() || "null".equals(sessionId)) {
+        // Generar sessionId si no viene
+        if (sessionId == null || sessionId.isBlank()) {
             sessionId = UUID.randomUUID().toString();
         }
 
         try (Connection conn = DatabaseConnection.getConnection()) {
 
+            // 1. Cargar historial de esta sesión (últimos 10 mensajes)
             List<AIService.ChatMessage> historial = loadHistory(conn, userId, sessionId);
 
+            // 2. Cargar configuración del profesor
             String[] profesorConfig = loadProfesorConfig(conn, userId);
             String profesorNombre  = profesorConfig[0];
             String personalidad    = profesorConfig[1];
 
-            // ── RAG: construir búsqueda con contexto conversacional ──
-            // Usar los últimos mensajes + el actual para que la búsqueda
-            // entienda de qué se está hablando (no solo el último mensaje)
-            StringBuilder searchContext = new StringBuilder();
-            int start = Math.max(0, historial.size() - 6);
-            for (int i = start; i < historial.size(); i++) {
-                searchContext.append(historial.get(i).content).append(" ");
-            }
-            searchContext.append(mensaje);
-
-            String contexto = UserContextService.buildContext(userId, searchContext.toString());
-
+            // 3. Guardar mensaje del usuario en BD
             saveMessage(conn, userId, sessionId, "user", mensaje);
 
-            String respuesta = AIService.chat(historial, mensaje, profesorNombre, personalidad, contexto);
+            // 4. Llamar a la IA
+            String respuesta = AIService.chat(historial, mensaje, profesorNombre, personalidad);
 
+            // 5. Guardar respuesta del asistente en BD
             saveMessage(conn, userId, sessionId, "assistant", respuesta);
 
-            String json = "{" +
-                "\"reply\":" + toJsonString(respuesta) + "," +
-                "\"sessionId\":\"" + sessionId + "\"" +
-                "}";
-            JsonUtil.sendSuccess(response, json);
+            // 6. Responder al frontend (usando Gson para armar el JSON, evita
+            //    errores de escape que tenía la concatenación manual anterior)
+            JsonObject responseJson = new JsonObject();
+            responseJson.addProperty("reply", respuesta);
+            responseJson.addProperty("sessionId", sessionId);
+            JsonUtil.sendSuccess(response, responseJson.toString());
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -108,62 +108,62 @@ public class ChatServlet extends HttpServlet {
         }
     }
 
+    // GET /api/chat?sessionId=xxx → historial de una sesión
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
         setCorsHeaders(response);
 
-        UUID userId = getUserIdFromSession(request);
-        if (userId == null) {
-            String userIdStr = request.getParameter("userId");
-            if (userIdStr != null && !userIdStr.isBlank()) {
-                try {
-                    userId = UUID.fromString(userIdStr);
-                } catch (IllegalArgumentException e) {
-                    JsonUtil.sendError(response, 400, "ID de usuario inválido.");
-                    return;
-                }
-            }
+        HttpSession session = request.getSession(false);
+        if (session == null || session.getAttribute("userId") == null) {
+            JsonUtil.sendError(response, 401, "No autenticado.");
+            return;
         }
 
-        if (userId == null) {
-            JsonUtil.sendError(response, 401, "No autenticado.");
+        UUID userId;
+        try {
+            userId = UUID.fromString((String) session.getAttribute("userId"));
+        } catch (IllegalArgumentException e) {
+            JsonUtil.sendError(response, 400, "ID de usuario inválido.");
             return;
         }
 
         String sessionId = request.getParameter("sessionId");
 
+        // Antes solo se atrapaba SQLException — un sessionId mal formado
+        // (UUID.fromString) lanzaba IllegalArgumentException y se colaba
+        // sin control. Ahora se atrapa cualquier Exception.
         try (Connection conn = DatabaseConnection.getConnection()) {
 
             if (sessionId != null && !sessionId.isBlank()) {
+                // Historial de una sesión específica
                 List<AIService.ChatMessage> msgs = loadHistory(conn, userId, sessionId);
-                StringBuilder sb = new StringBuilder("[");
-                for (int i = 0; i < msgs.size(); i++) {
-                    AIService.ChatMessage m = msgs.get(i);
-                    sb.append("{\"role\":").append(toJsonString(m.role))
-                      .append(",\"content\":").append(toJsonString(m.content))
-                      .append("}");
-                    if (i < msgs.size() - 1) sb.append(",");
+                com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+                for (AIService.ChatMessage m : msgs) {
+                    JsonObject o = new JsonObject();
+                    o.addProperty("role", m.role);
+                    o.addProperty("content", m.content);
+                    arr.add(o);
                 }
-                sb.append("]");
-                JsonUtil.sendSuccess(response, sb.toString());
+                JsonUtil.sendSuccess(response, arr.toString());
             } else {
+                // Lista de sesiones del usuario
                 List<String[]> sessions = loadSessions(conn, userId);
-                StringBuilder sb = new StringBuilder("[");
-                for (int i = 0; i < sessions.size(); i++) {
-                    String[] s = sessions.get(i);
-                    sb.append("{\"sessionId\":").append(toJsonString(s[0]))
-                      .append(",\"firstMessage\":").append(toJsonString(s[1]))
-                      .append(",\"createdAt\":").append(toJsonString(s[2]))
-                      .append("}");
-                    if (i < sessions.size() - 1) sb.append(",");
+                com.google.gson.JsonArray arr = new com.google.gson.JsonArray();
+                for (String[] s : sessions) {
+                    JsonObject o = new JsonObject();
+                    o.addProperty("sessionId", s[0]);
+                    o.addProperty("firstMessage", s[1]);
+                    o.addProperty("createdAt", s[2]);
+                    arr.add(o);
                 }
-                sb.append("]");
-                JsonUtil.sendSuccess(response, sb.toString());
+                JsonUtil.sendSuccess(response, arr.toString());
             }
 
-        } catch (SQLException e) {
+        } catch (IllegalArgumentException e) {
+            JsonUtil.sendError(response, 400, "sessionId inválido.");
+        } catch (Exception e) {
             e.printStackTrace();
             JsonUtil.sendError(response, 500, "Error interno del servidor.");
         }
@@ -175,68 +175,10 @@ public class ChatServlet extends HttpServlet {
         res.setStatus(HttpServletResponse.SC_OK);
     }
 
-    @Override
-    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-
-        setCorsHeaders(response);
-
-        UUID userId = getUserIdFromSession(request);
-        if (userId == null) {
-            String userIdStr = request.getParameter("userId");
-            if (userIdStr != null && !userIdStr.isBlank()) {
-                try { userId = UUID.fromString(userIdStr); }
-                catch (IllegalArgumentException e) {
-                    JsonUtil.sendError(response, 400, "ID de usuario inválido.");
-                    return;
-                }
-            }
-        }
-
-        if (userId == null) {
-            JsonUtil.sendError(response, 401, "No autenticado.");
-            return;
-        }
-
-        String sessionId = request.getParameter("sessionId");
-        if (sessionId == null || sessionId.isBlank()) {
-            JsonUtil.sendError(response, 400, "Se requiere sessionId.");
-            return;
-        }
-
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            String sql = "DELETE FROM chat_history WHERE user_id = ? AND session_id = ?";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setObject(1, userId);
-                ps.setObject(2, UUID.fromString(sessionId));
-                int deleted = ps.executeUpdate();
-                String json = "{\"deleted\":" + deleted + "}";
-                JsonUtil.sendSuccess(response, json);
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            JsonUtil.sendError(response, 500, "Error al eliminar el chat.");
-        }
-    }
-
-    // ── Helper: obtener userId de la sesión HTTP ──────────────────────────────
-
-    private UUID getUserIdFromSession(HttpServletRequest request) {
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("userId") == null) {
-            return null;
-        }
-        try {
-            return UUID.fromString((String) session.getAttribute("userId"));
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
     // ── Helpers BD ────────────────────────────────────────────────────────────
 
     private List<AIService.ChatMessage> loadHistory(Connection conn, UUID userId, String sessionId)
-            throws SQLException {
+            throws Exception {
         String sql = """
                 SELECT role, message FROM chat_history
                 WHERE user_id = ? AND session_id = ?
@@ -256,7 +198,7 @@ public class ChatServlet extends HttpServlet {
     }
 
     private void saveMessage(Connection conn, UUID userId, String sessionId,
-                              String role, String message) throws SQLException {
+                              String role, String message) throws Exception {
         String sql = """
                 INSERT INTO chat_history (id, user_id, session_id, role, message, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -272,7 +214,7 @@ public class ChatServlet extends HttpServlet {
         }
     }
 
-    private String[] loadProfesorConfig(Connection conn, UUID userId) throws SQLException {
+    private String[] loadProfesorConfig(Connection conn, UUID userId) throws Exception {
         String sql = "SELECT professor_name, personality FROM professor_config WHERE user_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
@@ -281,10 +223,10 @@ public class ChatServlet extends HttpServlet {
                 return new String[]{ rs.getString("professor_name"), rs.getString("personality") };
             }
         }
-        return new String[]{ "Búho ProfesorIA", "amigable y motivador" };
+        return new String[]{ "Mi ProfesorIA", "amigable y motivador" };
     }
 
-    private List<String[]> loadSessions(Connection conn, UUID userId) throws SQLException {
+    private List<String[]> loadSessions(Connection conn, UUID userId) throws Exception {
         String sql = """
                 SELECT DISTINCT ON (session_id)
                     session_id::text,
@@ -309,58 +251,10 @@ public class ChatServlet extends HttpServlet {
         return list;
     }
 
-    // ── Parser JSON robusto ───────────────────────────────────────────────────
-
-    private String extractJsonValue(String json, String field) {
-        if (json == null) return null;
-
-        String pattern = "\"" + field + "\"";
-        int fieldIdx = json.indexOf(pattern);
-        if (fieldIdx == -1) return null;
-
-        int colonIdx = json.indexOf(':', fieldIdx + pattern.length());
-        if (colonIdx == -1) return null;
-
-        int pos = colonIdx + 1;
-        while (pos < json.length() && json.charAt(pos) == ' ') pos++;
-
-        if (pos >= json.length()) return null;
-
-        // Si el valor es null
-        if (json.startsWith("null", pos)) return null;
-
-        // Si el valor es un string entre comillas
-        if (json.charAt(pos) == '"') {
-            int startVal = pos + 1;
-            int endVal = startVal;
-            while (endVal < json.length()) {
-                if (json.charAt(endVal) == '\\') {
-                    endVal += 2;
-                    continue;
-                }
-                if (json.charAt(endVal) == '"') break;
-                endVal++;
-            }
-            if (endVal > startVal) {
-                return json.substring(startVal, endVal);
-            }
-        }
-
-        return null;
-    }
-
-    private String toJsonString(String s) {
-        if (s == null) return "null";
-        return "\"" + s.replace("\\", "\\\\")
-                       .replace("\"", "\\\"")
-                       .replace("\n", "\\n")
-                       .replace("\r", "\\r")
-                       .replace("\t", "\\t") + "\"";
-    }
-
+    // ── CORS ─────────────────────────────────────────────────────────────────
     private void setCorsHeaders(HttpServletResponse response) {
         response.setHeader("Access-Control-Allow-Origin", "http://127.0.0.1:5500");
-        response.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+        response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "Content-Type");
         response.setHeader("Access-Control-Allow-Credentials", "true");
     }

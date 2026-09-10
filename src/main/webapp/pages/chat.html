@@ -12,32 +12,35 @@
 </head>
 <body data-page="mi-profesor">
 
-  <!-- ══ NAVBAR + NAV-SIDEBAR desde components.js ══ -->
   <div id="navbar-container"></div>
   <div id="sidebar-container"></div>
 
   <main class="content">
-        <!-- Pantalla de carga Polaris -->
-        <div class="polaris-loading" id="chatLoading">
-            <canvas class="polaris-loading-stars"></canvas>
-            <div class="polaris-loading-content">
-                <div class="polaris-loading-orb">
-                    <div class="polaris-orb-ring r1"></div>
-                    <div class="polaris-orb-ring r2"></div>
-                    <div class="polaris-orb-ring r3"></div>
-                    <div class="polaris-orb-core">
-                        <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
-                    </div>
-                </div>
-                <div class="polaris-loading-title">Cargando</div>
-                <div class="polaris-loading-subtitle" id="chatLoadingSub">Obteniendo datos...</div>
-            </div>
+
+    <!-- Pantalla de carga Polaris -->
+    <div class="polaris-loading" id="chatLoading">
+      <canvas class="polaris-loading-stars"></canvas>
+      <div class="polaris-loading-content">
+        <div class="polaris-loading-orb">
+          <div class="polaris-orb-ring r1"></div>
+          <div class="polaris-orb-ring r2"></div>
+          <div class="polaris-orb-ring r3"></div>
+          <div class="polaris-orb-core">
+            <img class="polaris-orb-star" src="../images/flashcards/cursor-star-cyan.png" alt="">
+          </div>
         </div>
+        <div class="polaris-loading-title">Cargando</div>
+        <div class="polaris-loading-subtitle" id="chatLoadingSub">Conectando...</div>
+      </div>
+    </div>
 
-    <!-- ══ CHAT SIDEBAR (búho + historial) ══ -->
+    <!-- ══ CHAT SIDEBAR ══ -->
     <aside class="chat-sidebar">
-
-      <!-- Logo + nuevo chat -->
+      <button class="chat-sidebar-close" onclick="toggleChatSidebar()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
       <div class="chat-logo-area">
         <div class="chat-logo-row">
           <div>
@@ -52,61 +55,19 @@
           </svg>
           Nuevo chat
         </button>
-      </div>
-
-      <!-- Búho con órbitas -->
-      <div class="owl-area">
-        <div class="owl-stage">
-          <svg class="ring1" width="116" height="116" viewBox="0 0 126 126" style="position:absolute;top:-8px;left:-8px;">
-            <circle cx="63" cy="4"    r="3.5" fill="#8b5cf6"/>
-            <circle cx="122" cy="63"  r="2.5" fill="#2dd4bf"/>
-            <circle cx="63"  cy="122" r="3"   fill="#ec4899"/>
+        <button class="wrapped-trigger-btn" onclick="openWrapped()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
           </svg>
-          <svg class="ring2" width="132" height="132" viewBox="0 0 142 142" style="position:absolute;top:-16px;left:-16px;">
-            <circle cx="71"  cy="3"   r="2"   fill="#2dd4bf"/>
-            <circle cx="139" cy="71"  r="1.8" fill="#f97316"/>
-            <circle cx="71"  cy="139" r="2.5" fill="#8b5cf6"/>
-            <circle cx="3"   cy="71"  r="1.8" fill="#ec4899"/>
-          </svg>
-          <svg class="owl-svg" id="owlSvg" width="100" height="100" viewBox="0 0 100 100" fill="none">
-            <polygon points="50,5 33,36 67,36" fill="#8b5cf6"/>
-            <ellipse cx="50" cy="36" rx="17" ry="5" fill="#6d28d9"/>
-            <text x="44" y="28" font-size="11" fill="#f97316">★</text>
-            <circle cx="42" cy="18" r="1.5" fill="#2dd4bf" opacity="0.8"/>
-            <circle cx="58" cy="22" r="1"   fill="#ec4899" opacity="0.8"/>
-            <ellipse cx="50" cy="67" rx="24" ry="27" fill="#6d28d9"/>
-            <ellipse cx="50" cy="70" rx="14" ry="18" fill="#8b5cf6" opacity="0.55"/>
-            <ellipse cx="26" cy="68" rx="10" ry="16" fill="#5b21b6" transform="rotate(-12,26,68)"/>
-            <ellipse cx="74" cy="68" rx="10" ry="16" fill="#5b21b6" transform="rotate(12,74,68)"/>
-            <circle cx="36" cy="55" r="11" fill="#1a1a35"/>
-            <circle cx="64" cy="55" r="11" fill="#1a1a35"/>
-            <circle cx="36" cy="55" r="8"  fill="#2dd4bf" opacity="0.92"/>
-            <circle cx="64" cy="55" r="8"  fill="#2dd4bf" opacity="0.92"/>
-            <g class="el"><circle cx="36" cy="55" r="5" fill="#0f0f23"/><circle cx="38" cy="53" r="1.5" fill="white"/></g>
-            <g class="er"><circle cx="64" cy="55" r="5" fill="#0f0f23"/><circle cx="66" cy="53" r="1.5" fill="white"/></g>
-            <circle cx="36" cy="55" r="8" fill="none" stroke="#2dd4bf" stroke-width="1" opacity="0.3"/>
-            <circle cx="64" cy="55" r="8" fill="none" stroke="#2dd4bf" stroke-width="1" opacity="0.3"/>
-            <polygon points="50,62 44,68 56,68" fill="#f97316"/>
-            <g class="mg"><path d="M 38 74 Q 50 80 62 74" stroke="#2dd4bf" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>
-            <line x1="38" y1="92" x2="30" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="38" y1="92" x2="38" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="38" y1="92" x2="46" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="62" y1="92" x2="54" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="62" y1="92" x2="62" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
-            <line x1="62" y1="92" x2="70" y2="98" stroke="#f97316" stroke-width="2.5" stroke-linecap="round"/>
-          </svg>
-        </div>
-        <div class="owl-name">Búho ProfesorIA</div>
-        <div class="owl-sub">Mago del Conocimiento</div>
+          Tu resumen semanal
+        </button>
       </div>
 
       <!-- Chats recientes -->
       <div class="recents">
         <div class="section-label">Chats recientes</div>
-        <!-- Los items se cargan dinámicamente desde chat.js -->
       </div>
 
-      <!-- Perfil del chat sidebar -->
       <div class="chat-profile-area">
         <div class="chat-profile-card">
           <div class="chat-avatar" id="chatAvatar">?</div>
@@ -119,14 +80,13 @@
     </aside>
 
     <!-- ══ CHAT PRINCIPAL ══ -->
-    <div class="chat-main">
+    <div class="chat-main" id="chatMain">
 
-      <!-- Botón para abrir chats recientes en mobile -->
       <button class="chat-mobile-toggle" onclick="toggleChatSidebar()">
-        <i class="fas fa-clock-rotate-left"></i>
+        <i class="fas fa-bars"></i>
       </button>
 
-      <!-- Canvas para efectos animados de fondo -->
+      <!-- Canvas fondos equipados -->
       <canvas id="galaxyCanvas"  class="chat-canvas"></canvas>
       <canvas id="forestCanvas"  class="chat-canvas"></canvas>
       <canvas id="volcanoCanvas" class="chat-canvas"></canvas>
@@ -135,25 +95,28 @@
       <canvas id="rainCanvas"    class="chat-canvas"></canvas>
       <canvas id="auroraCanvas"  class="chat-canvas"></canvas>
 
-      <div class="msgs" id="msgsArea">
+      <!-- Nebulosas reactivas al tema -->
+      <div class="nebula-layer" id="nebulaLayer">
+        <div class="nebula neb1"></div>
+        <div class="nebula neb2"></div>
+        <div class="nebula neb3"></div>
+      </div>
 
+      <!-- Confetti wrap -->
+      <div class="confetti-wrap" id="confettiWrap"></div>
+
+      <!-- Área de mensajes -->
+      <div class="msgs" id="msgsArea">
         <!-- Mensaje de bienvenida -->
         <div class="msg bot" id="welcomeMsg">
           <div class="msg-av bot-av">
-            <svg width="20" height="20" viewBox="0 0 100 100" fill="none">
-              <polygon points="50,5 33,36 67,36" fill="#8b5cf6"/>
-              <ellipse cx="50" cy="36" rx="17" ry="5" fill="#6d28d9"/>
-              <ellipse cx="50" cy="67" rx="24" ry="27" fill="#6d28d9"/>
-              <ellipse cx="50" cy="70" rx="14" ry="18" fill="#8b5cf6" opacity="0.6"/>
-              <circle cx="36" cy="55" r="9" fill="#1a1a35"/><circle cx="64" cy="55" r="9" fill="#1a1a35"/>
-              <circle cx="36" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/><circle cx="64" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/>
-              <circle cx="36" cy="55" r="4" fill="#0f0f23"/><circle cx="64" cy="55" r="4" fill="#0f0f23"/>
-              <polygon points="50,62 44,68 56,68" fill="#f97316"/>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
             </svg>
           </div>
           <div class="msg-body">
-            <div class="msg-who">Búho ProfesorIA</div>
-            <div class="bubble">¡Hola! Soy tu <strong>Búho ProfesorIA</strong>, tu guía del conocimiento. ¿En qué te puedo ayudar hoy?</div>
+            <div class="msg-who">Mi ProfesorIA</div>
+            <div class="bubble bot-bubble">¡Hola! Soy tu asistente educativo con IA. ¿En qué te ayudo hoy?</div>
             <div class="msg-time" id="initTime"></div>
           </div>
         </div>
@@ -161,23 +124,18 @@
         <!-- Typing indicator -->
         <div class="typing" id="typingRow">
           <div class="msg-av bot-av">
-            <svg width="20" height="20" viewBox="0 0 100 100" fill="none">
-              <polygon points="50,5 33,36 67,36" fill="#8b5cf6"/>
-              <ellipse cx="50" cy="36" rx="17" ry="5" fill="#6d28d9"/>
-              <ellipse cx="50" cy="67" rx="24" ry="27" fill="#6d28d9"/>
-              <ellipse cx="50" cy="70" rx="14" ry="18" fill="#8b5cf6" opacity="0.6"/>
-              <circle cx="36" cy="55" r="9" fill="#1a1a35"/><circle cx="64" cy="55" r="9" fill="#1a1a35"/>
-              <circle cx="36" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/><circle cx="64" cy="55" r="6.5" fill="#2dd4bf" opacity="0.9"/>
-              <circle cx="36" cy="55" r="4" fill="#0f0f23"/><circle cx="64" cy="55" r="4" fill="#0f0f23"/>
-              <polygon points="50,62 44,68 56,68" fill="#f97316"/>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
             </svg>
           </div>
           <div class="typing-dots">
             <div class="dot"></div><div class="dot"></div><div class="dot"></div>
           </div>
         </div>
-
       </div>
+
+      <!-- Sugerencias de preguntas -->
+      <div class="suggestions-bar" id="suggestionsBar"></div>
 
       <!-- Input -->
       <div class="input-area">
@@ -191,12 +149,68 @@
         </div>
         <div class="input-hint">Enter para enviar · Shift+Enter nueva línea</div>
       </div>
+    </div>
 
-    </div><!-- /chat-main -->
-
-    <!-- Overlay para cerrar sidebar en mobile -->
     <div class="chat-sidebar-overlay" id="chatSidebarOverlay" onclick="toggleChatSidebar()"></div>
   </main>
+
+  <!-- Modal: Resumen semanal (Wrapped) -->
+  <div class="modal wrapped-modal" id="wrappedModal">
+    <button class="wrapped-close" onclick="closeWrapped()">&times;</button>
+    <div class="wrapped-phone" id="wrappedPhone">
+      <div class="wrapped-slide ws1 show" id="ws1">
+        <div class="wrapped-eyebrow">Tu semana en Mi ProfesorIA</div>
+        <div class="wrapped-emoji">&#10022;</div>
+        <div class="wrapped-line">Esta semana</div>
+        <div class="wrapped-sub">Vamos a repasar como te fue estudiando.</div>
+      </div>
+      <div class="wrapped-slide ws2" id="ws2">
+        <div class="wrapped-eyebrow">Tiempo de estudio</div>
+        <div class="wrapped-num" id="wStudyTime">--</div>
+        <div class="wrapped-line">de estudio esta semana</div>
+        <div class="wrapped-sub" id="wStudyCompare"></div>
+      </div>
+      <div class="wrapped-slide ws3" id="ws3">
+        <div class="wrapped-eyebrow">Tus materias</div>
+        <div class="wrapped-line">Tu tema mas fuerte</div>
+        <div class="wrapped-num wrapped-num-sm" id="wTopSubject">--</div>
+        <div class="wrapped-tag-row"><span class="wrapped-tag wrapped-tag-cyan" id="wTopPct"></span></div>
+        <div class="wrapped-stat-card">
+          <div class="wrapped-stat-row"><span>Para reforzar</span><span class="wrapped-stat-val" id="wWeakSubject">--</span></div>
+          <div class="wrapped-stat-row"><span>Preguntas respondidas</span><span class="wrapped-stat-val" id="wQuestionsCount">--</span></div>
+        </div>
+      </div>
+      <div class="wrapped-slide wsfreq" id="wsfreq">
+        <div class="wrapped-eyebrow">Tu pregunta mas frecuente</div>
+        <div class="wrapped-emoji">&#128172;</div>
+        <div class="wrapped-line" id="wFreqTopic">--</div>
+        <div class="wrapped-sub" id="wFreqDetail"></div>
+      </div>
+      <div class="wrapped-slide ws4" id="ws4">
+        <div class="wrapped-eyebrow">Gamificacion</div>
+        <div class="wrapped-emoji">&#128293;</div>
+        <div class="wrapped-num" id="wStreak">--</div>
+        <div class="wrapped-line">de racha seguida</div>
+        <div class="wrapped-tag-row">
+          <span class="wrapped-tag wrapped-tag-purple" id="wXp"></span>
+          <span class="wrapped-tag wrapped-tag-orange" id="wCoins"></span>
+        </div>
+      </div>
+      <div class="wrapped-slide ws5" id="ws5">
+        <div class="wrapped-eyebrow">Para la proxima semana</div>
+        <div class="wrapped-line" id="wSuggestionTitle">Sugerencia de tu asistente</div>
+        <div class="wrapped-sub" id="wSuggestionText"></div>
+        <button class="wrapped-share-btn" onclick="shareWrappedCard(event)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          Compartir mi resumen
+        </button>
+        <div class="wrapped-share-status" id="wrappedShareStatus"></div>
+      </div>
+      <div class="wrapped-tapzone left" onclick="prevWrappedSlide()"></div>
+      <div class="wrapped-tapzone right" onclick="nextWrappedSlide()"></div>
+      <div class="wrapped-nav" id="wrappedNav"></div>
+    </div>
+  </div>
 
   <!-- Modal: Confirmar eliminar chat -->
   <div class="modal" id="deleteConfirmModal">
@@ -212,25 +226,23 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/chat.js"></script>
   <script src="../js/backgrounds-fx.js"></script>
   <script>
-    // Toggle chat sidebar en mobile
     function toggleChatSidebar() {
-        document.querySelector('.chat-sidebar').classList.toggle('mobile-open');
-        document.getElementById('chatSidebarOverlay').classList.toggle('active');
+      document.querySelector('.chat-sidebar').classList.toggle('mobile-open');
+      document.getElementById('chatSidebarOverlay').classList.toggle('active');
     }
-  </script>
-    <script>
     document.addEventListener('DOMContentLoaded', function() {
-        if (typeof PolarisLoading !== 'undefined')
-            PolarisLoading.initStars(document.querySelector('#chatLoading .polaris-loading-stars'));
+      if (typeof PolarisLoading !== 'undefined')
+        PolarisLoading.initStars(document.querySelector('#chatLoading .polaris-loading-stars'));
     });
     setTimeout(function() {
-        var el = document.getElementById('chatLoading');
-        if (el) { el.style.opacity='0'; el.style.pointerEvents='none'; setTimeout(function(){el.remove()},500); }
+      var el = document.getElementById('chatLoading');
+      if (el) { el.style.opacity='0'; el.style.pointerEvents='none'; setTimeout(function(){el.remove()},500); }
     }, 8000);
-    </script>
+  </script>
 </body>
 </html>

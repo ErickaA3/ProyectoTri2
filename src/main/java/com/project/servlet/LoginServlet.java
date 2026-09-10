@@ -5,6 +5,8 @@ import java.sql.SQLException;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.project.dao.implementation.UserDAOImpl;
 import com.project.dao.interfaces.IUserDAO;
 import com.project.model.users.Statistics;
@@ -35,8 +37,20 @@ public class LoginServlet extends HttpServlet {
 
         setCorsHeaders(response);
         String body = request.getReader().lines().collect(Collectors.joining());
-        String email    = extractJsonField(body, "email");
-        String password = extractJsonField(body, "password");
+
+        // Antes: extractJsonField() a mano, se rompía si el email/contraseña
+        // traía comillas o caracteres especiales. Ahora se usa Gson, igual
+        // que el resto del proyecto.
+        String email;
+        String password;
+        try {
+            JsonObject json = JsonParser.parseString(body).getAsJsonObject();
+            email    = json.has("email")    && !json.get("email").isJsonNull()    ? json.get("email").getAsString()    : null;
+            password = json.has("password") && !json.get("password").isJsonNull() ? json.get("password").getAsString() : null;
+        } catch (Exception e) {
+            JsonUtil.sendError(response, 400, "Body inválido, se esperaba JSON.");
+            return;
+        }
 
         if (email == null || email.isBlank() || password == null || password.isBlank()) {
             JsonUtil.sendError(response, 400, "Email y contraseña son obligatorios.");
@@ -84,18 +98,5 @@ public class LoginServlet extends HttpServlet {
         response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "Content-Type");
         response.setHeader("Access-Control-Allow-Credentials", "true");
-    }
-
-    private String extractJsonField(String json, String field) {
-        if (json == null) return null;
-        String key = "\"" + field + "\"";
-        int idx = json.indexOf(key);
-        if (idx == -1) return null;
-        int colon = json.indexOf(":", idx);
-        if (colon == -1) return null;
-        int start = json.indexOf("\"", colon) + 1;
-        int end   = json.indexOf("\"", start);
-        if (start <= 0 || end <= start) return null;
-        return json.substring(start, end);
     }
 }
