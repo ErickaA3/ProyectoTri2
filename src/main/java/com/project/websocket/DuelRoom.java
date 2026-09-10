@@ -26,6 +26,10 @@ public class DuelRoom {
     private final ConcurrentHashMap<String, Integer> currentQuestion = new ConcurrentHashMap<>();
     private volatile int totalQuestions = 0;
 
+    // Tiempo por pregunta cacheado en memoria — evita consultar la BD
+    // en cada respuesta/timeout, lo cual saturaba el pool de conexiones.
+    private volatile int timePerQuestion = 30;
+
     private final ConcurrentHashMap<String, Integer> scores = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> times  = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> finished = new ConcurrentHashMap<>();
@@ -166,6 +170,9 @@ public class DuelRoom {
     public int    getTime(String uid)            { return times.getOrDefault(uid, 0);  }
     public int    getCurrentQuestion(String uid) { return currentQuestion.getOrDefault(uid, 0); }
     public Session getSession(String uid)        { return sessions.get(uid); }
+
+    public void setTimePerQuestion(int t) { this.timePerQuestion = t; }
+    public int  getTimePerQuestion()      { return timePerQuestion; }
 
     public String getRival(String userId) {
         if (userId.equals(challengerId)) return opponentId;

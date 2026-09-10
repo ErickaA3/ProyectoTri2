@@ -7,6 +7,9 @@
  *   - Ambos jugadores usan "Jugar Ahora" desde Retos Activos
  *   - Badge de notificaciones eliminado (innecesario)
  *   - Status del duelo: waiting_opponent → in_progress → finished
+ *
+ * Cambios v4:
+ *   - Badge de "Retos Activos" ahora cuenta solo los NO vistos (localStorage)
  */
 
 const CTX = window.location.pathname.split('/pages')[0];
@@ -107,7 +110,10 @@ async function loadActiveDuels() {
         if (data.success) {
             activeDuels = data.duels || [];
             renderChallenges();
-            updateBadge('badgeRetos', activeDuels.filter(d => !d.hasPlayed).length);
+
+            const seen = getSeenDuelIds();
+            const unseenCount = activeDuels.filter(d => !d.hasPlayed && !seen.includes(d.id)).length;
+            updateBadge('badgeRetos', unseenCount);
         }
     } catch (e) { console.error('[Duelos] loadActive:', e); }
 }
@@ -451,6 +457,12 @@ function switchTab(tab, el) {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
     document.getElementById(`tab-${tab}`).classList.add('active');
     if (tab === 'leaderboard') loadLeaderboard();
+
+    if (tab === 'retos') {
+        const ids = activeDuels.filter(d => !d.hasPlayed).map(d => d.id);
+        markDuelsSeen(ids);
+        updateBadge('badgeRetos', 0);
+    }
 }
 
 function searchFriends() { renderFriends(); }
@@ -465,6 +477,27 @@ function updateBadge(id, count) {
     if (!el) return;
     if (count > 0) { el.textContent = count; el.style.display = 'inline-flex'; }
     else { el.style.display = 'none'; }
+}
+
+// ── Tracking de retos "vistos" para el badge ──────────────────────
+// Guarda en localStorage qué duelos ya vio el usuario, para que el
+// badge de "Retos Activos" solo muestre los NUEVOS desde la última
+// visita a esa pestaña, no todos los pendientes de siempre.
+function seenDuelsKey() {
+    const uid = getUserId();
+    return 'seenDuelIds_' + (uid || 'anon');
+}
+
+function getSeenDuelIds() {
+    try { return JSON.parse(localStorage.getItem(seenDuelsKey())) || []; }
+    catch (_) { return []; }
+}
+
+function markDuelsSeen(ids) {
+    const current = new Set(getSeenDuelIds());
+    ids.forEach(id => current.add(id));
+    try { localStorage.setItem(seenDuelsKey(), JSON.stringify([...current])); }
+    catch (_) { /* localStorage no disponible, se omite silenciosamente */ }
 }
 
 // ── Modals ──

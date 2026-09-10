@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="../css/examen-experto.css">
     <link rel="stylesheet" href="../css/responsive.css">
     <style>
-        /* ── Rival Panel ── */
         #rivalPanel {
             position: fixed;
             top: calc(var(--navbar-height, 65px) + 12px);
@@ -46,8 +45,7 @@
             font-weight: 400;
         }
 
-        /* ── Waiting Overlay ── */
-        #waitingOverlay {
+        #waitingOverlay, #fatalOverlay {
             position: fixed;
             inset: 0;
             background: rgba(5,6,15,0.97);
@@ -59,7 +57,10 @@
             z-index: 999;
             font-family: inherit;
             color: #e2e8f0;
+            text-align: center;
+            padding: 0 1.5rem;
         }
+        #fatalOverlay { display: none; z-index: 1000; }
         #waitingOverlay .spinner {
             width: 48px;
             height: 48px;
@@ -77,7 +78,6 @@
         }
         @keyframes ws-spin { to { transform: rotate(360deg); } }
 
-        /* ── Responsive rival panel + waiting ── */
         @media (max-width: 768px) {
             #rivalPanel {
                 top: calc(var(--navbar-height, 65px) + 8px);
@@ -170,10 +170,18 @@
         <div class="modal-actions"><button class="modal-btn cancel" onclick="closeExitModal()">Continuar</button><button class="modal-btn confirm-red" onclick="window.location.href='duelos.html'">Salir</button></div>
     </div></div>
 
-    <!-- Overlay de espera — independiente del exam-wrapper -->
+    <!-- Overlay de espera -->
     <div id="waitingOverlay">
         <div class="spinner"></div>
         <div id="waitingMsg">Conectando...</div>
+    </div>
+
+    <!-- Overlay de error fatal — NO destruye el DOM del juego, solo lo cubre -->
+    <div id="fatalOverlay">
+        <i class="fas fa-exclamation-triangle" style="font-size:3rem;color:#fbbf24;"></i>
+        <h2 style="margin:0;" id="fatalMsg"></h2>
+        <a href="duelos.html" style="padding:12px 28px;background:#2dd4bf;color:#0f0f23;
+            border-radius:12px;text-decoration:none;font-weight:600;">Ir a Duelos</a>
     </div>
 
     <script src="../js/components.js"></script>
@@ -201,21 +209,30 @@
     let startTime     = Date.now();
     let players       = {};
 
+    // ── Helper seguro: nunca crashea si el elemento no existe ──
+    function setText(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+        else console.warn('[duelo-play] Elemento no encontrado:', id);
+    }
+    function setHtml(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = value;
+        else console.warn('[duelo-play] Elemento no encontrado:', id);
+    }
+    function setStyle(id, prop, value) {
+        const el = document.getElementById(id);
+        if (el) el.style[prop] = value;
+    }
+
+    // showFatal ya NO destruye el DOM del juego — solo muestra un overlay encima.
+    // Así, si llega un mensaje tardío del servidor (QUESTION, TIMEOUT, etc.)
+    // después de un error, los elementos siguen existiendo y no crashea.
     function showFatal(msg) {
         hideWaiting();
-        const wrapper = document.getElementById('examWrapper');
-        if (wrapper) {
-            wrapper.style.opacity       = '1';
-            wrapper.style.pointerEvents = 'auto';
-            wrapper.innerHTML = `
-                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
-                    min-height:60vh;gap:1.5rem;text-align:center;padding:2rem;">
-                    <i class="fas fa-exclamation-triangle" style="font-size:3rem;color:#fbbf24;"></i>
-                    <h2 style="margin:0;">${msg}</h2>
-                    <a href="duelos.html" style="padding:12px 28px;background:#2dd4bf;color:#0f0f23;
-                        border-radius:12px;text-decoration:none;font-weight:600;">Ir a Duelos</a>
-                </div>`;
-        }
+        setText('fatalMsg', msg);
+        const overlay = document.getElementById('fatalOverlay');
+        if (overlay) overlay.style.display = 'flex';
     }
 
     if (!duelId || !userId) {
@@ -247,7 +264,7 @@
         };
         ws.onmessage = (e) => {
             const msg = JSON.parse(e.data);
-            console.log('[WS] ←', msg);
+            console.log('[WS] ←', msg.type, msg);
             handleMessage(msg);
         };
         ws.onclose = (e) => {
@@ -277,7 +294,7 @@
             case 'OPPONENT_LEFT':  showWaiting(`Tu oponente se desconectó. Esperando (${msg.graceSecs}s)...`); break;
             case 'STATE_SYNC':     onStateSync(msg); break;
             case 'INFO':           console.info('[WS]', msg.message); break;
-            case 'ERROR':          showFatal(msg.message); break;
+            case 'ERROR':          console.error('[WS] ERROR del servidor:', msg.message); showFatal(msg.message); break;
         }
     }
 
@@ -287,10 +304,10 @@
         players  = {};
         msg.players.forEach(p => { players[p.userId] = p; });
 
-        document.getElementById('qTotal').textContent    = totalQ;
-        document.getElementById('duelTitle').textContent = 'Duelo en vivo';
-        document.getElementById('qDots').innerHTML = Array.from({length: totalQ}, (_, i) =>
-            `<div class="q-dot ${i === 0 ? 'current' : ''}" id="dot-${i}"></div>`).join('');
+        setText('qTotal', totalQ);
+        setText('duelTitle', 'Duelo en vivo');
+        setHtml('qDots', Array.from({length: totalQ}, (_, i) =>
+            `<div class="q-dot ${i === 0 ? 'current' : ''}" id="dot-${i}"></div>`).join(''));
 
         const rival = Object.values(players).find(p => p.userId !== myUserId);
         if (rival) updateRivalPanel(rival.username, 0);
@@ -305,25 +322,27 @@
         selectedIdx   = null;
         questionStart = Date.now();
 
-        document.getElementById('qNumber').textContent  = `Pregunta ${currentQ + 1}`;
-        document.getElementById('qCurrent').textContent = currentQ + 1;
-        document.getElementById('qText').textContent    = msg.text || msg.question || '';
-        document.getElementById('progressFill').style.width = `${((currentQ + 1) / totalQ) * 100}%`;
+        setText('qNumber', `Pregunta ${currentQ + 1}`);
+        setText('qCurrent', currentQ + 1);
+        setText('qText', msg.text || msg.question || '');
+        setStyle('progressFill', 'width', `${((currentQ + 1) / totalQ) * 100}%`);
 
         const opts = msg.options || [];
-        document.getElementById('optionsList').innerHTML = opts.map((opt, i) =>
+        setHtml('optionsList', opts.map((opt, i) =>
             `<button class="option-btn" onclick="selectOption(${i}, this)">
                 <span class="option-letter">${String.fromCharCode(65 + i)}</span>
                 <span class="option-text">${opt}</span>
-            </button>`).join('');
+            </button>`).join(''));
 
         document.querySelectorAll('.q-dot').forEach((d, i) => d.classList.toggle('current', i === currentQ));
 
         const btn = document.getElementById('btnNext');
-        btn.disabled = true;
-        btn.innerHTML = currentQ < totalQ - 1
-            ? 'Siguiente <i class="fas fa-arrow-right"></i>'
-            : '<i class="fas fa-flag-checkered"></i> Finalizar';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = currentQ < totalQ - 1
+                ? 'Siguiente <i class="fas fa-arrow-right"></i>'
+                : '<i class="fas fa-flag-checkered"></i> Finalizar';
+        }
 
         startCountdown();
     }
@@ -339,14 +358,12 @@
             if (i === correctIdx) {
                 btn.style.borderColor   = 'var(--accent-green)';
                 btn.style.background    = 'rgba(34,197,94,0.15)';
-                letter.style.background = 'var(--accent-green)';
-                letter.style.color      = '#0f0f23';
+                if (letter) { letter.style.background = 'var(--accent-green)'; letter.style.color = '#0f0f23'; }
             }
             if (i === yourAnswerIdx && !correct) {
                 btn.style.borderColor   = 'var(--accent-red)';
                 btn.style.background    = 'rgba(239,68,68,0.15)';
-                letter.style.background = 'var(--accent-red)';
-                letter.style.color      = '#fff';
+                if (letter) { letter.style.background = 'var(--accent-red)'; letter.style.color = '#fff'; }
             }
         });
 
@@ -371,7 +388,7 @@
     function onGameOver(msg) {
         clearInterval(countdownInterval);
         hideWaiting();
-        ws.close(1000);
+        if (ws) ws.close(1000);
         showResults(msg, Math.floor((Date.now() - startTime) / 1000));
     }
 
@@ -397,19 +414,21 @@
         secondsLeft = timePerQ;
         updateTimerDisplay();
         const timerBox = document.getElementById('timerBox');
-        timerBox.classList.remove('warning', 'danger');
+        if (timerBox) timerBox.classList.remove('warning', 'danger');
         clearInterval(countdownInterval);
         countdownInterval = setInterval(() => {
             secondsLeft--;
             updateTimerDisplay();
-            if (secondsLeft <= 5)       { timerBox.classList.add('danger'); timerBox.classList.remove('warning'); }
-            else if (secondsLeft <= 10) { timerBox.classList.add('warning'); }
+            if (timerBox) {
+                if (secondsLeft <= 5)       { timerBox.classList.add('danger'); timerBox.classList.remove('warning'); }
+                else if (secondsLeft <= 10) { timerBox.classList.add('warning'); }
+            }
             if (secondsLeft <= 0) { clearInterval(countdownInterval); autoSubmitTimeout(); }
         }, 1000);
     }
 
     function updateTimerDisplay() {
-        document.getElementById('timerDisplay').textContent = Math.max(0, secondsLeft);
+        setText('timerDisplay', Math.max(0, secondsLeft));
     }
 
     function autoSubmitTimeout() {
@@ -433,8 +452,11 @@
             }
         });
 
-        document.getElementById(`dot-${currentQ}`).classList.add('answered');
-        document.getElementById('btnNext').disabled = false;
+        const dot = document.getElementById(`dot-${currentQ}`);
+        if (dot) dot.classList.add('answered');
+        const btn = document.getElementById('btnNext');
+        if (btn) btn.disabled = false;
+
         send({ type: 'ANSWER', questionIndex: currentQ, answerIdx: idx, timeSecs });
     }
 
@@ -448,7 +470,6 @@
         if (examScreen)    examScreen.classList.add('hidden');
         if (resultsScreen) resultsScreen.classList.add('active');
 
-        // Ocultar rival panel en resultados
         const panel = document.getElementById('rivalPanel');
         if (panel) panel.style.display = 'none';
 
@@ -465,30 +486,35 @@
         const title = document.getElementById('resultsTitle');
         const sub   = document.getElementById('resultsSubtitle');
 
-        if (isAbandoned)  { title.textContent = '🏆 ¡Victoria!'; title.style.color = 'var(--accent-yellow)'; sub.textContent = 'Tu oponente abandonó.'; }
-        else if (isDraw)  { title.textContent = '🤝 Empate';     title.style.color = 'var(--accent-cyan)';   sub.textContent = `Ambos: ${myScore}/${total}`; }
-        else if (isWin)   { title.textContent = '🏆 ¡Victoria!'; title.style.color = 'var(--accent-yellow)'; sub.textContent = `Rival: ${rivalScore}/${total}`; }
-        else              { title.textContent = '😞 Derrota';    title.style.color = 'var(--accent-red)';    sub.textContent = `Rival: ${rivalScore}/${total}`; }
+        if (title && sub) {
+            if (isAbandoned)  { title.textContent = '🏆 ¡Victoria!'; title.style.color = 'var(--accent-yellow)'; sub.textContent = 'Tu oponente abandonó.'; }
+            else if (isDraw)  { title.textContent = '🤝 Empate';     title.style.color = 'var(--accent-cyan)';   sub.textContent = `Ambos: ${myScore}/${total}`; }
+            else if (isWin)   { title.textContent = '🏆 ¡Victoria!'; title.style.color = 'var(--accent-yellow)'; sub.textContent = `Rival: ${rivalScore}/${total}`; }
+            else              { title.textContent = '😞 Derrota';    title.style.color = 'var(--accent-red)';    sub.textContent = `Rival: ${rivalScore}/${total}`; }
+        }
 
         const pct    = (myScore / total) * 100;
         const circ   = 2 * Math.PI * 75;
         const offset = circ - (circ * pct / 100);
         const circle = document.getElementById('gradeCircle');
-        circle.style.stroke = pct >= 80 ? 'var(--accent-green)' : pct >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)';
-        setTimeout(() => { circle.style.strokeDashoffset = offset; }, 200);
-        document.getElementById('gradeNumber').textContent = myScore;
-        document.getElementById('gradeLabel').textContent  = `/ ${total}`;
+        if (circle) {
+            circle.style.stroke = pct >= 80 ? 'var(--accent-green)' : pct >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+            setTimeout(() => { circle.style.strokeDashoffset = offset; }, 200);
+        }
+        setText('gradeNumber', myScore);
+        setText('gradeLabel', `/ ${total}`);
 
         const m = Math.floor(totalTime / 60), s = totalTime % 60;
-        document.getElementById('resultsStats').innerHTML = `
+        setHtml('resultsStats', `
             <div class="stat-card"><div class="stat-card-icon" style="background:rgba(34,197,94,0.2);color:var(--accent-green)"><i class="fas fa-check"></i></div><div class="stat-card-value">${myScore}</div><div class="stat-card-label">Correctas</div></div>
             <div class="stat-card"><div class="stat-card-icon" style="background:rgba(239,68,68,0.2);color:var(--accent-red)"><i class="fas fa-times"></i></div><div class="stat-card-value">${total - myScore}</div><div class="stat-card-label">Incorrectas</div></div>
             <div class="stat-card"><div class="stat-card-icon" style="background:rgba(45,212,191,0.2);color:var(--accent-cyan)"><i class="fas fa-clock"></i></div><div class="stat-card-value">${m}:${String(s).padStart(2,'0')}</div><div class="stat-card-label">Tiempo</div></div>
-            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(251,191,36,0.2);color:var(--accent-yellow)"><i class="fas fa-trophy"></i></div><div class="stat-card-value">${rivalScore}</div><div class="stat-card-label">Rival</div></div>`;
+            <div class="stat-card"><div class="stat-card-icon" style="background:rgba(251,191,36,0.2);color:var(--accent-yellow)"><i class="fas fa-trophy"></i></div><div class="stat-card-value">${rivalScore}</div><div class="stat-card-label">Rival</div></div>`);
 
         if (msg.xpEarned > 0 || msg.coinsEarned > 0) {
-            document.getElementById('xpEarned').style.display = 'flex';
-            document.getElementById('xpAmount').textContent   = `+${msg.xpEarned} XP · +${msg.coinsEarned} monedas`;
+            const xpEl = document.getElementById('xpEarned');
+            if (xpEl) xpEl.style.display = 'flex';
+            setText('xpAmount', `+${msg.xpEarned} XP · +${msg.coinsEarned} monedas`);
         }
 
         try {
@@ -499,8 +525,8 @@
         } catch(_) {}
     }
 
-    function confirmExit()    { document.getElementById('exitModal').classList.add('show'); }
-    function closeExitModal() { document.getElementById('exitModal').classList.remove('show'); }
+    function confirmExit()    { const m = document.getElementById('exitModal'); if (m) m.classList.add('show'); }
+    function closeExitModal() { const m = document.getElementById('exitModal'); if (m) m.classList.remove('show'); }
     document.querySelectorAll('.modal-overlay').forEach(m =>
         m.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('show'); })
     );
