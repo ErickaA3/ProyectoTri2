@@ -33,7 +33,6 @@ public class RegisterServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
-        setCorsHeaders(response);
         String body     = request.getReader().lines().collect(Collectors.joining());
         String username = extractJsonField(body, "username");
         String email    = extractJsonField(body, "email");
@@ -79,19 +78,7 @@ public class RegisterServlet extends HttpServlet {
         }
     }
 
-    @Override
-    protected void doOptions(HttpServletRequest req, HttpServletResponse res) throws IOException {
-        setCorsHeaders(res);
-        res.setStatus(HttpServletResponse.SC_OK);
-    }
-private void setCorsHeaders(HttpServletResponse response) {
-    String origin = response.getHeader("Origin");
-    response.setHeader("Access-Control-Allow-Origin", "*");
-    response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    response.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    response.setHeader("Access-Control-Allow-Credentials", "false");
-}
-    
+    // CORS y preflight OPTIONS los maneja el CorsFilter global (@WebFilter("/*")).
 
     private String extractJsonField(String json, String field) {
         if (json == null) return null;

@@ -40,8 +40,7 @@ function getUserId() {
 }
 
 function authHeaders() {
-    const uid = getUserId();
-    return getAuthHeaders(uid ? { 'X-User-Id': uid } : {});
+    return getAuthHeaders();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

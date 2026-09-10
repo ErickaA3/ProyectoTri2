@@ -70,14 +70,18 @@ public class ModoEstudioServlet extends HttpServlet {
             String dataType = req.getContentType() != null && req.getContentType().contains("multipart")
                 ? "file" : "json";
 
-            String userId;
+            // Identidad desde el JWT validado por JwtFilter (nunca del cliente).
+            String userId = (String) req.getAttribute("userId");
+            if (userId == null) {
+                sendError(res, 401, "No autenticado.");
+                return;
+            }
             List<String> options;
             String textoBase;
             JsonObject configs = new JsonObject();
 
             if ("file".equals(dataType)) {
                 // ── Multipart: viene con archivo ──────────────────────
-                userId  = req.getParameter("userId");
                 String optionsParam = req.getParameter("options");
                 options = gson.fromJson(optionsParam,
                     new com.google.gson.reflect.TypeToken<List<String>>(){}.getType());
@@ -123,7 +127,6 @@ public class ModoEstudioServlet extends HttpServlet {
                 String body = req.getReader().lines().collect(Collectors.joining());
                 JsonObject data = JsonParser.parseString(body).getAsJsonObject();
 
-                userId  = data.get("userId").getAsString();
                 options = gson.fromJson(data.getAsJsonArray("options"),
                     new com.google.gson.reflect.TypeToken<List<String>>(){}.getType());
                 textoBase = (data.has("text") && !data.get("text").isJsonNull()) ? data.get("text").getAsString() : null;

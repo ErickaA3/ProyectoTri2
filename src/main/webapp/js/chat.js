@@ -416,7 +416,7 @@ async function loadEquippedBackground() {
 
     try {
         const res = await fetch(`${API_BASE}/shop`, {
-            headers: getAuthHeaders({ 'X-User-Id': userId })
+            headers: getAuthHeaders()
         });
         if (!res.ok) return;
         const data = await res.json();
