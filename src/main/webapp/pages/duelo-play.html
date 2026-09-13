@@ -78,6 +78,57 @@
         }
         @keyframes ws-spin { to { transform: rotate(360deg); } }
 
+        /* ── Countdown circular dramático ── */
+        .countdown-ring {
+            position: absolute;
+            top: 12px;
+            right: 16px;
+            width: 64px;
+            height: 64px;
+            z-index: 10;
+        }
+        .countdown-ring svg {
+            transform: rotate(-90deg);
+            width: 64px;
+            height: 64px;
+        }
+        .countdown-ring .ring-bg {
+            fill: none;
+            stroke: rgba(255,255,255,0.08);
+            stroke-width: 4;
+        }
+        .countdown-ring .ring-fill {
+            fill: none;
+            stroke: #2dd4bf;
+            stroke-width: 4;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s linear, stroke 0.3s;
+        }
+        .countdown-ring .ring-fill.warning { stroke: #fbbf24; }
+        .countdown-ring .ring-fill.danger  { stroke: #ef4444; }
+        .countdown-ring .ring-seconds {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: #2dd4bf;
+            transition: color 0.3s;
+        }
+        .countdown-ring .ring-seconds.warning { color: #fbbf24; }
+        .countdown-ring .ring-seconds.danger  { color: #ef4444; }
+
+        @keyframes timer-pulse {
+            0%, 100% { transform: scale(1); }
+            50%      { transform: scale(1.12); }
+        }
+        .countdown-ring.critical {
+            animation: timer-pulse 0.6s ease-in-out infinite;
+        }
+
+        /* ── Responsive ── */
         @media (max-width: 768px) {
             #rivalPanel {
                 top: calc(var(--navbar-height, 65px) + 8px);
@@ -89,6 +140,9 @@
             #rivalPanel .rival-name { font-size: 0.75rem; max-width: 90px; }
             #rivalPanel .rival-score { font-size: 0.9rem; }
             #waitingMsg { font-size: 0.95rem; }
+            .countdown-ring { width: 52px; height: 52px; top: 8px; right: 10px; }
+            .countdown-ring svg { width: 52px; height: 52px; }
+            .countdown-ring .ring-seconds { font-size: 1.1rem; }
         }
 
         @media (max-width: 480px) {
@@ -103,6 +157,9 @@
             #rivalPanel .rival-score { font-size: 0.82rem; }
             #waitingOverlay .spinner { width: 38px; height: 38px; }
             #waitingMsg { font-size: 0.88rem; }
+            .countdown-ring { width: 44px; height: 44px; top: 6px; right: 8px; }
+            .countdown-ring svg { width: 44px; height: 44px; }
+            .countdown-ring .ring-seconds { font-size: 0.95rem; }
         }
 
         @media (max-width: 390px) {
@@ -135,6 +192,15 @@
         <div class="exam-screen" id="examScreen">
             <div class="question-area">
                 <div class="question-card" id="questionCard">
+                    <!-- Countdown circular dentro de la card -->
+                    <div class="countdown-ring" id="countdownRing">
+                        <svg viewBox="0 0 68 68">
+                            <circle class="ring-bg" cx="34" cy="34" r="30"/>
+                            <circle class="ring-fill" id="ringFill" cx="34" cy="34" r="30"
+                                stroke-dasharray="188.5" stroke-dashoffset="0"/>
+                        </svg>
+                        <div class="ring-seconds" id="ringSeconds">30</div>
+                    </div>
                     <div class="question-number" id="qNumber">Pregunta 1</div>
                     <div class="question-text" id="qText"></div>
                     <div class="options-list" id="optionsList"></div>
@@ -170,13 +236,11 @@
         <div class="modal-actions"><button class="modal-btn cancel" onclick="closeExitModal()">Continuar</button><button class="modal-btn confirm-red" onclick="window.location.href='duelos.html'">Salir</button></div>
     </div></div>
 
-    <!-- Overlay de espera -->
     <div id="waitingOverlay">
         <div class="spinner"></div>
         <div id="waitingMsg">Conectando...</div>
     </div>
 
-    <!-- Overlay de error fatal — NO destruye el DOM del juego, solo lo cubre -->
     <div id="fatalOverlay">
         <i class="fas fa-exclamation-triangle" style="font-size:3rem;color:#fbbf24;"></i>
         <h2 style="margin:0;" id="fatalMsg"></h2>
@@ -196,7 +260,7 @@
     const userId   = getUserId();
     const myUserId = userId;
 
-    const WS_URL = `ws://localhost:8080/project-1.0-SNAPSHOT/ws/duelo/${duelId}`;
+    const WS_URL = `ws://${window.location.host}/ws/duelo/${duelId}`;
     let ws = null;
     let totalQ        = 0;
     let currentQ      = 0;
@@ -209,7 +273,6 @@
     let startTime     = Date.now();
     let players       = {};
 
-    // ── Helper seguro: nunca crashea si el elemento no existe ──
     function setText(id, value) {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
@@ -225,9 +288,6 @@
         if (el) el.style[prop] = value;
     }
 
-    // showFatal ya NO destruye el DOM del juego — solo muestra un overlay encima.
-    // Así, si llega un mensaje tardío del servidor (QUESTION, TIMEOUT, etc.)
-    // después de un error, los elementos siguen existiendo y no crashea.
     function showFatal(msg) {
         hideWaiting();
         setText('fatalMsg', msg);
@@ -410,25 +470,57 @@
             <div class="rival-score">${rivalScore} <span>puntos</span></div>`;
     }
 
+    // ── Countdown circular dramático ──────────────────────────────
     function startCountdown() {
         secondsLeft = timePerQ;
         updateTimerDisplay();
-        const timerBox = document.getElementById('timerBox');
-        if (timerBox) timerBox.classList.remove('warning', 'danger');
+
+        const ring      = document.getElementById('countdownRing');
+        const ringFill  = document.getElementById('ringFill');
+        const ringSecs  = document.getElementById('ringSeconds');
+        const timerBox  = document.getElementById('timerBox');
+        const circumference = 2 * Math.PI * 30; // r=30
+
+        // Reset visual
+        if (ringFill) { ringFill.style.strokeDashoffset = '0'; ringFill.classList.remove('warning', 'danger'); }
+        if (ringSecs) { ringSecs.classList.remove('warning', 'danger'); }
+        if (ring)     { ring.classList.remove('critical'); }
+        if (timerBox) { timerBox.classList.remove('warning', 'danger'); }
+
         clearInterval(countdownInterval);
         countdownInterval = setInterval(() => {
             secondsLeft--;
             updateTimerDisplay();
-            if (timerBox) {
-                if (secondsLeft <= 5)       { timerBox.classList.add('danger'); timerBox.classList.remove('warning'); }
-                else if (secondsLeft <= 10) { timerBox.classList.add('warning'); }
+
+            // Animar el anillo circular
+            if (ringFill) {
+                const pct = secondsLeft / timePerQ;
+                ringFill.style.strokeDashoffset = circumference * (1 - pct);
             }
-            if (secondsLeft <= 0) { clearInterval(countdownInterval); autoSubmitTimeout(); }
+
+            // Colores según urgencia
+            if (secondsLeft <= 5) {
+                if (ringFill) { ringFill.classList.add('danger'); ringFill.classList.remove('warning'); }
+                if (ringSecs) { ringSecs.classList.add('danger'); ringSecs.classList.remove('warning'); }
+                if (ring)     { ring.classList.add('critical'); }
+                if (timerBox) { timerBox.classList.add('danger'); timerBox.classList.remove('warning'); }
+            } else if (secondsLeft <= 10) {
+                if (ringFill) { ringFill.classList.add('warning'); ringFill.classList.remove('danger'); }
+                if (ringSecs) { ringSecs.classList.add('warning'); ringSecs.classList.remove('danger'); }
+                if (ring)     { ring.classList.remove('critical'); }
+                if (timerBox) { timerBox.classList.add('warning'); }
+            }
+
+            if (secondsLeft <= 0) {
+                clearInterval(countdownInterval);
+                autoSubmitTimeout();
+            }
         }, 1000);
     }
 
     function updateTimerDisplay() {
         setText('timerDisplay', Math.max(0, secondsLeft));
+        setText('ringSeconds', Math.max(0, secondsLeft));
     }
 
     function autoSubmitTimeout() {

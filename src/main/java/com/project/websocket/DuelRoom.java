@@ -22,19 +22,15 @@ public class DuelRoom {
     private volatile String challengerId;
     private volatile String opponentId;
 
-    // Progreso individual por jugador
     private final ConcurrentHashMap<String, Integer> currentQuestion = new ConcurrentHashMap<>();
     private volatile int totalQuestions = 0;
 
-    // Tiempo por pregunta cacheado en memoria — evita consultar la BD
-    // en cada respuesta/timeout, lo cual saturaba el pool de conexiones.
     private volatile int timePerQuestion = 30;
 
     private final ConcurrentHashMap<String, Integer> scores = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> times  = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> finished = new ConcurrentHashMap<>();
 
-    // Timer individual por jugador
     private final ConcurrentHashMap<String, ScheduledFuture<?>> questionTimers = new ConcurrentHashMap<>();
 
     private volatile JsonArray questions;
@@ -95,34 +91,59 @@ public class DuelRoom {
         this.state = State.PLAYING;
     }
 
-    // Registrar respuesta individual
-    public synchronized boolean registerAnswer(String userId, boolean correct, int timeSecs) {
+    /**
+     * Intenta registrar la respuesta de un jugador PARA UNA PREGUNTA ESPECÍFICA.
+     * Es la única puerta de entrada para avanzar el progreso de un jugador —
+     * tanto handleAnswer como onQuestionTimeout pasan por acá.
+     *
+     * Es a prueba de carreras: si el timeout del servidor y la respuesta real
+     * del cliente llegan casi al mismo tiempo para la MISMA pregunta, solo el
+     * primero que consigue el lock del objeto se aplica; el segundo detecta
+     * que currentQuestion ya avanzó y no hace nada (retorna false).
+     *
+     * @return true si esta llamada fue la que efectivamente avanzó la partida,
+     *         false si ya se había procesado esta pregunta (llamada duplicada/tardía).
+     */
+    public synchronized boolean tryRegisterAnswer(String userId, int questionIndex, boolean correct, int timeSecs) {
+        int current = currentQuestion.getOrDefault(userId, 0);
+        if (questionIndex != current) {
+            // Pregunta obsoleta — ya se procesó (carrera timeout vs respuesta real).
+            return false;
+        }
+
+        cancelQuestionTimer(userId);
         if (correct) scores.merge(userId, 1, Integer::sum);
         times.merge(userId, timeSecs, Integer::sum);
-        cancelQuestionTimer(userId);
 
         int next = currentQuestion.merge(userId, 1, Integer::sum);
         if (next >= totalQuestions) {
             finished.put(userId, true);
         }
-
-        return finished.getOrDefault(userId, false);
+        return true;
     }
 
-    // Verificar si ambos terminaron
+    public boolean isFinished(String uid) {
+        return finished.getOrDefault(uid, false);
+    }
+
     public synchronized boolean bothFinished() {
         return finished.getOrDefault(challengerId, false)
                 && finished.getOrDefault(opponentId, false);
     }
 
-    // Timer individual por pregunta
-    public void scheduleQuestionTimer(String userId, int timeLimitSecs) {
+    /**
+     * Programa el timer de una pregunta específica. El índice de la pregunta
+     * se CAPTURA aquí, en el momento de programar el timer — no se relee
+     * cuando el timer se dispara. Esto evita que un timer "viejo" reporte
+     * un índice ya avanzado si hay una carrera con la respuesta del cliente.
+     */
+    public void scheduleQuestionTimer(String userId, int questionIndex, int timeLimitSecs) {
         cancelQuestionTimer(userId);
         ScheduledFuture<?> timer = scheduler.schedule(() -> {
             synchronized (this) {
                 if (state != State.PLAYING) return;
                 if (callback != null) {
-                    callback.onQuestionTimeout(duelId, userId, currentQuestion.getOrDefault(userId, 0));
+                    callback.onQuestionTimeout(duelId, userId, questionIndex);
                 }
             }
         }, timeLimitSecs, TimeUnit.SECONDS);
@@ -134,7 +155,6 @@ public class DuelRoom {
         if (t != null && !t.isDone()) t.cancel(false);
     }
 
-    // Validación de respuesta
     public void setQuestions(JsonArray questions) { this.questions = questions; }
     public JsonArray getQuestions()               { return questions; }
 
