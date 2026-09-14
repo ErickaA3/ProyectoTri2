@@ -301,16 +301,46 @@ public class GamificationService {
         // Día consecutivo — racha sube
         if (days == 1) return new StreakResult(currentStreak + 1, false);
 
-        // Se saltó al menos un día
-        if (hasShield) {
-            // El escudo cubre exactamente UN día perdido.
+        // Se saltó exactamente un día — el escudo lo cubre.
+        // FIX Bug A: antes esta condición era solo "if (hasShield)", lo que
+        // perdonaba CUALQUIER cantidad de días saltados (10, 30, lo que sea).
+        // Ahora el escudo solo aplica cuando days == 2 (un único día saltado
+        // entre la última actividad y hoy).
+        if (hasShield && days == 2) {
             // La racha se mantiene (no sube — el día faltante queda perdonado).
             // shieldUsed = true → el DAO consumirá el shield (hasStreakShield → false).
             return new StreakResult(currentStreak, true);
         }
 
-        // Sin escudo: racha rota, empieza desde 1
+        // Sin escudo (o con escudo pero ausencia de más de 1 día): racha rota, empieza desde 1
         return new StreakResult(1, false);
+    }
+
+    /**
+     * FIX Bug B — Calcula la racha "real" a partir de lo guardado en base de
+     * datos, sin esperar a que el usuario haga una actividad nueva para que
+     * se refresque (evita que la racha quede "congelada"/inflada en pantalla).
+     *
+     * Devuelve 0 si la racha ya se rompió:
+     *   - más de 1 día de ausencia sin escudo, o
+     *   - más de 2 días de ausencia con escudo activo sin usar.
+     *
+     * Reusable: la llaman tanto getPlayerStats() (endpoint /api/gamification/stats)
+     * como ProfileServlet (endpoint /api/profile), que son los dos caminos que
+     * hoy muestran la racha al usuario.
+     */
+    public static int effectiveStreak(int streakActual, LocalDate ultimaActividad, boolean tieneEscudo) {
+        if (ultimaActividad == null) {
+            return streakActual;
+        }
+        long days = java.time.temporal.ChronoUnit.DAYS.between(ultimaActividad, LocalDate.now());
+        if (days <= 1) {
+            return streakActual;
+        }
+        if (days == 2 && tieneEscudo) {
+            return streakActual;
+        }
+        return 0;
     }
 
     private static int calculateLevel(int totalXp) {
@@ -399,7 +429,23 @@ public class GamificationService {
             stats.addProperty("levelProgress",  100);
         }
         stats.addProperty("maxLevel",         MAX_LEVEL);
-        int sc = stats.has("streakCurrent") && !stats.get("streakCurrent").isJsonNull() ? stats.get("streakCurrent").getAsInt() : 0;
+
+        // FIX Bug B — recalcular la racha real antes de devolverla, en vez de
+        // mostrar tal cual lo que quedó guardado la última vez que hubo actividad.
+        int streakCurrentRaw = stats.has("streakCurrent") && !stats.get("streakCurrent").isJsonNull()
+                ? stats.get("streakCurrent").getAsInt() : 0;
+        String lastActivityStr = stats.has("streakLastActivity") && !stats.get("streakLastActivity").isJsonNull()
+                ? stats.get("streakLastActivity").getAsString() : null;
+        boolean hasShield = stats.has("hasStreakShield") && !stats.get("hasStreakShield").isJsonNull()
+                && stats.get("hasStreakShield").getAsBoolean();
+
+        LocalDate lastActivity = (lastActivityStr != null && !lastActivityStr.isEmpty()
+                                   && !"null".equals(lastActivityStr))
+                                 ? LocalDate.parse(lastActivityStr)
+                                 : null;
+
+        int sc = effectiveStreak(streakCurrentRaw, lastActivity, hasShield);
+        stats.addProperty("streakCurrent", sc);
         stats.addProperty("streakMultiplier", getStreakMultiplier(sc));
         return stats;
     }
