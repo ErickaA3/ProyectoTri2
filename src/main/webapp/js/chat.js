@@ -4,6 +4,7 @@ const API_BASE = window.API_BASE || '';
 
 let chatHistory    = [];
 let currentSession = null;
+let attachedPdf    = null;
 let busy           = false;
 let msgCount       = 0;
 
@@ -156,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function send() {
     const inp = document.getElementById('userInput');
     const txt = inp.value.trim();
-    if (!txt || busy) return;
+    if ((!txt && !attachedPdf) || busy) return;
 
     const userId = getUserId();
     if (!userId) {
@@ -179,7 +180,7 @@ async function send() {
             method: 'POST',
             headers: getAuthHeaders(),
             credentials: 'include',
-            body: JSON.stringify({ mensaje: txt, sessionId: currentSession, userId })
+            body: JSON.stringify(Object.assign({ mensaje: txt || '(Ver PDF adjunto)', sessionId: currentSession, userId }, attachedPdf ? { pdfBase64: attachedPdf.base64, pdfName: attachedPdf.name } : {}))
         });
 
         const data = await res.json();
@@ -189,6 +190,8 @@ async function send() {
             addBotMsg('Hubo un error: ' + (data.message || 'Intenta de nuevo.'));
             return;
         }
+
+        removePdf();
 
         if (!currentSession) {
             currentSession = data.data.sessionId;
@@ -569,4 +572,41 @@ async function shareWrappedCard(e) {
         status.textContent = 'No se pudo generar la imagen.';
         console.error('[Wrapped] Error al compartir:', err);
     }
+}
+// ── PDF Upload ───────────────────────────────────────────────────────────────
+
+function handlePdfUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+        addBotMsg('⚠️ El PDF es demasiado grande. Máximo 10 MB.');
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result.split(',')[1];
+        attachedPdf = { name: file.name, base64: base64 };
+        document.getElementById('pdfChip').querySelector('.pdf-chip-name').textContent = file.name;
+        document.getElementById('pdfChip').style.display = 'flex';
+        document.getElementById('pdfBtn').style.display = 'none';
+        document.getElementById('userInput').placeholder = '¿Qué querés saber sobre el PDF? (opcional)';
+        document.getElementById('userInput').focus();
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+}
+
+function removePdf() {
+    attachedPdf = null;
+    const chip = document.getElementById('pdfChip');
+    if (chip) chip.style.display = 'none';
+    const btn = document.getElementById('pdfBtn');
+    if (btn) btn.style.display = 'flex';
+    const fi = document.getElementById('pdfFileInput');
+    if (fi) fi.value = '';
+    const inp = document.getElementById('userInput');
+    if (inp) inp.placeholder = 'Escríbeme tu pregunta...';
 }
