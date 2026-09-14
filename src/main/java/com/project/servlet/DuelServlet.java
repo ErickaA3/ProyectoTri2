@@ -185,15 +185,27 @@ public class DuelServlet extends HttpServlet {
                 }
 
                 case "/submit" -> {
-                    String duelId    = data.get("duelId").getAsString();
-                    int    score     = data.get("score").getAsInt();
-                    int    maxScore  = data.get("maxScore").getAsInt();
-                    int    timeSecs  = data.get("timeSecs").getAsInt();
-                    String answers   = data.getAsJsonArray("answers").toString();
+                    // [SEGURIDAD] Antes se confiaba en "score", "maxScore" y el
+                    // "isCorrect" de cada respuesta tal cual los mandaba el
+                    // cliente — cualquiera podía llamar este endpoint directo
+                    // (sin usar el WebSocket) y autodeclararse ganador con
+                    // cualquier puntaje. Ahora solo se manda el índice de la
+                    // opción elegida por pregunta ("answerGiven") y el tiempo;
+                    // el score real y la corrección de cada respuesta se
+                    // calculan siempre en el servidor, contra las preguntas
+                    // reales del duelo (ver DuelDAOImpl.submitDuelResultGraded).
+                    String duelId = data.get("duelId").getAsString();
+                    int timeSecsClient = data.has("timeSecs") ? data.get("timeSecs").getAsInt() : 0;
+                    JsonArray rawAnswers = data.has("answers")
+                        ? data.getAsJsonArray("answers") : new JsonArray();
 
-                    JsonObject result = duelDAO.submitDuelResult(duelId, userId, score, maxScore, timeSecs, answers);
+                    JsonObject result = duelDAO.submitDuelResultGraded(duelId, userId, rawAnswers, timeSecsClient);
 
                     if (result.has("duelFinished") && result.get("duelFinished").getAsBoolean()) {
+                        int score    = result.get("score").getAsInt();
+                        int maxScore = result.get("maxScore").getAsInt();
+                        int timeSecs = result.get("timeSecs").getAsInt();
+
                         String resultType = result.get("result").getAsString();
 
                         String activityType = switch (resultType) {
