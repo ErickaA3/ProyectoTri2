@@ -127,9 +127,8 @@ async function loadNotifications() {
         }
     } catch (e) { console.error('[Duelos] loadHistory:', e); }
 
-    const wins = (notifications || []).filter(n => n.result === 'win').length;
-    const el = document.getElementById('victoriesCount');
-    if (el) el.textContent = wins;
+    // El contador de victorias se actualiza desde renderLeaderboard()
+    // que usa el dato real de la BD (no el historial con LIMIT 20).
 }
 
 async function createDuel() {
@@ -679,8 +678,16 @@ function renderLeaderboard() {
             lbAnimateValue(document.getElementById('lbMyWins'), me.wins || 0);
             lbAnimateValue(document.getElementById('lbMyXp'), me.xp || 0, { format: lbFmt });
             lbAnimateValue(document.getElementById('lbMyStreak'), me.streak || 0);
+
+            // Actualizar el badge de victorias del header con el dato real de la BD
+            const vcEl = document.getElementById('victoriesCount');
+            if (vcEl) lbAnimateValue(vcEl, me.wins || 0);
         } else {
             banner.style.display = 'none';
+            // Fallback: contar del historial si el usuario no aparece en el ranking
+            const wins = (notifications || []).filter(n => n.result === 'win').length;
+            const vcEl = document.getElementById('victoriesCount');
+            if (vcEl) vcEl.textContent = wins;
         }
     }
 
