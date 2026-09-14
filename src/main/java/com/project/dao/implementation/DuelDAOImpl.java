@@ -18,7 +18,6 @@ public class DuelDAOImpl implements IDuelDAO {
 
     @Override
     public String sendFriendRequest(String senderId, String receiverEmailOrUsername) throws Exception {
-        // Buscar al usuario por email o username
         String findUser = """
             SELECT id FROM users
             WHERE email = ? OR username = ?
@@ -37,7 +36,6 @@ public class DuelDAOImpl implements IDuelDAO {
 
         if (senderId.equals(receiverId)) throw new Exception("No puedes agregarte a ti mismo.");
 
-        // Verificar que no exista ya
         String check = """
             SELECT id, status FROM friendships
             WHERE (sender_id = ?::uuid AND receiver_id = ?::uuid)
@@ -56,7 +54,6 @@ public class DuelDAOImpl implements IDuelDAO {
             }
         }
 
-        // Crear solicitud
         String insert = """
             INSERT INTO friendships (sender_id, receiver_id, status)
             VALUES (?::uuid, ?::uuid, 'pending')
@@ -246,8 +243,6 @@ public class DuelDAOImpl implements IDuelDAO {
             d.addProperty("opponentTime",    rs.getInt("opponent_time"));
             d.addProperty("winnerId",        rs.getString("winner_id"));
             d.addProperty("createdAt",       rs.getTimestamp("created_at") != null ? rs.getTimestamp("created_at").toString() : null);
-
-            // Determinar rol del usuario
             d.addProperty("isChallenger", userId.equals(rs.getString("challenger_id")));
 
             return d;
@@ -292,7 +287,6 @@ public class DuelDAOImpl implements IDuelDAO {
                 d.addProperty("opponentLevel",   rs.getInt("opponent_level"));
                 d.addProperty("isChallenger",    userId.equals(rs.getString("challenger_id")));
 
-                // ¿Este usuario ya jugó?
                 boolean isChallenger = userId.equals(rs.getString("challenger_id"));
                 boolean hasPlayed = isChallenger
                     ? rs.getBigDecimal("challenger_score") != null
@@ -340,7 +334,6 @@ public class DuelDAOImpl implements IDuelDAO {
                 d.addProperty("finishedAt",      rs.getString("finished_at"));
                 d.addProperty("isChallenger",    userId.equals(rs.getString("challenger_id")));
 
-                // Resultado para este usuario
                 String winnerId = rs.getString("winner_id");
                 if (winnerId == null) d.addProperty("result", "draw");
                 else if (winnerId.equals(userId)) d.addProperty("result", "win");
@@ -367,6 +360,28 @@ public class DuelDAOImpl implements IDuelDAO {
         }
     }
 
+    // ── Helper: arma el UPDATE de cierre de duelo evitando null::uuid ──────────
+    private void finishDuelStatement(Connection conn, String duelId, String winnerId) throws Exception {
+        // FIX: winner_id = null con cast ?::uuid lanza error en PostgreSQL.
+        // Cuando es empate (winnerId == null) guardamos NULL sin cast usando CASE.
+        String finish = """
+            UPDATE duels
+               SET status     = 'finished',
+                   winner_id  = CASE WHEN ? THEN NULL ELSE ?::uuid END,
+                   finished_at = NOW()
+             WHERE id = ?::uuid
+            """;
+        try (PreparedStatement ps = conn.prepareStatement(finish)) {
+            boolean isDraw = (winnerId == null);
+            ps.setBoolean(1, isDraw);
+            // Cuando es empate el segundo parámetro no se usa (rama ELSE no ejecuta),
+            // pero JDBC exige que el bind exista; ponemos un UUID dummy válido.
+            ps.setString(2, isDraw ? "00000000-0000-0000-0000-000000000000" : winnerId);
+            ps.setString(3, duelId);
+            ps.executeUpdate();
+        }
+    }
+
     @Override
     public JsonObject submitDuelResult(String duelId, String userId, int score,
                                        int maxScore, int timeSecs, String answersJson) throws Exception {
@@ -374,7 +389,6 @@ public class DuelDAOImpl implements IDuelDAO {
         try {
             conn.setAutoCommit(false);
 
-            // 1. Obtener info del duelo
             String getDuel = """
                 SELECT challenger_id, opponent_id, status, question_count,
                        challenger_score, opponent_score
@@ -397,7 +411,6 @@ public class DuelDAOImpl implements IDuelDAO {
                 opponentPlayed   = rs.getBigDecimal("opponent_score") != null;
             }
 
-            // Validar que el duelo esté activo
             if ("finished".equals(status) || "declined".equals(status)) {
                 conn.rollback();
                 throw new Exception("Este duelo ya terminó.");
@@ -405,19 +418,16 @@ public class DuelDAOImpl implements IDuelDAO {
 
             boolean isChallenger = userId.equals(challengerId);
 
-            // Validar que no haya jugado ya
             if ((isChallenger && challengerPlayed) || (!isChallenger && opponentPlayed)) {
                 conn.rollback();
                 throw new Exception("Ya jugaste este duelo.");
             }
 
-            // Validar que el usuario sea participante
             if (!userId.equals(challengerId) && !userId.equals(opponentId)) {
                 conn.rollback();
                 throw new Exception("No eres participante de este duelo.");
             }
 
-            // 2. Guardar respuestas individuales
             JsonArray answers = JsonParser.parseString(answersJson).getAsJsonArray();
             String insertAnswer = """
                 INSERT INTO duel_answers (duel_id, user_id, question_index, answer_given, is_correct, time_ms)
@@ -437,7 +447,6 @@ public class DuelDAOImpl implements IDuelDAO {
                 ps.executeBatch();
             }
 
-            // 3. Actualizar score del jugador
             String updateScore = isChallenger
                 ? "UPDATE duels SET challenger_score = ?, challenger_time = ? WHERE id = ?::uuid"
                 : "UPDATE duels SET opponent_score = ?, opponent_time = ? WHERE id = ?::uuid";
@@ -449,7 +458,6 @@ public class DuelDAOImpl implements IDuelDAO {
                 ps.executeUpdate();
             }
 
-            // 4. ¿Ambos ya jugaron? → declarar ganador. ¿Solo uno? → marcar in_progress
             boolean otherPlayed = isChallenger ? opponentPlayed : challengerPlayed;
             JsonObject result = new JsonObject();
             result.addProperty("success", true);
@@ -458,7 +466,6 @@ public class DuelDAOImpl implements IDuelDAO {
             result.addProperty("timeSecs", timeSecs);
 
             if (otherPlayed) {
-                // ── AMBOS JUGARON → determinar ganador ──
                 String getOther = isChallenger
                     ? "SELECT opponent_score, opponent_time FROM duels WHERE id = ?::uuid"
                     : "SELECT challenger_score, challenger_time FROM duels WHERE id = ?::uuid";
@@ -472,7 +479,6 @@ public class DuelDAOImpl implements IDuelDAO {
                     otherTime  = rs.getInt(2);
                 }
 
-                // Determinar ganador
                 String winnerId = null;
                 String resultType;
                 if (score > otherScore) {
@@ -482,7 +488,6 @@ public class DuelDAOImpl implements IDuelDAO {
                     winnerId = isChallenger ? opponentId : challengerId;
                     resultType = "loss";
                 } else {
-                    // Empate en score → gana el más rápido
                     if (timeSecs < otherTime) {
                         winnerId = userId;
                         resultType = "win";
@@ -490,28 +495,19 @@ public class DuelDAOImpl implements IDuelDAO {
                         winnerId = isChallenger ? opponentId : challengerId;
                         resultType = "loss";
                     } else {
-                        resultType = "draw"; // Empate total
+                        resultType = "draw"; // winnerId queda null → empate total
                     }
                 }
 
-                // Actualizar duelo como terminado
-                String finish = """
-                    UPDATE duels SET status = 'finished', winner_id = ?::uuid, finished_at = NOW()
-                    WHERE id = ?::uuid
-                    """;
-                try (PreparedStatement ps = conn.prepareStatement(finish)) {
-                    ps.setString(1, winnerId);
-                    ps.setString(2, duelId);
-                    ps.executeUpdate();
-                }
+                // FIX: se usa el helper para evitar null::uuid en PostgreSQL
+                finishDuelStatement(conn, duelId, winnerId);
 
                 result.addProperty("duelFinished", true);
                 result.addProperty("result", resultType);
-                result.addProperty("winnerId", winnerId);
+                result.addProperty("winnerId", winnerId != null ? winnerId : "");
                 result.addProperty("otherScore", otherScore);
                 result.addProperty("otherTime", otherTime);
             } else {
-                // ── PRIMER JUGADOR → actualizar status a in_progress ──
                 String updateStatus = "UPDATE duels SET status = 'in_progress' WHERE id = ?::uuid";
                 try (PreparedStatement ps = conn.prepareStatement(updateStatus)) {
                     ps.setString(1, duelId);
@@ -535,11 +531,8 @@ public class DuelDAOImpl implements IDuelDAO {
     }
 
     /**
-     * [SEGURIDAD] Versión "graded" de submitDuelResult, para usar cuando el
-     * submit llega directo de POST /api/duels/submit (sin pasar por el
-     * WebSocket). Acá NO se confía en nada que mande el cliente sobre si
-     * acertó o no: se recalcula todo contra las preguntas reales guardadas
-     * en study_content para ese duelo.
+     * [SEGURIDAD] Versión "graded" de submitDuelResult — recalcula todo
+     * en el servidor contra las preguntas reales, sin confiar en el cliente.
      */
     @Override
     public JsonObject submitDuelResultGraded(String duelId, String userId,
@@ -548,7 +541,6 @@ public class DuelDAOImpl implements IDuelDAO {
         try {
             conn.setAutoCommit(false);
 
-            // 1. Info del duelo + preguntas reales (con la respuesta correcta)
             String getDuel = """
                 SELECT d.challenger_id, d.opponent_id, d.status, d.question_count,
                        d.challenger_score, d.opponent_score, d.time_per_question,
@@ -594,9 +586,6 @@ public class DuelDAOImpl implements IDuelDAO {
                 throw new Exception("Ya jugaste este duelo.");
             }
 
-            // 2. Calificar cada respuesta EN EL SERVIDOR contra la pregunta real.
-            //    Se ignora por completo cualquier "isCorrect"/"score" que
-            //    venga del cliente — solo se usa el índice de la opción elegida.
             JsonObject content = JsonParser.parseString(contentJson).getAsJsonObject();
             JsonArray questions = content.has("questions")
                 ? content.getAsJsonArray("questions") : new JsonArray();
@@ -608,7 +597,7 @@ public class DuelDAOImpl implements IDuelDAO {
                 try {
                     a = rawAnswers.get(i).getAsJsonObject();
                 } catch (Exception e) {
-                    continue; // ítem malformado → se ignora, no tumba el submit
+                    continue;
                 }
 
                 int qIndex = a.has("questionIndex") ? safeInt(a.get("questionIndex"), -1) : -1;
@@ -633,13 +622,9 @@ public class DuelDAOImpl implements IDuelDAO {
             }
 
             int maxScore = questionCount > 0 ? questionCount : questions.size();
-
-            // Tiempo: se acota a un rango razonable, nunca se confía tal cual
-            // en lo que mande el cliente (afecta el desempate por tiempo).
             int maxTime  = Math.max(1, questionCount) * Math.max(5, timePerQuestion);
             int timeSecs = Math.max(0, Math.min(timeSecsRaw, maxTime));
 
-            // 3. Guardar las respuestas ya calificadas
             String insertAnswer = """
                 INSERT INTO duel_answers (duel_id, user_id, question_index, answer_given, is_correct, time_ms)
                 VALUES (?::uuid, ?::uuid, ?, ?, ?, ?)
@@ -658,7 +643,6 @@ public class DuelDAOImpl implements IDuelDAO {
                 if (gradedAnswers.size() > 0) ps.executeBatch();
             }
 
-            // 4. Guardar el score CALCULADO (nunca el que mandó el cliente)
             String updateScore = isChallenger
                 ? "UPDATE duels SET challenger_score = ?, challenger_time = ? WHERE id = ?::uuid"
                 : "UPDATE duels SET opponent_score = ?, opponent_time = ? WHERE id = ?::uuid";
@@ -669,7 +653,6 @@ public class DuelDAOImpl implements IDuelDAO {
                 ps.executeUpdate();
             }
 
-            // 5. ¿Ambos ya jugaron? → declarar ganador (misma lógica que submitDuelResult)
             boolean otherPlayed = isChallenger ? opponentPlayed : challengerPlayed;
             JsonObject result = new JsonObject();
             result.addProperty("success",  true);
@@ -691,7 +674,7 @@ public class DuelDAOImpl implements IDuelDAO {
                     otherTime  = rs.getInt(2);
                 }
 
-                String winnerId;
+                String winnerId = null;
                 String resultType;
                 if (score > otherScore) {
                     winnerId = userId;
@@ -712,19 +695,12 @@ public class DuelDAOImpl implements IDuelDAO {
                     }
                 }
 
-                String finish = """
-                    UPDATE duels SET status = 'finished', winner_id = ?::uuid, finished_at = NOW()
-                    WHERE id = ?::uuid
-                    """;
-                try (PreparedStatement ps = conn.prepareStatement(finish)) {
-                    ps.setString(1, winnerId);
-                    ps.setString(2, duelId);
-                    ps.executeUpdate();
-                }
+                // FIX: se usa el helper para evitar null::uuid en PostgreSQL
+                finishDuelStatement(conn, duelId, winnerId);
 
                 result.addProperty("duelFinished", true);
                 result.addProperty("result",       resultType);
-                result.addProperty("winnerId",     winnerId);
+                result.addProperty("winnerId",     winnerId != null ? winnerId : "");
                 result.addProperty("otherScore",   otherScore);
                 result.addProperty("otherTime",    otherTime);
             } else {
@@ -762,7 +738,6 @@ public class DuelDAOImpl implements IDuelDAO {
 
     @Override
     public JsonObject getDuelQuestions(String duelId, String userId) throws Exception {
-        // Primero verificar que el usuario no haya jugado ya
         String checkPlayed = """
             SELECT challenger_id, opponent_id, challenger_score, opponent_score, status
             FROM duels WHERE id = ?::uuid
@@ -790,7 +765,6 @@ public class DuelDAOImpl implements IDuelDAO {
             }
         }
 
-        // Obtener preguntas
         String sql = """
             SELECT sc.content::text, sc.title, d.question_count, d.topic, d.time_per_question
             FROM duels d
@@ -820,16 +794,16 @@ public class DuelDAOImpl implements IDuelDAO {
     }
 
     @Override
-public boolean finishDuelWithWinner(String duelId, String winnerId) throws Exception {
-    String sql = """
-        UPDATE duels SET status = 'finished', winner_id = ?::uuid, finished_at = NOW()
-        WHERE id = ?::uuid AND status != 'finished'
-        """;
-    try (Connection conn = DatabaseConnection.getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql)) {
-        ps.setString(1, winnerId);
-        ps.setString(2, duelId);
-        return ps.executeUpdate() > 0;
+    public boolean finishDuelWithWinner(String duelId, String winnerId) throws Exception {
+        String sql = """
+            UPDATE duels SET status = 'finished', winner_id = ?::uuid, finished_at = NOW()
+            WHERE id = ?::uuid AND status != 'finished'
+            """;
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, winnerId);
+            ps.setString(2, duelId);
+            return ps.executeUpdate() > 0;
+        }
     }
-}
 }
