@@ -7,6 +7,13 @@ import java.util.stream.Collectors;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.io.RandomAccessReadBuffer;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.poi.xslf.usermodel.XMLSlideShow;
+import org.apache.poi.xslf.usermodel.XSLFSlide;
+import org.apache.poi.xslf.usermodel.XSLFTextShape;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -26,14 +33,6 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
-
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xslf.usermodel.XMLSlideShow;
-import org.apache.poi.xslf.usermodel.XSLFSlide;
-import org.apache.poi.xslf.usermodel.XSLFTextShape;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 
 /**
  * Servlet de Duelos y Amigos.
@@ -220,23 +219,29 @@ public class DuelServlet extends HttpServlet {
                         );
                         result.add("reward", reward);
 
+                        // FIX: getDuel puede retornar null en casos extremos.
+                        // Se agrega null-check para evitar NullPointerException
+                        // que antes tiraba un 500 y dejaba la gamificación del
+                        // otro jugador sin procesar.
                         JsonObject duel = duelDAO.getDuel(duelId, userId);
-                        String otherUserId = userId.equals(duel.get("challengerId").getAsString())
-                            ? duel.get("opponentId").getAsString()
-                            : duel.get("challengerId").getAsString();
+                        if (duel != null) {
+                            String otherUserId = userId.equals(duel.get("challengerId").getAsString())
+                                ? duel.get("opponentId").getAsString()
+                                : duel.get("challengerId").getAsString();
 
-                        String otherActivityType = switch (resultType) {
-                            case "win"  -> "duelo_perdido";
-                            case "loss" -> "duelo_ganado";
-                            default     -> "duelo_empate";
-                        };
+                            String otherActivityType = switch (resultType) {
+                                case "win"  -> "duelo_perdido";
+                                case "loss" -> "duelo_ganado";
+                                default     -> "duelo_empate";
+                            };
 
-                        int otherScore = result.get("otherScore").getAsInt();
-                        double otherPct = maxScore > 0 ? (otherScore * 100.0 / maxScore) : 0;
-                        int otherTime = result.get("otherTime").getAsInt();
-                        GamificationService.processActivity(
-                            otherUserId, otherActivityType, otherPct, null, otherTime, maxScore
-                        );
+                            int otherScore = result.has("otherScore") ? result.get("otherScore").getAsInt() : 0;
+                            double otherPct = maxScore > 0 ? (otherScore * 100.0 / maxScore) : 0;
+                            int otherTime = result.has("otherTime") ? result.get("otherTime").getAsInt() : 0;
+                            GamificationService.processActivity(
+                                otherUserId, otherActivityType, otherPct, null, otherTime, maxScore
+                            );
+                        }
                     }
 
                     res.getWriter().write(gson.toJson(result));
