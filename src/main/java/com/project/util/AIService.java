@@ -7,6 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 
 import com.google.gson.Gson;
@@ -26,6 +27,71 @@ public class AIService {
         .build();
 
     private static final Gson gson = new Gson();
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REINTENTOS CON BACKOFF EXPONENCIAL
+    // Absorbe errores transitorios (429 rate limit, 5xx del lado de OpenAI,
+    // cortes de red) sin exponer el fallo al estudiante en el primer intento.
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private static final int MAX_RETRIES = 3;          // 4 intentos en total
+    private static final long BASE_BACKOFF_MS = 1000;  // 1s, 2s, 4s
+    private static final long MAX_BACKOFF_MS = 30_000;
+
+    private static HttpResponse<String> sendWithRetry(HttpRequest request) throws Exception {
+        Exception lastError = null;
+
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                int status = response.statusCode();
+
+                if (status == 200) return response;
+
+                boolean esTransitorio = status == 429 || (status >= 500 && status < 600);
+                if (!esTransitorio || attempt == MAX_RETRIES) {
+                    // Error del cliente (4xx que no sea 429) o se agotaron los intentos:
+                    // se devuelve tal cual para que el llamador lance su excepción normal.
+                    return response;
+                }
+
+                long esperaMs = calcularEspera(response, attempt);
+                System.err.println("[AIService] Status " + status + " de OpenAI (intento "
+                    + (attempt + 1) + "/" + (MAX_RETRIES + 1) + "). Reintentando en " + esperaMs + "ms.");
+                Thread.sleep(esperaMs);
+
+            } catch (java.io.IOException e) {
+                lastError = e;
+                if (attempt == MAX_RETRIES) throw e;
+                long esperaMs = Math.min(BASE_BACKOFF_MS * (1L << attempt), MAX_BACKOFF_MS);
+                System.err.println("[AIService] Error de red (intento " + (attempt + 1) + "/"
+                    + (MAX_RETRIES + 1) + "): " + e.getMessage() + ". Reintentando en " + esperaMs + "ms.");
+                Thread.sleep(esperaMs);
+            }
+        }
+
+        throw lastError != null ? lastError : new Exception("Fallo desconocido al llamar a la API tras reintentos.");
+    }
+
+    /**
+     * Respeta el header Retry-After si OpenAI lo envía (típico en 429).
+     * Si no viene, usa backoff exponencial con jitter para evitar que varias
+     * peticiones reintenten exactamente en el mismo instante.
+     */
+    private static long calcularEspera(HttpResponse<String> response, int attempt) {
+        Optional<String> retryAfter = response.headers().firstValue("Retry-After");
+        if (retryAfter.isPresent()) {
+            try {
+                long segundos = Long.parseLong(retryAfter.get().trim());
+                return Math.min(segundos * 1000, MAX_BACKOFF_MS);
+            } catch (NumberFormatException ignored) {
+                // Si el header viene en un formato inesperado, se ignora y se usa el backoff normal.
+            }
+        }
+        long base = Math.min(BASE_BACKOFF_MS * (1L << attempt), MAX_BACKOFF_MS);
+        long jitter = (long) (Math.random() * 300);
+        return base + jitter;
+    }
 
     private static String loadApiKey() {
         String envKey = System.getenv("OPENAI_API_KEY");
@@ -122,7 +188,17 @@ public class AIService {
                     + "- Varía el tipo de preguntas: definiciones, procesos, comparaciones, ejemplos.\n"
                     + "- Ordena las flashcards de lo más fundamental a lo más específico.\n"
                     + "- NO repitas información entre tarjetas.\n"
-                    + "- Genera entre 8 y 15 flashcards dependiendo de la densidad del contenido.\n";
+                    + "- Genera entre 8 y 15 flashcards dependiendo de la densidad del contenido.\n"
+                    + "\nEJEMPLOS DE CALIDAD:\n"
+                    + "BIEN: front=\"¿Qué diferencia a una clave primaria de una clave foránea?\" "
+                    + "back=\"La clave primaria identifica de forma única cada fila de su propia tabla; "
+                    + "la clave foránea referencia la clave primaria de otra tabla para crear una relación.\"\n"
+                    + "MAL: front=\"Clave primaria\" back=\"Es importante en las bases de datos.\"\n"
+                    + "\nEVITA:\n"
+                    + "- Un \"front\" que es solo un sustantivo suelto, sin forma de pregunta o consigna clara.\n"
+                    + "- Un \"back\" genérico que podría aplicar a cualquier tema (\"Es importante porque ayuda a organizar la información\").\n"
+                    + "- Un \"back\" que es una lista de 4 o más puntos: si el concepto necesita eso, son 2 flashcards, no una.\n"
+                    + "- Repetir la misma idea con distinta redacción en dos tarjetas distintas.\n";
 
             case "schema": {
                 String tipoEsquema = config.has("tipo") ? config.get("tipo").getAsString() : "jerarquico";
@@ -137,7 +213,8 @@ public class AIService {
                             + "- Los nodos del ÚLTIMO nivel (hojas) DEBEN incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
                             + "- El \"detail\" es un párrafo breve que explica ese concepto específico.\n"
                             + "- Cada label debe ser corto: máximo 4-5 palabras.\n"
-                            + "- La estructura debe reflejar la jerarquía lógica del contenido.\n";
+                            + "- La estructura debe reflejar la jerarquía lógica del contenido.\n"
+                            + "- Evita que dos subtemas hermanos terminen cubriendo lo mismo desde ángulos distintos.\n";
                         break;
                     case "conceptual":
                         instrEsquema = "TIPO DE ESQUEMA: Mapa Conceptual (nodo central con conexiones radiales).\n"
@@ -146,7 +223,9 @@ public class AIService {
                             + "- Cada concepto principal DEBE tener 2-4 sub-conceptos como children.\n"
                             + "- Cada sub-concepto DEBE incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
                             + "- Los labels deben ser conceptos concretos, máx 3-5 palabras.\n"
-                            + "- Piensa en RELACIONES entre ideas, no solo en jerarquía.\n";
+                            + "- Piensa en RELACIONES entre ideas, no solo en jerarquía.\n"
+                            + "- Las conexiones deben representar relaciones reales (causa, dependencia, comparación), "
+                            + "no jerarquía disfrazada de \"concepto → sub-concepto\".\n";
                         break;
                     case "timeline":
                         instrEsquema = "TIPO DE ESQUEMA: Línea del Tiempo (eventos cronológicos).\n"
@@ -154,7 +233,9 @@ public class AIService {
                             + "- Los children directos son los eventos/etapas EN ORDEN CRONOLÓGICO (4-8 eventos).\n"
                             + "- Cada evento DEBE tener 2-4 sub-children con detalles o consecuencias.\n"
                             + "- Cada sub-child DEBE incluir un campo \"detail\" con 1-2 oraciones que expliquen ese punto.\n"
-                            + "- Si el texto no tiene fechas, usa orden lógico de pasos/fases.\n";
+                            + "- Si el texto no tiene fechas, usa orden lógico de pasos/fases.\n"
+                            + "- El orden cronológico debe basarse en la secuencia real del texto; usa el orden lógico "
+                            + "de fases SOLO si el texto genuinamente no trae cronología.\n";
                         break;
                     case "causa-efecto":
                         instrEsquema = "TIPO DE ESQUEMA: Causa y Efecto (diagrama Ishikawa/espina de pescado).\n"
@@ -164,7 +245,9 @@ public class AIService {
                             + "- Cada sub-causa DEBE incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
                             + "- Distribuye las causas de forma equilibrada.\n"
                             + "- Cada label debe ser conciso: máximo 4-5 palabras.\n"
-                            + "- Las causas deben ser categorías distintas, no repeticiones.\n";
+                            + "- Las causas deben ser categorías distintas, no repeticiones.\n"
+                            + "- Cada causa debe ser una causa raíz distinta, no el mismo problema reformulado. "
+                            + "Si dos causas se sienten intercambiables, son la misma causa mal dividida.\n";
                         break;
                     case "ciclico":
                         instrEsquema = "TIPO DE ESQUEMA: Cíclico (proceso que se repite en ciclo).\n"
@@ -173,18 +256,34 @@ public class AIService {
                             + "- La última fase debe conectar lógicamente con la primera.\n"
                             + "- Cada fase DEBE tener 2-3 sub-children con detalles del proceso.\n"
                             + "- Cada sub-child DEBE incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
-                            + "- Labels cortos: máximo 4-5 palabras por fase.\n";
+                            + "- Labels cortos: máximo 4-5 palabras por fase.\n"
+                            + "- El \"detail\" de la última fase debe mencionar explícitamente cómo conecta de vuelta "
+                            + "con la primera, para que el ciclo se sienta cerrado y no como una lista lineal.\n";
                         break;
                     default:
                         instrEsquema = "TIPO DE ESQUEMA: Jerárquico. Organiza de lo general a lo específico.\n";
                 }
-                return base + "\nMODO: Generador de Esquemas.\n" + instrEsquema;
+                String estandarCalidadEsquema = "\nESTÁNDAR DE CALIDAD (aplica a todos los tipos de esquema):\n"
+                    + "- Cada label debe nombrar algo específico del contenido, NUNCA un placeholder "
+                    + "(\"Concepto clave\", \"Aspecto importante\", \"Punto relevante\").\n"
+                    + "- El \"detail\" de un nodo hoja debe aportar información NUEVA respecto a su label, "
+                    + "no repetirlo con otras palabras.\n"
+                    + "- Los nodos hermanos deben ser categorías realmente distintas entre sí, no la misma idea dos veces.\n"
+                    + "- Reparte el contenido de forma equilibrada entre ramas: evita una rama con 5+ hijos y otra con 1 solo.\n";
+                return base + "\nMODO: Generador de Esquemas.\n" + instrEsquema + estandarCalidadEsquema;
             }
 
             case "quiz": {
                 String tipo = config.has("tipo") ? config.get("tipo").getAsString() : "quiz";
                 String dificultad = config.has("dificultad") ? config.get("dificultad").getAsString() : "medio";
                 boolean esExperto = "expert_exam".equals(tipo);
+
+                String nivelesCognitivos = "\nNIVELES POR OPERACIÓN COGNITIVA (no por \"tema difícil o fácil\"):\n"
+                    + "- RECORDAR: la respuesta está textual o casi textual en el contenido.\n"
+                    + "- APLICAR: requiere usar una definición o regla del contenido en un caso nuevo, no solo repetirla.\n"
+                    + "- ANALIZAR: requiere comparar, detectar una excepción, o distinguir entre dos conceptos parecidos.\n"
+                    + "Esta escala funciona igual sin importar la materia: úsala para calibrar la dificultad pedida "
+                    + "(facil→RECORDAR, medio→mezcla RECORDAR/APLICAR, dificil→APLICAR/ANALIZAR).\n";
 
                 String instrDif;
                 switch (dificultad) {
@@ -220,7 +319,18 @@ public class AIService {
                         + "- Ayuda al estudiante a entender, no solo a memorizar.\n";
                 }
 
-                return base + "\nMODO: Generador de Evaluaciones.\n" + instrTipo + instrDif;
+                String estandarCalidadQuiz = "\nESTÁNDAR DE CALIDAD:\n"
+                    + "BIEN: cada opción incorrecta representa un error conceptual real y plausible "
+                    + "(ej. confundir clave foránea con índice).\n"
+                    + "MAL: una opción incorrecta evidentemente absurda o de otro tema, que no exige conocimiento real "
+                    + "para descartarla.\n"
+                    + "\nEVITA:\n"
+                    + "- Preguntas respondibles con sentido común sin haber leído el material.\n"
+                    + "- Una sola opción visiblemente más larga o detallada que las demás (delata la respuesta correcta).\n"
+                    + "- Repetir la misma pregunta con distintas palabras entre dos preguntas del mismo quiz.\n";
+
+                return base + "\nMODO: Generador de Evaluaciones.\n" + instrTipo + instrDif
+                    + nivelesCognitivos + estandarCalidadQuiz;
             }
 
             case "summary":
@@ -231,7 +341,17 @@ public class AIService {
                     + "- El highlight es un dato clave, cifra, o concepto crucial de esa sección (o null).\n"
                     + "- Los keywords deben ser términos técnicos o conceptos clave del texto.\n"
                     + "- readingMinutes: estima cuántos minutos toma leer tu resumen (mínimo 2).\n"
-                    + "- NO copies oraciones textuales del original. Parafrasea con claridad.\n";
+                    + "- NO copies oraciones textuales del original. Parafrasea con claridad.\n"
+                    + "\nEJEMPLOS DE CALIDAD:\n"
+                    + "BIEN heading: \"Arquitectura de tres capas en sistemas web\"\n"
+                    + "MAL heading: \"Introducción\" / \"Desarrollo\" / \"Conclusión\" (genéricos, no dicen de qué trata la sección)\n"
+                    + "BIEN highlight: \"El patrón MVC separa datos, lógica y presentación en tres componentes independientes.\"\n"
+                    + "MAL highlight: \"Este tema es fundamental.\" (no es un dato, es relleno)\n"
+                    + "\nEVITA:\n"
+                    + "- Secciones con heading genérico que no menciona el contenido real de esa sección.\n"
+                    + "- Un highlight que es una opinión vacía en vez de un dato, cifra o concepto concreto del texto.\n"
+                    + "- Secciones que repiten la misma idea central con otras palabras.\n"
+                    + "- Keywords que son palabras comunes sin contexto (\"importante\", \"proceso\", \"sistema\" sueltos).\n";
 
             default:
                 return base;
@@ -579,7 +699,7 @@ public class AIService {
             .timeout(Duration.ofSeconds(30))
             .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = sendWithRetry(request);
 
         if (response.statusCode() != 200) {
             throw new Exception("Error en la API de IA. Status: " + response.statusCode()
@@ -644,7 +764,7 @@ public class AIService {
             .timeout(Duration.ofSeconds(90))
             .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = sendWithRetry(request);
 
         if (response.statusCode() != 200) {
             throw new Exception("Error API OpenAI. Status: " + response.statusCode()
@@ -699,7 +819,7 @@ public class AIService {
             .timeout(Duration.ofSeconds(30))
             .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = sendWithRetry(request);
 
         if (response.statusCode() != 200) {
             throw new Exception("Error API embeddings. Status: " + response.statusCode()
