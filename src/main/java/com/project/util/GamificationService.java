@@ -1,6 +1,7 @@
 package com.project.util;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 import com.google.gson.JsonObject;
 import com.project.dao.implementation.GamificationDAOImpl;
@@ -53,6 +54,14 @@ public class GamificationService {
 
     private static final IGamificationDAO dao = new GamificationDAOImpl();
 
+    // [SEGURIDAD/BUG] LocalDate.now() sin zona usa la zona horaria del
+    // servidor (en Railway, UTC), no la del usuario. Con Costa Rica en
+    // UTC-6, eso hacía que el "día" cambiara a las 6pm hora local en vez
+    // de medianoche — la racha y las misiones/objetivos se sentían raras
+    // porque el corte de día no coincidía con el día real del usuario.
+    // Costa Rica no tiene horario de verano, así que esta zona es estable.
+    private static final ZoneId APP_ZONE = ZoneId.of("America/Costa_Rica");
+
     private static final int[] LEVEL_THRESHOLDS = {
         0, 80, 200, 380, 640, 1000, 1480, 2100, 2900, 3900
     };
@@ -83,7 +92,7 @@ public class GamificationService {
         boolean hasShield      = stats.has("hasStreakShield") && !stats.get("hasStreakShield").isJsonNull() && stats.get("hasStreakShield").getAsBoolean();
 
         // 2. Racha
-        LocalDate today        = LocalDate.now();
+        LocalDate today        = LocalDate.now(APP_ZONE);
         LocalDate lastActivity = (lastActivityStr != null && !lastActivityStr.isEmpty()
                                    && !"null".equals(lastActivityStr))
                                  ? LocalDate.parse(lastActivityStr)
@@ -153,12 +162,12 @@ public class GamificationService {
         // ══════════════════════════════════════════════════════════════════════
         String missionType = mapToMissionType(activityType);
         if (missionType != null && !alreadyRewarded) {
-            dao.advanceDailyMissions(userId, missionType);
+            dao.advanceDailyMissions(userId, missionType, today);
         }
 
         // Si la racha subió, avanzar misiones de tipo maintain_streak
         if (streak.newStreak > streakCurrent) {
-            dao.advanceDailyMissions(userId, "maintain_streak");
+            dao.advanceDailyMissions(userId, "maintain_streak", today);
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -166,24 +175,35 @@ public class GamificationService {
         //     Types: streak_days, activities, duels_won, perfect_exam,
         //            complete_flashcard, complete_quiz, complete_summary, win_duel
         // ══════════════════════════════════════════════════════════════════════
+        LocalDate weekStart = today.with(java.time.DayOfWeek.MONDAY);
         String objectiveType = mapToObjectiveType(activityType, scorePercent);
         if (objectiveType != null) {
-            dao.advanceWeeklyObjectives(userId, objectiveType);
+            dao.advanceWeeklyObjectives(userId, objectiveType, weekStart);
+            // [BUG] El pool de objetivos semanales (UserDAOImpl.ensureWeeklyObjectives)
+            // tiene DOS entradas distintas para "ganar duelos": type="duels_won"
+            // ("Ganar 2 duelos") y type="win_duel" ("Ganar 3 duelos"). Acá solo se
+            // generaba "win_duel" al ganar un duelo, así que a cualquier usuario
+            // al que le tocara el objetivo "duels_won" esa semana, nunca se le
+            // avanzaba — se quedaba pegado en 0/2 sin importar cuántos duelos
+            // ganara. Se avanzan ambos tipos para que ninguno quede huérfano.
+            if ("win_duel".equals(objectiveType)) {
+                dao.advanceWeeklyObjectives(userId, "duels_won", weekStart);
+            }
         }
 
         // "activities" cuenta CUALQUIER actividad positiva (no abandon)
         if (!"abandon_exam".equals(activityType)) {
-            dao.advanceWeeklyObjectives(userId, "activities");
+            dao.advanceWeeklyObjectives(userId, "activities", weekStart);
         }
 
         // Si la racha subió, avanzar objetivo de streak_days
         if (streak.newStreak > streakCurrent) {
-            dao.advanceWeeklyObjectives(userId, "streak_days");
+            dao.advanceWeeklyObjectives(userId, "streak_days", weekStart);
         }
 
         // 12. Check completados
-        JsonObject missionRewards   = dao.checkCompletedMissions(userId);
-        JsonObject objectiveRewards = dao.checkCompletedObjectives(userId);
+        JsonObject missionRewards   = dao.checkCompletedMissions(userId, today);
+        JsonObject objectiveRewards = dao.checkCompletedObjectives(userId, weekStart);
 
         int bonusXp    = missionRewards.get("missionXp").getAsInt()
                        + objectiveRewards.get("objectiveXp").getAsInt();
@@ -335,7 +355,7 @@ public class GamificationService {
         if (ultimaActividad == null) {
             return streakActual;
         }
-        long days = java.time.temporal.ChronoUnit.DAYS.between(ultimaActividad, LocalDate.now());
+        long days = java.time.temporal.ChronoUnit.DAYS.between(ultimaActividad, LocalDate.now(APP_ZONE));
         if (days <= 1) {
             return streakActual;
         }
