@@ -54,8 +54,6 @@ import org.apache.pdfbox.text.PDFTextStripper;
  *   POST /api/duels/create           → Crear duelo (no retorna preguntas, solo metadata)
  *   POST /api/duels/submit           → Enviar resultado + gamificación automática
  *   POST /api/duels/decline          → Declinar/cancelar duelo
- *
- * Todos requieren header X-User-Id.
  */
 @WebServlet("/api/duels/*")
 @MultipartConfig(maxFileSize = 10485760) // 10MB
@@ -73,8 +71,8 @@ public class DuelServlet extends HttpServlet {
         res.setContentType("application/json");
         res.setCharacterEncoding("UTF-8");
 
-        String userId = req.getHeader("X-User-Id");
-        if (userId == null || userId.isBlank()) { sendError(res, 401, "Falta X-User-Id."); return; }
+        String userId = (String) req.getAttribute("userId");
+        if (userId == null || userId.isBlank()) { sendError(res, 401, "Sesión no válida."); return; }
 
         String path = req.getPathInfo() != null ? req.getPathInfo() : "";
 
@@ -139,25 +137,22 @@ public class DuelServlet extends HttpServlet {
         res.setContentType("application/json");
         res.setCharacterEncoding("UTF-8");
 
-        String userId = req.getHeader("X-User-Id");
-        if (userId == null || userId.isBlank()) { sendError(res, 401, "Falta X-User-Id."); return; }
+        String userId = (String) req.getAttribute("userId");
+        if (userId == null || userId.isBlank()) { sendError(res, 401, "Sesión no válida."); return; }
 
         String path = req.getPathInfo() != null ? req.getPathInfo() : "";
 
         try {
-            // /create puede venir como multipart (con archivo) o JSON (solo texto)
             if ("/create".equals(path)) {
                 handleCreate(req, res, userId);
                 return;
             }
 
-            // El resto siempre es JSON
             String body = req.getReader().lines().collect(Collectors.joining());
             JsonObject data = JsonParser.parseString(body).getAsJsonObject();
 
             switch (path) {
 
-                // ── AMIGOS ──
                 case "/friends/add" -> {
                     String emailOrUsername = data.get("emailOrUsername").getAsString();
                     String friendshipId = duelDAO.sendFriendRequest(userId, emailOrUsername);
@@ -189,7 +184,6 @@ public class DuelServlet extends HttpServlet {
                     res.getWriter().write(gson.toJson(r));
                 }
 
-                // ── ENVIAR RESULTADO ──
                 case "/submit" -> {
                     String duelId    = data.get("duelId").getAsString();
                     int    score     = data.get("score").getAsInt();
@@ -199,11 +193,9 @@ public class DuelServlet extends HttpServlet {
 
                     JsonObject result = duelDAO.submitDuelResult(duelId, userId, score, maxScore, timeSecs, answers);
 
-                    // Si el duelo terminó, dar rewards de gamificación a AMBOS jugadores
                     if (result.has("duelFinished") && result.get("duelFinished").getAsBoolean()) {
                         String resultType = result.get("result").getAsString();
 
-                        // Reward para el jugador actual
                         String activityType = switch (resultType) {
                             case "win"  -> "duelo_ganado";
                             case "loss" -> "duelo_perdido";
@@ -216,15 +208,14 @@ public class DuelServlet extends HttpServlet {
                         );
                         result.add("reward", reward);
 
-                        // Reward para el otro jugador
                         JsonObject duel = duelDAO.getDuel(duelId, userId);
                         String otherUserId = userId.equals(duel.get("challengerId").getAsString())
                             ? duel.get("opponentId").getAsString()
                             : duel.get("challengerId").getAsString();
 
                         String otherActivityType = switch (resultType) {
-                            case "win"  -> "duelo_perdido";  // invertido
-                            case "loss" -> "duelo_ganado";   // invertido
+                            case "win"  -> "duelo_perdido";
+                            case "loss" -> "duelo_ganado";
                             default     -> "duelo_empate";
                         };
 
@@ -239,7 +230,6 @@ public class DuelServlet extends HttpServlet {
                     res.getWriter().write(gson.toJson(result));
                 }
 
-                // ── DECLINAR DUELO ──
                 case "/decline" -> {
                     String duelId = data.get("duelId").getAsString();
                     boolean ok = duelDAO.declineDuel(duelId, userId);
@@ -255,7 +245,6 @@ public class DuelServlet extends HttpServlet {
         }
     }
 
-    // ─── CREAR DUELO (JSON o Multipart con archivo) ───────────
     private void handleCreate(HttpServletRequest req, HttpServletResponse res, String userId)
             throws Exception {
 
@@ -264,7 +253,6 @@ public class DuelServlet extends HttpServlet {
         int questionCount, timePerQ;
 
         if (contentType != null && contentType.contains("multipart/form-data")) {
-            // ── Multipart: archivo subido ──
             opponentId    = req.getParameter("opponentId");
             topic         = req.getParameter("topic");
             questionCount = parseInt(req.getParameter("questionCount"), 10);
@@ -281,7 +269,6 @@ public class DuelServlet extends HttpServlet {
             }
 
         } else {
-            // ── JSON: solo texto ──
             String body = req.getReader().lines().collect(Collectors.joining());
             JsonObject data = JsonParser.parseString(body).getAsJsonObject();
             opponentId    = data.get("opponentId").getAsString();
@@ -292,7 +279,6 @@ public class DuelServlet extends HttpServlet {
                             ? data.get("text").getAsString() : topic;
         }
 
-        // 1. Generar quiz con la IA
         JsonObject quizConfig = new JsonObject();
         quizConfig.addProperty("tipo", "quiz");
         quizConfig.addProperty("numPreguntas", questionCount);
@@ -302,14 +288,11 @@ public class DuelServlet extends HttpServlet {
         JsonObject aiData = JsonParser.parseString(aiJson).getAsJsonObject();
         String title = aiData.has("title") ? aiData.get("title").getAsString() : topic;
 
-        // 2. Guardar quiz en study_content (type='duel_quiz')
         Quiz quizContent = new Quiz(userId, "duel_quiz", title, null);
         String contentId = contentDAO.save(quizContent, aiJson, text);
 
-        // 3. Crear duelo
         String duelId = duelDAO.createDuel(userId, opponentId, contentId, topic, questionCount, timePerQ);
 
-        // 4. Responder con metadata
         JsonObject r = new JsonObject();
         r.addProperty("success", true);
         r.addProperty("duelId", duelId);
@@ -325,7 +308,6 @@ public class DuelServlet extends HttpServlet {
         catch (NumberFormatException e) { return defaultVal; }
     }
 
-    /** Extrae texto de PDF, DOCX, PPTX o TXT */
     private String extractTextFromFile(Part filePart) {
         String fileName = filePart.getSubmittedFileName().toLowerCase();
         try (InputStream is = filePart.getInputStream()) {

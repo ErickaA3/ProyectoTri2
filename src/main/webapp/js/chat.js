@@ -5,11 +5,10 @@ const API_BASE = window.API_BASE || '';
 let chatHistory    = [];
 let currentSession = null;
 let busy           = false;
-let msgCount       = 0; // para disparar quiz y sugerencias
+let msgCount       = 0;
 
 const BOT_AV = `<div class="msg-av bot-av"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>`;
 
-// ── Detectar tema de la conversación ───────────────────────
 const SUBJECT_MAP = {
     math:    ['matemática','álgebra','cálculo','geometría','ecuación','matriz','función','derivada','integral','estadística','trigonometría','número','fracción'],
     history: ['historia','guerra','revolución','imperio','civilización','siglo','rey','presidente','política','sociedad','cultura','antiguo','medieval'],
@@ -30,7 +29,6 @@ function applyTheme(theme) {
     main.classList.add('theme-' + theme);
 }
 
-// ── Estrellas de fondo ──────────────────────────────────────
 function initStars() {
     const main = document.getElementById('chatMain');
     if (!main) return;
@@ -43,7 +41,6 @@ function initStars() {
     }
 }
 
-// ── Sugerencias de preguntas ────────────────────────────────
 const SUGGESTIONS = {
     math:    ['¿Puedes dar un ejemplo?','¿Cómo se resuelve paso a paso?','¿Para qué sirve en la vida real?'],
     history: ['¿Cuál fue el impacto principal?','¿Quiénes fueron los protagonistas?','¿Qué pasó después?'],
@@ -69,7 +66,6 @@ function sendSuggestion(text) {
     send();
 }
 
-// ── Confetti ────────────────────────────────────────────────
 function shootConfetti() {
     const wrap = document.getElementById('confettiWrap');
     if (!wrap) return;
@@ -83,7 +79,6 @@ function shootConfetti() {
     }
 }
 
-// ── XP popup ────────────────────────────────────────────────
 function showXpPopup(amount) {
     const main = document.getElementById('chatMain');
     if (!main) return;
@@ -95,7 +90,6 @@ function showXpPopup(amount) {
     setTimeout(() => el.remove(), 1700);
 }
 
-// ── Comprensión al final de respuesta del bot ───────────────
 function addCompRow(msgDiv) {
     const comp = document.createElement('div');
     comp.className = 'comp-row';
@@ -117,13 +111,21 @@ function comprendo(r, btn) {
     if (r === 'si') { shootConfetti(); showXpPopup(10); }
 }
 
-// ── getUserId ───────────────────────────────────────────────
 function getUserId() {
     try { return JSON.parse(localStorage.getItem('user') || '{}').id || null; }
     catch(e) { return null; }
 }
 
-// ── Init ────────────────────────────────────────────────────
+// ── JWT + JSON headers (de develop) ────────────────────────
+function getAuthHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    try {
+        const token = localStorage.getItem('token');
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+    } catch(e) {}
+    return headers;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     try {
         const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -148,11 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
     Promise.allSettled([loadSessions(), loadEquippedBackground()])
         .finally(() => { clearInterval(_ct); PolarisLoading.hide('chatLoading'); });
 
-    // Mostrar sugerencias iniciales después de 1s
     setTimeout(() => showSuggestions('default'), 1200);
 });
 
-// ── Enviar mensaje ──────────────────────────────────────────
 async function send() {
     const inp = document.getElementById('userInput');
     const txt = inp.value.trim();
@@ -170,16 +170,14 @@ async function send() {
     inp.style.height = 'auto';
     setTyping(true);
 
-    // Detectar tema y aplicar
     const theme = detectTheme(txt);
     if (theme !== 'default') applyTheme(theme);
-
     msgCount++;
 
     try {
         const res = await fetch(`${API_BASE}/api/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             credentials: 'include',
             body: JSON.stringify({ mensaje: txt, sessionId: currentSession, userId })
         });
@@ -194,19 +192,14 @@ async function send() {
 
         if (!currentSession) {
             currentSession = data.data.sessionId;
-            addSessionToSidebar(txt, currentSession);
+            addSessionToSidebar(txt, currentSession, true, new Date().toISOString());
         }
 
         const reply = formatReply(data.data.reply);
         const msgDiv = addBotMsg(reply);
 
-        // Agregar barra de comprensión cada 2 respuestas
         if (msgCount % 2 === 0 && msgDiv) addCompRow(msgDiv);
-
-        // Mostrar sugerencias relacionadas al tema
         setTimeout(() => showSuggestions(theme), 600);
-
-        // XP por cada mensaje
         showXpPopup(5);
 
     } catch(e) {
@@ -216,7 +209,6 @@ async function send() {
     }
 }
 
-// ── Nuevo chat ──────────────────────────────────────────────
 function newChat() {
     currentSession = null;
     chatHistory    = [];
@@ -232,21 +224,23 @@ function newChat() {
     setTimeout(() => showSuggestions('default'), 400);
 }
 
-// ── Cargar sesiones ─────────────────────────────────────────
 async function loadSessions() {
     const userId = getUserId();
     if (!userId) return;
     try {
-        const res = await fetch(`${API_BASE}/api/chat?userId=${userId}`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE}/api/chat?userId=${userId}`, {
+            headers: getAuthHeaders(),
+            credentials: 'include'
+        });
         if (!res.ok) return;
         const data = await res.json();
         if (!data.success) return;
 
-        const sessions   = data.data;
-        const container  = document.querySelector('.recents');
+        const sessions  = data.data;
+        const container = document.querySelector('.recents');
         container.querySelectorAll('.chat-item').forEach(el => el.remove());
 
-        if (sessions.length === 0) {
+        if (!sessions || sessions.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'empty-sessions';
             empty.textContent = 'No hay chats recientes.';
@@ -254,18 +248,29 @@ async function loadSessions() {
             container.appendChild(empty);
             return;
         }
-        sessions.forEach(s => addSessionToSidebar(s.firstMessage, s.sessionId));
+        sessions.forEach(s => addSessionToSidebar(s.firstMessage, s.sessionId, false, s.createdAt));
     } catch(e) { console.error('Error cargando sesiones:', e); }
 }
 
-// ── Sidebar session item ────────────────────────────────────
-function addSessionToSidebar(firstMessage, sessionId) {
+// ── Fecha relativa (de develop) ─────────────────────────────
+function formatSessionDate(isoString) {
+    if (!isoString) return '';
+    const fecha = new Date(isoString);
+    if (isNaN(fecha.getTime())) return '';
+    const hoy  = new Date();
+    const same = (a, b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+    if (same(fecha, hoy)) return 'Hoy';
+    const ayer = new Date(hoy); ayer.setDate(hoy.getDate()-1);
+    if (same(fecha, ayer)) return 'Ayer';
+    return fecha.toLocaleDateString('es', { day:'2-digit', month:'short' });
+}
+
+function addSessionToSidebar(firstMessage, sessionId, prepend = false, createdAt = null) {
     const container = document.querySelector('.recents');
     const empty = container.querySelector('.empty-sessions');
     if (empty) empty.remove();
 
-    // Color del ícono según tema detectado
-    const theme = detectTheme(firstMessage);
+    const theme = detectTheme(firstMessage || '');
     const iconColors = { math:'#3b82f6', history:'#f59e0b', science:'#10b981', code:'#2dd4bf', default:'#8b5cf6' };
     const iconColor = iconColors[theme] || iconColors.default;
 
@@ -275,8 +280,8 @@ function addSessionToSidebar(firstMessage, sessionId) {
     item.style.setProperty('--dot-color', iconColor);
     item.innerHTML = `
         <div class="chat-item-meta">
-            <div class="chat-item-label">${esc(firstMessage.substring(0,35))}${firstMessage.length>35?'...':''}</div>
-            <div class="chat-item-date">Hoy</div>
+            <div class="chat-item-label">${esc(firstMessage ? firstMessage.substring(0,35) : 'Chat')}${firstMessage && firstMessage.length>35?'...':''}</div>
+            <div class="chat-item-date">${formatSessionDate(createdAt)}</div>
         </div>
         <button class="chat-item-delete" title="Eliminar chat">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
@@ -291,10 +296,16 @@ function addSessionToSidebar(firstMessage, sessionId) {
         e.stopPropagation();
         showDeleteConfirm(sessionId, item);
     });
-    container.appendChild(item);
+
+    if (prepend) {
+        const label = container.querySelector('.section-label');
+        if (label && label.nextSibling) container.insertBefore(item, label.nextSibling);
+        else container.appendChild(item);
+    } else {
+        container.appendChild(item);
+    }
 }
 
-// ── Eliminar sesión ─────────────────────────────────────────
 let pendingDeleteSessionId = null;
 let pendingDeleteElement   = null;
 
@@ -317,14 +328,15 @@ async function confirmDeleteChat() {
     if (!userId) return;
     try {
         const res = await fetch(`${API_BASE}/api/chat?sessionId=${pendingDeleteSessionId}&userId=${userId}`, {
-            method: 'DELETE', credentials: 'include'
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+            credentials: 'include'
         });
         const data = await res.json();
         if (data.success) {
             if (pendingDeleteElement) pendingDeleteElement.remove();
             if (currentSession === pendingDeleteSessionId) newChat();
-            const remaining = document.querySelectorAll('.chat-item');
-            if (remaining.length === 0) {
+            if (document.querySelectorAll('.chat-item').length === 0) {
                 const container = document.querySelector('.recents');
                 const empty = document.createElement('div');
                 empty.className = 'empty-sessions';
@@ -337,7 +349,6 @@ async function confirmDeleteChat() {
     closeDeleteModal();
 }
 
-// ── Seleccionar sesión ──────────────────────────────────────
 async function selectSession(el, sessionId) {
     document.querySelectorAll('.chat-item').forEach(c => c.classList.remove('active'));
     el.classList.add('active');
@@ -345,7 +356,10 @@ async function selectSession(el, sessionId) {
     const userId = getUserId();
     if (!userId) return;
     try {
-        const res  = await fetch(`${API_BASE}/api/chat?sessionId=${sessionId}&userId=${userId}`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE}/api/chat?sessionId=${sessionId}&userId=${userId}`, {
+            headers: getAuthHeaders(),
+            credentials: 'include'
+        });
         const data = await res.json();
         if (!data.success) return;
 
@@ -353,18 +367,17 @@ async function selectSession(el, sessionId) {
         const typing = document.getElementById('typingRow');
         [...area.children].forEach(c => { if (c !== typing) c.remove(); });
 
-        // Detectar tema del historial
         const firstUserMsg = data.data.find(m => m.role === 'user');
-        if (firstUserMsg) applyTheme(detectTheme(firstUserMsg.content));
+        if (firstUserMsg) applyTheme(detectTheme(firstUserMsg.message || firstUserMsg.content || ''));
 
         data.data.forEach(msg => {
-            if (msg.role === 'user') addMsg('user', msg.content);
-            else addBotMsg(formatReply(msg.content));
+            const texto = msg.message || msg.content || '';
+            if (msg.role === 'user') addMsg('user', texto);
+            else addBotMsg(formatReply(texto));
         });
     } catch(e) { console.error('Error cargando historial:', e); }
 }
 
-// ── Helpers UI ──────────────────────────────────────────────
 function addBotMsg(txt) { return addMsg('bot', txt); }
 
 function addMsg(role, txt) {
@@ -372,7 +385,6 @@ function addMsg(role, txt) {
     const typing = document.getElementById('typingRow');
     const div    = document.createElement('div');
     div.className = `msg ${role}`;
-
     const initials = document.getElementById('chatAvatar').textContent || 'U';
     if (role === 'bot') {
         div.innerHTML = `${BOT_AV}<div class="msg-body"><div class="msg-who">Mi ProfesorIA</div><div class="bubble bot-bubble">${txt}</div><div class="msg-time">${fmt(new Date())}</div></div>`;
@@ -409,33 +421,30 @@ function handleKey(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
 }
 
+// ── Fix de seguridad (de develop): escapa HTML antes del formato ──
 function formatReply(txt) {
     if (!txt) return '';
-    return txt
+    let safe = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return safe
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>');
 }
 
 function esc(t) {
+    if (!t) return '';
     return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
 
-// ── Fondo equipado ──────────────────────────────────────────
 const BG_CLASS_MAP = {
-    'Noche Oscura':   'bg-default',
-    'Galaxia':        'bg-galaxy',
-    'Volcán':         'bg-volcano',
-    'Océano':         'bg-ocean',
-    'Amazonas':       'bg-forest',
-    'Cielo Nocturno': 'bg-sky',
-    'Lluvia Digital': 'bg-rain',
-    'Aurora Boreal':  'bg-aurora'
+    'Noche Oscura':'bg-default','Galaxia':'bg-galaxy','Volcán':'bg-volcano',
+    'Océano':'bg-ocean','Amazonas':'bg-forest','Cielo Nocturno':'bg-sky',
+    'Lluvia Digital':'bg-rain','Aurora Boreal':'bg-aurora'
 };
 async function loadEquippedBackground() {
     const userId = getUserId();
     if (!userId) return;
     try {
-        const res = await fetch(`${API_BASE}/shop`, { credentials: 'include', headers: { 'X-User-Id': userId } });
+        const res = await fetch(`${API_BASE}/shop`, { headers: getAuthHeaders(), credentials: 'include' });
         if (!res.ok) return;
         const data = await res.json();
         if (!data.success || !data.equippedBackgroundId) return;
@@ -451,7 +460,6 @@ async function loadEquippedBackground() {
     } catch(e) { console.error('[Chat] Error cargando fondo equipado:', e); }
 }
 
-// ── Backdrop click ──────────────────────────────────────────
 document.addEventListener('click', function(e) {
     if (e.target.id === 'deleteConfirmModal') closeDeleteModal();
     if (e.target.id === 'wrappedModal') closeWrapped();
@@ -484,36 +492,37 @@ function prevWrappedSlide() { wrappedIdx = Math.max(wrappedIdx - 1, 0); renderWr
 
 async function loadWrappedData() {
     const userId = getUserId();
-    // Datos de respaldo, por si el endpoint aun no existe o falla
     let data = {
-        studyHours: '4.5h', studyCompare: 'Aun no hay suficientes semanas para comparar.',
+        studyHours: '--', studyCompare: 'Aún no hay suficientes datos.',
         topSubject: 'Sin datos', topPct: '', weakSubject: 'Sin datos', questionsCount: '0',
-        freqTopic: 'Sin datos aun', freqDetail: 'Preguntale mas cosas a tu asistente esta semana.',
-        streak: '0 dias', xp: '+0 XP', coins: '+0 monedas',
+        freqTopic: 'Sin datos aún', freqDetail: 'Pregúntale más cosas a tu asistente esta semana.',
+        streak: '0 días', xp: '+0 XP', coins: '+0 monedas',
         suggestionTitle: 'Sigue chateando esta semana',
-        suggestionText: 'Cuantas mas dudas resuelvas, mas preciso sera tu resumen la proxima semana.'
+        suggestionText: 'Cuantas más dudas resuelvas, más preciso será tu resumen la próxima semana.'
     };
     try {
         if (userId) {
-            const res = await fetch(`${API_BASE}/api/wrapped?userId=${userId}`, { credentials: 'include' });
+            const res = await fetch(`${API_BASE}/api/wrapped?userId=${userId}`, {
+                headers: getAuthHeaders(), credentials: 'include'
+            });
             if (res.ok) {
                 const json = await res.json();
                 if (json.success && json.data) data = { ...data, ...json.data };
             }
         }
-    } catch (e) { console.error('[Wrapped] usando datos de respaldo:', e); }
+    } catch(e) { console.error('[Wrapped] usando datos de respaldo:', e); }
 
-    document.getElementById('wStudyTime').textContent    = data.studyHours;
-    document.getElementById('wStudyCompare').textContent = data.studyCompare;
-    document.getElementById('wTopSubject').textContent   = data.topSubject;
-    document.getElementById('wTopPct').textContent       = data.topPct;
-    document.getElementById('wWeakSubject').textContent  = data.weakSubject;
-    document.getElementById('wQuestionsCount').textContent = data.questionsCount;
-    document.getElementById('wFreqTopic').textContent   = data.freqTopic;
-    document.getElementById('wFreqDetail').textContent  = data.freqDetail;
-    document.getElementById('wStreak').textContent       = data.streak;
-    document.getElementById('wXp').textContent           = data.xp;
-    document.getElementById('wCoins').textContent        = data.coins;
+    document.getElementById('wStudyTime').textContent       = data.studyHours;
+    document.getElementById('wStudyCompare').textContent    = data.studyCompare;
+    document.getElementById('wTopSubject').textContent      = data.topSubject;
+    document.getElementById('wTopPct').textContent          = data.topPct;
+    document.getElementById('wWeakSubject').textContent     = data.weakSubject;
+    document.getElementById('wQuestionsCount').textContent  = data.questionsCount;
+    document.getElementById('wFreqTopic').textContent       = data.freqTopic;
+    document.getElementById('wFreqDetail').textContent      = data.freqDetail;
+    document.getElementById('wStreak').textContent          = data.streak;
+    document.getElementById('wXp').textContent              = data.xp;
+    document.getElementById('wCoins').textContent           = data.coins;
     document.getElementById('wSuggestionTitle').textContent = data.suggestionTitle;
     document.getElementById('wSuggestionText').textContent  = data.suggestionText;
     wrappedDataLoaded = true;
@@ -547,7 +556,7 @@ async function shareWrappedCard(e) {
                 try {
                     await navigator.share({ files: [file], title: 'Mi resumen semanal' });
                     status.textContent = '¡Compartido!';
-                } catch (err) { status.textContent = 'Cancelado.'; }
+                } catch(err) { status.textContent = 'Cancelado.'; }
             } else {
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
@@ -556,7 +565,7 @@ async function shareWrappedCard(e) {
                 status.textContent = 'Imagen descargada.';
             }
         }, 'image/png');
-    } catch (err) {
+    } catch(err) {
         status.textContent = 'No se pudo generar la imagen.';
         console.error('[Wrapped] Error al compartir:', err);
     }

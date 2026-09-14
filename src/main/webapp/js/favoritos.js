@@ -37,7 +37,7 @@ async function loadFavorites() {
 
     try {
         const response = await fetch('../api/favoritos', {
-            headers: { 'X-User-Id': userId }
+            headers: getAuthHeaders()
         });
 
         const data = await response.json();
@@ -74,10 +74,7 @@ async function removeFavorite(contentId) {
     try {
         const response = await fetch('../api/favoritos', {
             method:  'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-User-Id': userId
-            },
+            headers: getAuthHeaders(),
             body: JSON.stringify({
                 contentId:  contentId,
                 isFavorite: false
@@ -129,7 +126,7 @@ async function openItem(id) {
 
     try {
         const response = await fetch(`../api/favoritos/${id}`, {
-            headers: { 'X-User-Id': userId }
+            headers: getAuthHeaders()
         });
 
         if (!response.ok) {
@@ -331,6 +328,8 @@ document.addEventListener('keydown', function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', function() {
-    const t = PolarisLoading.rotateMessages('favoritosLoadingSub', ['Cargando favoritos...', 'Buscando tu contenido...', 'Casi listo...']);
-    loadFavorites().finally(() => { clearInterval(t); PolarisLoading.hide('favoritosLoading'); });
+    const t = PolarisLoading.rotateMessages('favoritosLoadingSub',
+        ['Cargando favoritos...', 'Buscando tu contenido...', 'Casi listo...']);
+    PolarisLoading.wrap('favoritosLoading', loadFavorites())
+        .finally(() => clearInterval(t));
 });

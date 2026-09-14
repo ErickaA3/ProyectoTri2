@@ -1,34 +1,27 @@
 package com.project.util;
 
+import com.pgvector.PGvector;
 import com.project.database.DatabaseConnection;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 /**
- * RAG real por búsqueda de relevancia.
+ * RAG real por búsqueda semántica (pgvector).
  *
  * En vez de mandar TODO el contenido al modelo:
  *   1. Siempre: perfil, stats, misiones, inventario, tienda (poco espacio)
  *   2. Siempre: lista compacta de TODOS los títulos (para que el modelo sepa qué existe)
- *   3. Búsqueda: trae el JSONB completo SOLO de contenidos que matcheen con la pregunta
- *
- * Así el modelo puede discutir cualquier tema con detalle, sin importar cuántos haya.
+ *   3. Búsqueda: trae el JSONB completo SOLO de contenidos semánticamente
+ *      similares a la pregunta, usando el embedding.
  */
 public class UserContextService {
 
     private static final int MAX_RELEVANT_ITEMS = 4;
 
-    /**
-     * Construye el contexto usando la pregunta del usuario para buscar contenido relevante.
-     */
     public static String buildContext(UUID userId, String userMessage) {
         StringBuilder ctx = new StringBuilder();
 
@@ -37,7 +30,6 @@ public class UserContextService {
             appendUserInfo(conn, userId, ctx);
             appendStats(conn, userId, ctx);
 
-            // ── Contenido: lista completa + búsqueda relevante ──
             appendAllTitles(conn, userId, ctx);
             appendRelevantContent(conn, userId, userMessage, ctx);
 
@@ -56,9 +48,6 @@ public class UserContextService {
         return ctx.toString();
     }
 
-    /**
-     * Overload sin mensaje — para compatibilidad.
-     */
     public static String buildContext(UUID userId) {
         return buildContext(userId, "");
     }
@@ -152,48 +141,42 @@ public class UserContextService {
         } catch (SQLException e) { logErr("allTitles", e); }
     }
 
-    // ── Búsqueda de contenido RELEVANTE a la pregunta ─────────────────────
+    // ── Búsqueda de contenido RELEVANTE — AHORA POR SIMILITUD VECTORIAL ────
 
     private static void appendRelevantContent(Connection conn, UUID userId,
                                                String userMessage, StringBuilder ctx) {
         if (userMessage == null || userMessage.isBlank()) {
-            // Sin mensaje — traer los 3 más recientes como fallback
             appendRecentContent(conn, userId, ctx, 3);
             return;
         }
 
-        // Extraer palabras clave de la pregunta (>= 3 chars, ignorar stop words)
-        List<String> keywords = extractKeywords(userMessage);
-
-        if (keywords.isEmpty()) {
+        // 1. Generar el embedding de la pregunta del usuario
+        float[] queryEmbedding;
+        try {
+            queryEmbedding = AIService.generateEmbedding(userMessage);
+        } catch (Exception e) {
+            System.err.println("[RAG] Error generando embedding de búsqueda: " + e.getMessage());
             appendRecentContent(conn, userId, ctx, 3);
             return;
         }
 
-        // Construir query con ILIKE para cada keyword (OR entre ellas)
-        StringBuilder sqlBuilder = new StringBuilder();
-        sqlBuilder.append("SELECT id, type, title, content::text, is_favorite FROM study_content ");
-        sqlBuilder.append("WHERE user_id = ? AND (");
+        // 2. Buscar los contenidos más parecidos por distancia coseno (<=>)
+        //    Solo entre filas que YA tienen embedding (embedding IS NOT NULL)
+        String sql = """
+            SELECT id, type, title, content::text, is_favorite
+            FROM study_content
+            WHERE user_id = ? AND embedding IS NOT NULL
+            ORDER BY embedding <=> ?
+            LIMIT ?
+            """;
 
-        for (int i = 0; i < keywords.size(); i++) {
-            if (i > 0) sqlBuilder.append(" OR ");
-            sqlBuilder.append("LOWER(title) LIKE ?");
-            sqlBuilder.append(" OR LOWER(content::text) LIKE ?");
-        }
-        sqlBuilder.append(") ORDER BY created_at DESC LIMIT ").append(MAX_RELEVANT_ITEMS);
-
-        try (PreparedStatement ps = conn.prepareStatement(sqlBuilder.toString())) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
-            int paramIdx = 2;
-            for (String kw : keywords) {
-                String like = "%" + kw.toLowerCase() + "%";
-                ps.setString(paramIdx++, like);
-                ps.setString(paramIdx++, like);
-            }
+            ps.setObject(2, new PGvector(queryEmbedding));
+            ps.setInt(3, MAX_RELEVANT_ITEMS);
 
             ResultSet rs = ps.executeQuery();
             boolean hasResults = false;
-            Set<String> foundIds = new HashSet<>();
 
             while (rs.next()) {
                 if (!hasResults) {
@@ -206,8 +189,6 @@ public class UserContextService {
                 String title   = rs.getString("title");
                 String content = rs.getString("content");
                 boolean fav    = rs.getBoolean("is_favorite");
-
-                foundIds.add(id);
 
                 ctx.append("\n── ").append(mapType(type)).append(": \"");
                 ctx.append(title != null ? title : "Sin título").append("\"");
@@ -228,7 +209,6 @@ public class UserContextService {
 
         } catch (SQLException e) {
             logErr("relevantContent", e);
-            // Fallback: traer recientes
             appendRecentContent(conn, userId, ctx, 3);
         }
     }
@@ -264,38 +244,6 @@ public class UserContextService {
             }
             if (has) ctx.append("\n");
         } catch (SQLException e) { logErr("recentContent", e); }
-    }
-
-    /** Extrae palabras clave del mensaje (>= 3 chars, sin stop words) */
-    private static List<String> extractKeywords(String message) {
-        Set<String> stopWords = Set.of(
-            "que", "qué", "como", "cómo", "cual", "cuál", "cuando", "cuándo",
-            "donde", "dónde", "por", "para", "con", "sin", "sobre", "entre",
-            "los", "las", "del", "una", "uno", "unos", "unas", "son", "está",
-            "hay", "fue", "ser", "haber", "tener", "hacer", "poder", "deber",
-            "esto", "esta", "ese", "esa", "eso", "estos", "estas",
-            "más", "muy", "también", "pero", "porque", "desde", "hasta",
-            "todo", "toda", "todos", "todas", "otro", "otra", "otros",
-            "mis", "tus", "sus", "este", "puede", "puedo", "tienes", "tiene",
-            "habla", "hablame", "háblame", "explica", "explicame", "explícame",
-            "dime", "dame", "muestrame", "muéstrame", "cuéntame", "cuentame",
-            "acerca", "respecto", "favor", "quiero", "necesito", "saber",
-            "cuantos", "cuántos", "cuantas", "cuántas", "tengo"
-        );
-
-        List<String> keywords = new ArrayList<>();
-        String[] words = message.toLowerCase()
-            .replaceAll("[^a-záéíóúñü\\s]", "")
-            .split("\\s+");
-
-        for (String w : words) {
-            if (w.length() >= 3 && !stopWords.contains(w)) {
-                keywords.add(w);
-            }
-        }
-
-        // Limitar a 5 keywords para no hacer queries enormes
-        return keywords.size() > 5 ? keywords.subList(0, 5) : keywords;
     }
 
     // ── Volcado completo del JSONB ────────────────────────────────────────
@@ -386,7 +334,6 @@ public class UserContextService {
         }
     }
 
-    /** Recursivo para esquemas — muestra toda la estructura del árbol */
     private static void appendSchemaNode(StringBuilder ctx, com.google.gson.JsonObject node, int depth) {
         String indent = "  " + "  ".repeat(depth);
         ctx.append(indent).append("- ").append(safeGet(node, "label")).append("\n");

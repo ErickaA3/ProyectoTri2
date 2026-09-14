@@ -18,7 +18,7 @@ FROM tomcat:10.1-jdk21-temurin
 RUN rm -rf /usr/local/tomcat/webapps/*
 
 # Copiar el WAR generado
-COPY --from=build /app/target/project-1.0-SNAPSHOT.war /usr/local/tomcat/webapps/ROOT.war
+COPY --from=build /app/target/ROOT.war /usr/local/tomcat/webapps/ROOT.war
 
 # Puerto que expone Tomcat
 EXPOSE 8080

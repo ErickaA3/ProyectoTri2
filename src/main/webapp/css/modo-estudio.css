@@ -1,4 +1,4 @@
- /* ===== MODO ESTUDIO - ESTILOS ESPECÍFICOS DE PÁGINA ===== */
+/* ===== MODO ESTUDIO - ESTILOS ESPECÍFICOS DE PÁGINA ===== */
 
 /* ===== CONTENIDO PRINCIPAL ===== */
 .content {
@@ -24,11 +24,18 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 3rem;
+    /* [FIX] antes: margin-bottom: 3rem fijo. Con clamp() cede espacio
+       en pantallas de poco alto en vez de sumar siempre 3rem completos. */
+    margin-bottom: clamp(1rem, 3vh, 3rem);
 }
 
 .modo-estudio-logo {
-    height: 450px;
+    /* [FIX] antes: height: 450px fijo. En laptops de ~768px de alto
+       esto por sí solo ya ocupaba más de la mitad de la ventana.
+       Con clamp() escala según el alto real del viewport (28vh),
+       con un piso de 160px (no se ve minúsculo) y techo de 450px
+       (no crece de más en pantallas grandes). */
+    height: clamp(160px, 28vh, 450px);
     width: auto;
     max-width: 100%;
     filter: drop-shadow(0 0 35px rgba(255, 215, 0, 0.7));
@@ -54,7 +61,10 @@
     background: rgba(20, 20, 50, 0.7);
     border: 1px solid rgba(45, 212, 191, 0.25);
     border-radius: 28px;
-    padding: 3.5rem;
+    /* [FIX] antes: padding: 3.5rem fijo (112px arriba+abajo).
+       Con clamp() se reduce en pantallas bajas sin perder el aire
+       generoso en pantallas grandes. */
+    padding: clamp(1.5rem, 4vh, 3.5rem);
     position: relative;
     overflow: visible;
     backdrop-filter: blur(20px);
@@ -154,7 +164,8 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 1.75rem;
-    margin-bottom: 3rem;
+    /* [FIX] antes: margin-bottom: 3rem fijo. */
+    margin-bottom: clamp(1.5rem, 3vh, 3rem);
     position: relative;
     z-index: 1;
 }
@@ -305,7 +316,8 @@
 
 /* ===== SECCIÓN APORTAR DATOS ===== */
 .data-section {
-    margin-bottom: 3rem;
+    /* [FIX] antes: margin-bottom: 3rem fijo. */
+    margin-bottom: clamp(1.5rem, 3vh, 3rem);
     position: relative;
     z-index: 1;
 }

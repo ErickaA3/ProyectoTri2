@@ -31,12 +31,18 @@
     --sidebar-width: 300px;
 }
 
+/* [FIX] antes: min-height: 100vh; sin overflow.
+   El body podía crecer más allá del viewport y generaba el scroll
+   de la ventana completa, que competía con el scroll fijo del sidebar.
+   Ahora el body queda anclado a la altura del viewport y el único
+   que scrollea es .content (ver más abajo). */
 body {
     font-family: 'Coolvetica', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: var(--primary-bg);
     color: var(--text-primary);
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
     padding-top: var(--navbar-height);
 }
 
@@ -433,12 +439,20 @@ body {
 }
 
 /* ===== CONTENIDO PRINCIPAL ===== */
+/* [FIX] antes: min-height: calc(100vh - navbar-height); sin overflow propio.
+   Como el body no tenía altura fija, .content nunca llegaba a desbordar
+   dentro de su propia caja: en vez de scrollear, empujaba la altura de
+   todo el documento y aparecía el scroll de la ventana, compitiendo con
+   el scroll fijo del sidebar. Ahora .content tiene altura fija real y
+   overflow-y: auto, así que scrollea dentro de su propia caja, igual que
+   ya hacía .sidebar-cards. */
 .content {
     flex: 1;
     padding: 2rem;
     margin-left: var(--sidebar-width);
     background: var(--primary-bg);
-    min-height: calc(100vh - var(--navbar-height));
+    height: calc(100vh - var(--navbar-height));
+    overflow-y: auto;
 }
 
 /* ===== RESPONSIVE ===== */
@@ -496,6 +510,9 @@ body {
     .content {
         margin-left: 0;
         padding: 1.5rem 1rem;
+        /* [FIX] la altura de .content también debe respetar el navbar
+           en móvil con las barras dinámicas del navegador */
+        height: calc(100dvh - var(--navbar-height));
     }
 }
 

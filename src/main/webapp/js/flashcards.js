@@ -1,17 +1,14 @@
-// ─────────────────────────────────────────────────────────────
-//  flashcards.js — Mi ProfesorIA
-//  Estudia flashcards generadas por IA con evaluación y score
-// ─────────────────────────────────────────────────────────────
 
 // ═══════════════════════════════════════════════════════════════
 // ESTADO
 // ═══════════════════════════════════════════════════════════════
-let cards       = [];
-let currentIdx  = 0;
-let isFlipped   = false;
-let answers     = [];   // { correct: bool } por cada card
-let highScore   = 0;
-let reviewMode  = false;
+let cards        = [];
+let originalCards = [];   // [FIX] guarda el mazo completo para restaurar en restart
+let currentIdx   = 0;
+let isFlipped    = false;
+let answers      = [];    // { correct: bool } por cada card
+let highScore    = 0;
+let reviewMode   = false;
 
 // ═══════════════════════════════════════════════════════════════
 // INICIALIZACIÓN
@@ -31,6 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
             goBack(); return;
         }
         cards = data.cards;
+        // [FIX] Guardar copia del mazo original para poder restaurarlo en restart
+        originalCards = [...cards];
         document.getElementById('topicLabel').textContent = data.title || 'Flashcards';
     } catch (e) {
         console.error('Error parsing flashcards:', e);
@@ -38,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Cargar high score
-    const savedHS = localStorage.getItem('fc_highscore_' + cards.length);
+    const savedHS = localStorage.getItem('fc_highscore_' + originalCards.length);
     if (savedHS) highScore = parseInt(savedHS);
     document.getElementById('highScoreDisplay').textContent = highScore + '%';
 
@@ -70,6 +69,12 @@ function showCard(idx) {
 
     // Nav buttons
     document.getElementById('prevBtn').disabled = idx === 0;
+
+    // [FIX] Deshabilitar nextBtn en la última tarjeta si quedan sin evaluar.
+    // Si ya están todas evaluadas, el click mostrará resultados (nextCard lo maneja).
+    const isLastCard  = idx === cards.length - 1;
+    const allAnswered = answers.every(a => a !== null);
+    document.getElementById('nextBtn').disabled = isLastCard && !allAnswered;
 
     // Eval buttons: mostrar solo si la tarjeta está volteada y no evaluada
     updateEvalVisibility();
@@ -187,11 +192,11 @@ function showResults() {
     document.getElementById('incorrectCount').textContent = incorrect;
     document.getElementById('scoreNumber').textContent = score + '%';
 
-    // High score
+    // High score (basado en el mazo original para consistencia)
     const isNewHS = score > highScore;
     if (isNewHS) {
         highScore = score;
-        localStorage.setItem('fc_highscore_' + cards.length, highScore);
+        localStorage.setItem('fc_highscore_' + originalCards.length, highScore);
     }
     document.getElementById('highScoreResult').textContent = highScore + '%';
     document.getElementById('highScoreDisplay').textContent = highScore + '%';
@@ -204,7 +209,6 @@ function showResults() {
     setTimeout(() => {
         ring.style.transition = 'stroke-dashoffset 1.5s ease';
         ring.style.strokeDashoffset = offset;
-        // Color según score
         if (score >= 70) ring.style.stroke = '#22c55e';
         else if (score >= 50) ring.style.stroke = '#fbbf24';
         else ring.style.stroke = '#ef4444';
@@ -246,16 +250,24 @@ function showResults() {
 // ACCIONES DE RESULTADOS
 // ═══════════════════════════════════════════════════════════════
 function restartFlashcards() {
+    // [FIX] Restaurar el mazo completo original, no el subset de errores
+    cards = [...originalCards];
     answers = new Array(cards.length).fill(null);
     reviewMode = false;
+
     document.getElementById('resultsView').classList.remove('active');
     document.getElementById('studyView').classList.remove('hidden');
+
+    // Actualizar total (puede haber cambiado si veníamos de reviewMistakes)
+    document.getElementById('totalNum').textContent = cards.length;
 
     // Reset score ring
     const ring = document.getElementById('scoreRing');
     ring.style.transition = 'none';
     ring.style.strokeDashoffset = 471.24;
 
+    // [FIX] Reconstruir dots para el mazo correcto
+    buildDots();
     showCard(0);
 }
 
@@ -269,8 +281,7 @@ function reviewMistakes() {
         return;
     }
 
-    // Crear subset solo con errores
-    const originalCards = [...cards];
+    // Crear subset solo con errores (originalCards no se toca)
     cards = mistakeIndices.map(i => originalCards[i]);
     answers = new Array(cards.length).fill(null);
     reviewMode = true;
@@ -328,7 +339,7 @@ const confettiStyle = document.createElement('style');
 confettiStyle.textContent = `
     @keyframes confettiFall {
         0% { transform: translateY(0) rotate(0deg); opacity:1; }
-        100% { transform: translateY(100vh) rotate(${360 + Math.random()*360}deg); opacity:0; }
+        100% { transform: translateY(100vh) rotate(720deg); opacity:0; }
     }
 `;
 document.head.appendChild(confettiStyle);
@@ -338,7 +349,6 @@ document.head.appendChild(confettiStyle);
 // ═══════════════════════════════════════════════════════════════
 function goBack(e) {
     if (e) e.preventDefault();
-    // Volver a sesion-estudio con los resultados existentes
     window.location.href = '../pages/sesion-estudio.html';
 }
 
@@ -353,7 +363,7 @@ document.addEventListener('keydown', (e) => {
             flipCard();
             break;
         case 'ArrowRight':
-            nextCard();
+            if (!document.getElementById('nextBtn').disabled) nextCard();
             break;
         case 'ArrowLeft':
             prevCard();

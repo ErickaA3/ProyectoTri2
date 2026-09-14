@@ -27,8 +27,8 @@ import jakarta.servlet.http.HttpSession;
  *   POST /shop/buy      → comprar un ítem  { "itemId": 3 }
  *   POST /shop/equip    → equipar un ítem  { "itemId": 3 }
  *
- * Auth: HttpSession → fallback header X-User-Id
- * (mismo patrón que FavoritesServlet y ModoEstudioServlet)
+ * Auth: JWT (req.getAttribute("userId") puesto por JwtFilter) → fallback HttpSession.
+ * La ruta /shop/* está cubierta por JwtFilter (mismo patrón que el resto del API).
  */
 @WebServlet("/shop/*")
 public class ShopServlet extends HttpServlet {
@@ -157,17 +157,18 @@ public class ShopServlet extends HttpServlet {
     // ──────────────────────────────────────────────────────────────
 
     /**
-     * Obtiene el userId desde la sesión HTTP.
-     * Fallback: header X-User-Id (útil para pruebas con Thunder Client).
+     * Obtiene el userId desde el JWT validado por JwtFilter (req.getAttribute),
+     * con fallback a HttpSession. Ya no se acepta el header X-User-Id (spoofable).
      */
     private String getUserId(HttpServletRequest req) {
+        Object attr = req.getAttribute("userId");
+        if (attr != null) return attr.toString();
         HttpSession session = req.getSession(false);
         if (session != null) {
             Object uid = session.getAttribute("userId");
             if (uid != null) return uid.toString();
         }
-        String header = req.getHeader("X-User-Id");
-        return (header != null && !header.isBlank()) ? header : null;
+        return null;
     }
 
     private void sendError(HttpServletResponse res, int status, String message) throws IOException {

@@ -2,22 +2,17 @@ package com.project.database;
 
 import java.io.InputStream;
 import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.util.Properties;
 
-/**
- * Crea una conexión nueva en cada llamada.
- *
- * PRIORIDAD de configuración:
- *   1. Variables de entorno (Railway en producción)
- *   2. config/database.properties (desarrollo local)
- *
- * En local: seguís usando database.properties normalmente, sin cambiar nada.
- * En Railway: las variables DB_URL, DB_USERNAME, DB_PASSWORD sobreescriben el archivo.
- */
+import com.pgvector.PGvector;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
 public class DatabaseConnection {
 
     private static Properties fileConfig = null;
+    private static volatile HikariDataSource dataSource;
 
     private static Properties loadFileConfig() {
         if (fileConfig != null) return fileConfig;
@@ -33,38 +28,71 @@ public class DatabaseConnection {
         }
     }
 
-    /**
-     * Lee una propiedad con esta prioridad:
-     *   1. Variable de entorno (ej: DB_URL)
-     *   2. Valor en database.properties (ej: db.url)
-     */
     private static String getProp(String envKey, String fileKey) {
         String envVal = System.getenv(envKey);
         if (envVal != null && !envVal.isBlank()) return envVal.trim();
         return loadFileConfig().getProperty(fileKey);
     }
 
+    /** Inicializa el pool UNA sola vez, la primera vez que se pide una conexión. */
+    private static HikariDataSource getDataSource() {
+        HikariDataSource ds = dataSource;
+        if (ds == null) {
+            synchronized (DatabaseConnection.class) {
+                ds = dataSource;
+                if (ds == null) {
+                    String url      = getProp("DB_URL",     "db.url");
+                    String username = getProp("DB_USERNAME", "db.username");
+                    String password = getProp("DB_PASSWORD", "db.password");
+                    String driver   = getProp("DB_DRIVER",   "db.driver");
+
+                    HikariConfig config = new HikariConfig();
+                    config.setJdbcUrl(url);
+                    config.setUsername(username);
+                    config.setPassword(password);
+                    config.setDriverClassName(driver);
+
+                    // Ajustables según carga real; valores conservadores para
+                    // el límite de conexiones del plan free de Supabase.
+                    config.setMaximumPoolSize(10);
+                    config.setMinimumIdle(2);
+                    config.setConnectionTimeout(10_000);   // 10s esperando conexión libre
+                    config.setIdleTimeout(300_000);         // 5min
+                    config.setMaxLifetime(1_800_000);       // 30min, refresca conexiones viejas
+
+                    config.addDataSourceProperty("sslmode", "require");
+                    config.addDataSourceProperty("prepareThreshold", "0");
+
+                    ds = new HikariDataSource(config);
+                    dataSource = ds;
+                    System.out.println("[DB] Pool HikariCP inicializado — "
+                        + (System.getenv("DB_URL") != null ? "Railway" : "Local"));
+                }
+            }
+        }
+        return ds;
+    }
+
     public static Connection getConnection() {
-        try {
-            String url      = getProp("DB_URL",      "db.url");
-            String username = getProp("DB_USERNAME",  "db.username");
-            String password = getProp("DB_PASSWORD",  "db.password");
-            String driver   = getProp("DB_DRIVER",    "db.driver");
+    try {
+        Connection conn = getDataSource().getConnection();
+        PGvector.addVectorType(conn);
+        return conn;
+    } catch (SQLException e) {
+        System.err.println("[DB] Error obteniendo conexión del pool: " + e.getMessage());
+        e.printStackTrace(); // ← agregar esta línea temporalmente
+        if (e.getCause() != null) {
+            System.err.println("[DB] Causa raíz: " + e.getCause());
+        }
+        throw new RuntimeException("No se pudo conectar a la base de datos: " + e.getMessage());
+    }
+}
 
-            Properties props = new Properties();
-            props.setProperty("user",             username);
-            props.setProperty("password",         password);
-            props.setProperty("sslmode",          "require");
-            props.setProperty("prepareThreshold", "0");
-
-            Class.forName(driver);
-            Connection conn = DriverManager.getConnection(url, props);
-            System.out.println("[DB] Conexión OK — " + (System.getenv("DB_URL") != null ? "Railway" : "Local"));
-            return conn;
-
-        } catch (Exception e) {
-            System.err.println("[DB] Error conectando: " + e.getMessage());
-            throw new RuntimeException("No se pudo conectar a la base de datos: " + e.getMessage());
+    /** Llamar desde AppShutdownListener al redeploy/shutdown de Tomcat. */
+    public static void shutdown() {
+        if (dataSource != null) {
+            dataSource.close();
+            dataSource = null;
         }
     }
 }
