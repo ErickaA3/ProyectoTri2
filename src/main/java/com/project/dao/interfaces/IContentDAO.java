@@ -51,4 +51,15 @@ public interface IContentDAO {
      * @return null si no existe o no pertenece al usuario
      */
     String getContentJson(String contentId, String userId) throws Exception;
+
+    /**
+     * Obtiene solo el "type" de un contenido, verificando que pertenezca al
+     * usuario. Se usa para validar en el servidor que un contentId que
+     * llega en un request realmente existe, es del usuario autenticado, y
+     * es del tipo que dice ser (ej: no puede reclamar recompensa de "quiz"
+     * pasando el id de un resumen).
+     * @return "flashcard" | "schema" | "summary" | "quiz" | "expert_exam",
+     *         o null si el contenido no existe o no es de ese usuario.
+     */
+    String getContentType(String contentId, String userId) throws Exception;
 }

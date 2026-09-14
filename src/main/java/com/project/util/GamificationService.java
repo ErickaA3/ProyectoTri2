@@ -93,14 +93,16 @@ public class GamificationService {
 
         // 2.5. Guardar resultado + detectar si ya fue recompensado antes
         //      saveActivityResult devuelve null cuando ya existe el registro (mismo user + content)
+        //      [SEGURIDAD] Antes esto solo aplicaba a "expert_exam"/"quiz" — se
+        //      extiende a CUALQUIER actividad que traiga contentId (resumen,
+        //      flashcards, generar, etc.), para que no se pueda volver a cobrar
+        //      recompensa por el mismo contenido reenviando la misma llamada.
         String resultId = null;
         boolean alreadyRewarded = false;
         if (contentId != null && !contentId.isEmpty()) {
             double score = (scorePercent / 100.0) * maxScore;
             resultId = dao.saveActivityResult(userId, contentId, score, maxScore, timeTakenSecs);
-            if ("expert_exam".equals(activityType) || "quiz".equals(activityType)) {
-                alreadyRewarded = (resultId == null);
-            }
+            alreadyRewarded = (resultId == null);
         }
 
         // 3. Rewards base — 0 si ya fue recompensado
