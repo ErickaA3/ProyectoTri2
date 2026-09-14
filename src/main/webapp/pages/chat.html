@@ -140,14 +140,31 @@
       <!-- Input -->
       <div class="input-area">
         <div class="input-box">
+          <input type="file" id="pdfFileInput" accept="application/pdf" style="display:none" onchange="handlePdfUpload(event)">
+
+          <!-- Chip PDF dentro del input-box -->
+          <div class="pdf-chip" id="pdfChip" style="display:none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="pdf-chip-name"></span>
+            <button class="pdf-chip-remove" onclick="removePdf()" title="Quitar PDF">&#215;</button>
+          </div>
+
+          <!-- Botón adjuntar PDF -->
+          <button class="pdf-btn" id="pdfBtn" onclick="document.getElementById('pdfFileInput').click()" title="Adjuntar PDF">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+          </button>
+
           <textarea id="userInput" rows="1" placeholder="Escríbeme tu pregunta..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+
           <button class="send-btn" id="sendBtn" onclick="send()">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
             </svg>
           </button>
         </div>
-        <div class="input-hint">Enter para enviar · Shift+Enter nueva línea</div>
+        <div class="input-hint">Enter para enviar &middot; Shift+Enter nueva l&iacute;nea &middot; 📎 adjuntar PDF</div>
       </div>
     </div>
 
