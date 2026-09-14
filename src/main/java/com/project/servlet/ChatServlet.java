@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.project.database.DatabaseConnection;
 import com.project.util.AIService;
 import com.project.util.JsonUtil;
@@ -26,313 +29,581 @@ import jakarta.servlet.http.HttpSession;
 @WebServlet("/api/chat")
 public class ChatServlet extends HttpServlet {
 
+    // POST /api/chat
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+    protected void doPost(
+            HttpServletRequest request,
+            HttpServletResponse response)
             throws ServletException, IOException {
 
-        // Leer body completo primero
-        String body = request.getReader().lines().collect(Collectors.joining());
+        String body = request.getReader()
+                .lines()
+                .collect(Collectors.joining());
 
-        // Identidad únicamente desde el JWT validado por JwtFilter (sin fallback de cliente).
         UUID userId = resolveUserId(request);
+
         if (userId == null) {
-            JsonUtil.sendError(response, 401, "No autenticado. Inicia sesión de nuevo.");
+            JsonUtil.sendError(
+                    response,
+                    401,
+                    "No autenticado. Inicia sesión de nuevo."
+            );
             return;
         }
 
-        String mensaje   = extractJsonValue(body, "mensaje");
-        String sessionId = extractJsonValue(body, "sessionId");
+        String mensaje;
+        String sessionId;
 
-        processChat(response, userId, mensaje, sessionId);
-    }
+        try {
+            JsonObject json = JsonParser
+                    .parseString(body)
+                    .getAsJsonObject();
 
-    private void processChat(HttpServletResponse response, UUID userId,
-                              String mensaje, String sessionId) throws IOException {
+            mensaje = json.has("mensaje")
+                    && !json.get("mensaje").isJsonNull()
+                    ? json.get("mensaje").getAsString()
+                    : null;
+
+            sessionId = json.has("sessionId")
+                    && !json.get("sessionId").isJsonNull()
+                    ? json.get("sessionId").getAsString()
+                    : null;
+
+        } catch (Exception e) {
+            JsonUtil.sendError(
+                    response,
+                    400,
+                    "Body inválido, se esperaba JSON."
+            );
+            return;
+        }
 
         if (mensaje == null || mensaje.isBlank()) {
-            JsonUtil.sendError(response, 400, "El mensaje no puede estar vacío.");
+            JsonUtil.sendError(
+                    response,
+                    400,
+                    "El mensaje no puede estar vacío."
+            );
             return;
         }
 
-        if (sessionId == null || sessionId.isBlank() || "null".equals(sessionId)) {
+        if (sessionId == null || sessionId.isBlank()) {
             sessionId = UUID.randomUUID().toString();
         }
+
         final String finalSessionId = sessionId;
 
         try {
             List<AIService.ChatMessage> historial;
-            String profesorNombre, personalidad;
+            String profesorNombre;
+            String personalidad;
 
-            // ── Bloque 1: BD corta, solo lectura + guardar mensaje del usuario ──
+            // Obtener historial y configuración del profesor
             try (Connection conn = DatabaseConnection.getConnection()) {
-                historial = loadHistory(conn, userId, finalSessionId);
-                String[] profesorConfig = loadProfesorConfig(conn, userId);
+
+                historial = loadHistory(
+                        conn,
+                        userId,
+                        finalSessionId
+                );
+
+                String[] profesorConfig =
+                        loadProfesorConfig(conn, userId);
+
                 profesorNombre = profesorConfig[0];
-                personalidad   = profesorConfig[1];
-                saveMessage(conn, userId, finalSessionId, "user", mensaje);
+                personalidad = profesorConfig[1];
+
+                // Guardar mensaje del usuario
+                saveMessage(
+                        conn,
+                        userId,
+                        finalSessionId,
+                        "user",
+                        mensaje
+                );
             }
 
-            // ── Fuera de la conexión: construir contexto RAG + llamar a OpenAI ──
-            StringBuilder searchContext = new StringBuilder();
-            int start = Math.max(0, historial.size() - 6);
-            for (int i = start; i < historial.size(); i++) {
-                searchContext.append(historial.get(i).content).append(" ");
+            // Construir contexto para la IA
+            StringBuilder searchContext =
+                    new StringBuilder();
+
+            int start =
+                    Math.max(0, historial.size() - 6);
+
+            for (int i = start;
+                    i < historial.size();
+                    i++) {
+
+                searchContext
+                        .append(historial.get(i).content)
+                        .append(" ");
             }
+
             searchContext.append(mensaje);
 
-            String contexto = UserContextService.buildContext(userId, searchContext.toString());
-            String respuesta = AIService.chat(historial, mensaje, profesorNombre, personalidad, contexto);
+            String contexto =
+                    UserContextService.buildContext(
+                            userId,
+                            searchContext.toString()
+                    );
 
-            // ── Bloque 2: BD corta, solo guardar respuesta del asistente ──
-            try (Connection conn = DatabaseConnection.getConnection()) {
-                saveMessage(conn, userId, finalSessionId, "assistant", respuesta);
+            // Llamar a la IA
+            String respuesta = AIService.chat(
+                    historial,
+                    mensaje,
+                    profesorNombre,
+                    personalidad,
+                    contexto
+            );
+
+            // Guardar respuesta del asistente
+            try (Connection conn =
+                    DatabaseConnection.getConnection()) {
+
+                saveMessage(
+                        conn,
+                        userId,
+                        finalSessionId,
+                        "assistant",
+                        respuesta
+                );
             }
 
-            String json = "{" +
-                "\"reply\":" + toJsonString(respuesta) + "," +
-                "\"sessionId\":\"" + finalSessionId + "\"" +
-                "}";
-            JsonUtil.sendSuccess(response, json);
+            // Respuesta al frontend
+            JsonObject responseJson =
+                    new JsonObject();
+
+            responseJson.addProperty(
+                    "reply",
+                    respuesta
+            );
+
+            responseJson.addProperty(
+                    "sessionId",
+                    finalSessionId
+            );
+
+            JsonUtil.sendSuccess(
+                    response,
+                    responseJson.toString()
+            );
 
         } catch (Exception e) {
+
             e.printStackTrace();
-            JsonUtil.sendError(response, 500, "Error interno del servidor.");
+
+            JsonUtil.sendError(
+                    response,
+                    500,
+                    "Error interno del servidor."
+            );
         }
     }
 
+    // GET /api/chat?sessionId=xxx
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+    protected void doGet(
+            HttpServletRequest request,
+            HttpServletResponse response)
             throws ServletException, IOException {
 
         UUID userId = resolveUserId(request);
+
         if (userId == null) {
-            JsonUtil.sendError(response, 401, "No autenticado.");
+            JsonUtil.sendError(
+                    response,
+                    401,
+                    "No autenticado."
+            );
             return;
         }
 
-        String sessionId = request.getParameter("sessionId");
+        String sessionId =
+                request.getParameter("sessionId");
 
-        try (Connection conn = DatabaseConnection.getConnection()) {
+        try (Connection conn =
+                DatabaseConnection.getConnection()) {
 
-            if (sessionId != null && !sessionId.isBlank()) {
-                List<AIService.ChatMessage> msgs = loadHistory(conn, userId, sessionId);
-                StringBuilder sb = new StringBuilder("[");
-                for (int i = 0; i < msgs.size(); i++) {
-                    AIService.ChatMessage m = msgs.get(i);
-                    sb.append("{\"role\":").append(toJsonString(m.role))
-                      .append(",\"content\":").append(toJsonString(m.content))
-                      .append("}");
-                    if (i < msgs.size() - 1) sb.append(",");
+            if (sessionId != null
+                    && !sessionId.isBlank()) {
+
+                // Historial de una sesión
+                List<AIService.ChatMessage> msgs =
+                        loadHistory(
+                                conn,
+                                userId,
+                                sessionId
+                        );
+
+                JsonArray arr = new JsonArray();
+
+                for (AIService.ChatMessage m : msgs) {
+
+                    JsonObject o = new JsonObject();
+
+                    o.addProperty("role", m.role);
+                    o.addProperty("content", m.content);
+
+                    arr.add(o);
                 }
-                sb.append("]");
-                JsonUtil.sendSuccess(response, sb.toString());
+
+                JsonUtil.sendSuccess(
+                        response,
+                        arr.toString()
+                );
+
             } else {
-                List<String[]> sessions = loadSessions(conn, userId);
-                StringBuilder sb = new StringBuilder("[");
-                for (int i = 0; i < sessions.size(); i++) {
-                    String[] s = sessions.get(i);
-                    sb.append("{\"sessionId\":").append(toJsonString(s[0]))
-                      .append(",\"firstMessage\":").append(toJsonString(s[1]))
-                      .append(",\"createdAt\":").append(toJsonString(s[2]))
-                      .append("}");
-                    if (i < sessions.size() - 1) sb.append(",");
+
+                // Lista de sesiones
+                List<String[]> sessions =
+                        loadSessions(conn, userId);
+
+                JsonArray arr = new JsonArray();
+
+                for (String[] s : sessions) {
+
+                    JsonObject o = new JsonObject();
+
+                    o.addProperty(
+                            "sessionId",
+                            s[0]
+                    );
+
+                    o.addProperty(
+                            "firstMessage",
+                            s[1]
+                    );
+
+                    o.addProperty(
+                            "createdAt",
+                            s[2]
+                    );
+
+                    arr.add(o);
                 }
-                sb.append("]");
-                JsonUtil.sendSuccess(response, sb.toString());
+
+                JsonUtil.sendSuccess(
+                        response,
+                        arr.toString()
+                );
             }
 
-        } catch (SQLException e) {
+        } catch (IllegalArgumentException e) {
+
+            JsonUtil.sendError(
+                    response,
+                    400,
+                    "sessionId inválido."
+            );
+
+        } catch (Exception e) {
+
             e.printStackTrace();
-            JsonUtil.sendError(response, 500, "Error interno del servidor.");
+
+            JsonUtil.sendError(
+                    response,
+                    500,
+                    "Error interno del servidor."
+            );
         }
     }
 
+    // DELETE /api/chat?sessionId=xxx
     @Override
-    protected void doDelete(HttpServletRequest request, HttpServletResponse response)
+    protected void doDelete(
+            HttpServletRequest request,
+            HttpServletResponse response)
             throws ServletException, IOException {
 
         UUID userId = resolveUserId(request);
+
         if (userId == null) {
-            JsonUtil.sendError(response, 401, "No autenticado.");
+            JsonUtil.sendError(
+                    response,
+                    401,
+                    "No autenticado."
+            );
             return;
         }
 
-        String sessionId = request.getParameter("sessionId");
+        String sessionId =
+                request.getParameter("sessionId");
+
         if (sessionId == null || sessionId.isBlank()) {
-            JsonUtil.sendError(response, 400, "Se requiere sessionId.");
+            JsonUtil.sendError(
+                    response,
+                    400,
+                    "Se requiere sessionId."
+            );
             return;
         }
 
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            String sql = "DELETE FROM chat_history WHERE user_id = ? AND session_id = ?";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn =
+                DatabaseConnection.getConnection()) {
+
+            String sql =
+                    "DELETE FROM chat_history " +
+                    "WHERE user_id = ? AND session_id = ?";
+
+            try (PreparedStatement ps =
+                    conn.prepareStatement(sql)) {
+
                 ps.setObject(1, userId);
-                ps.setObject(2, UUID.fromString(sessionId));
+
+                ps.setObject(
+                        2,
+                        UUID.fromString(sessionId)
+                );
+
                 int deleted = ps.executeUpdate();
-                String json = "{\"deleted\":" + deleted + "}";
-                JsonUtil.sendSuccess(response, json);
+
+                String json =
+                        "{\"deleted\":" + deleted + "}";
+
+                JsonUtil.sendSuccess(
+                        response,
+                        json
+                );
             }
+
+        } catch (IllegalArgumentException e) {
+
+            JsonUtil.sendError(
+                    response,
+                    400,
+                    "sessionId inválido."
+            );
+
         } catch (SQLException e) {
+
             e.printStackTrace();
-            JsonUtil.sendError(response, 500, "Error al eliminar el chat.");
+
+            JsonUtil.sendError(
+                    response,
+                    500,
+                    "Error al eliminar el chat."
+            );
         }
     }
 
-    // ── Helper: identidad desde el JWT (JwtFilter) con fallback a sesión ───────
+    // Obtener el ID del usuario autenticado
+    private UUID resolveUserId(
+            HttpServletRequest request) {
 
-    private UUID resolveUserId(HttpServletRequest request) {
-        String uid = (String) request.getAttribute("userId");
+        String uid =
+                (String) request.getAttribute("userId");
+
         if (uid == null) {
-            HttpSession session = request.getSession(false);
+
+            HttpSession session =
+                    request.getSession(false);
+
             if (session != null) {
-                Object attr = session.getAttribute("userId");
-                if (attr != null) uid = attr.toString();
+
+                Object attr =
+                        session.getAttribute("userId");
+
+                if (attr != null) {
+                    uid = attr.toString();
+                }
             }
         }
-        if (uid == null) return null;
+
+        if (uid == null) {
+            return null;
+        }
+
         try {
+
             return UUID.fromString(uid);
+
         } catch (IllegalArgumentException e) {
+
             return null;
         }
     }
 
-    // ── Helpers BD ────────────────────────────────────────────────────────────
+    // Cargar historial del chat
+    private List<AIService.ChatMessage> loadHistory(
+            Connection conn,
+            UUID userId,
+            String sessionId)
+            throws Exception {
 
-    private List<AIService.ChatMessage> loadHistory(Connection conn, UUID userId, String sessionId)
-            throws SQLException {
         String sql = """
-                SELECT role, message FROM chat_history
+                SELECT role, message
+                FROM chat_history
                 WHERE user_id = ? AND session_id = ?
                 ORDER BY created_at DESC
                 LIMIT 20
                 """;
-        List<AIService.ChatMessage> list = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+
+        List<AIService.ChatMessage> list =
+                new ArrayList<>();
+
+        try (PreparedStatement ps =
+                conn.prepareStatement(sql)) {
+
             ps.setObject(1, userId);
-            ps.setObject(2, UUID.fromString(sessionId));
+
+            ps.setObject(
+                    2,
+                    UUID.fromString(sessionId)
+            );
+
             ResultSet rs = ps.executeQuery();
+
             while (rs.next()) {
-                list.add(new AIService.ChatMessage(rs.getString("role"), rs.getString("message")));
+
+                list.add(
+                        new AIService.ChatMessage(
+                                rs.getString("role"),
+                                rs.getString("message")
+                        )
+                );
             }
         }
-        java.util.Collections.reverse(list); // vuelve a orden cronológico ascendente
+
+        // Orden cronológico
+        java.util.Collections.reverse(list);
+
         return list;
     }
 
-    private void saveMessage(Connection conn, UUID userId, String sessionId,
-                              String role, String message) throws SQLException {
+    // Guardar mensaje
+    private void saveMessage(
+            Connection conn,
+            UUID userId,
+            String sessionId,
+            String role,
+            String message)
+            throws Exception {
+
         String sql = """
-                INSERT INTO chat_history (id, user_id, session_id, role, message, created_at)
+                INSERT INTO chat_history
+                (id, user_id, session_id, role, message, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """;
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setObject(1, UUID.randomUUID());
+
+        try (PreparedStatement ps =
+                conn.prepareStatement(sql)) {
+
+            ps.setObject(
+                    1,
+                    UUID.randomUUID()
+            );
+
             ps.setObject(2, userId);
-            ps.setObject(3, UUID.fromString(sessionId));
+
+            ps.setObject(
+                    3,
+                    UUID.fromString(sessionId)
+            );
+
             ps.setString(4, role);
             ps.setString(5, message);
-            ps.setTimestamp(6, new Timestamp(System.currentTimeMillis()));
+
+            ps.setTimestamp(
+                    6,
+                    new Timestamp(
+                            System.currentTimeMillis()
+                    )
+            );
+
             ps.executeUpdate();
         }
     }
 
-    private String[] loadProfesorConfig(Connection conn, UUID userId) throws SQLException {
-        String sql = "SELECT professor_name, personality FROM professor_config WHERE user_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+    // Cargar configuración del profesor
+    private String[] loadProfesorConfig(
+            Connection conn,
+            UUID userId)
+            throws Exception {
+
+        String sql =
+                "SELECT professor_name, personality " +
+                "FROM professor_config " +
+                "WHERE user_id = ?";
+
+        try (PreparedStatement ps =
+                conn.prepareStatement(sql)) {
+
             ps.setObject(1, userId);
+
             ResultSet rs = ps.executeQuery();
+
             if (rs.next()) {
-                return new String[]{ rs.getString("professor_name"), rs.getString("personality") };
+
+                return new String[]{
+                        rs.getString("professor_name"),
+                        rs.getString("personality")
+                };
             }
         }
-        return new String[]{ "Búho ProfesorIA", "amigable y motivador" };
+
+        return new String[]{
+                "Mi ProfesorIA",
+                "amigable y motivador"
+        };
     }
 
-    private List<String[]> loadSessions(Connection conn, UUID userId) throws SQLException {
+    // Cargar sesiones anteriores
+    private List<String[]> loadSessions(
+            Connection conn,
+            UUID userId)
+            throws Exception {
+
         String sql = """
                 WITH first_msgs AS (
                     SELECT DISTINCT ON (session_id)
-                        session_id, message, created_at
+                        session_id,
+                        message,
+                        created_at
                     FROM chat_history
                     WHERE user_id = ? AND role = 'user'
                     ORDER BY session_id, created_at ASC
                 ),
                 last_activity AS (
-                    SELECT session_id, MAX(created_at) AS last_at
+                    SELECT
+                        session_id,
+                        MAX(created_at) AS last_at
                     FROM chat_history
                     WHERE user_id = ?
                     GROUP BY session_id
                 )
-                SELECT f.session_id::text, f.message, f.created_at::text
+                SELECT
+                    f.session_id::text,
+                    f.message,
+                    f.created_at::text
                 FROM first_msgs f
-                JOIN last_activity l ON l.session_id = f.session_id
+                JOIN last_activity l
+                    ON l.session_id = f.session_id
                 ORDER BY l.last_at DESC
                 """;
-        List<String[]> list = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+
+        List<String[]> list =
+                new ArrayList<>();
+
+        try (PreparedStatement ps =
+                conn.prepareStatement(sql)) {
+
             ps.setObject(1, userId);
             ps.setObject(2, userId);
+
             ResultSet rs = ps.executeQuery();
+
             while (rs.next()) {
-                list.add(new String[]{
-                    rs.getString("session_id"),
-                    rs.getString("message"),
-                    rs.getString("created_at")
-                });
+
+                list.add(
+                        new String[]{
+                                rs.getString("session_id"),
+                                rs.getString("message"),
+                                rs.getString("created_at")
+                        }
+                );
             }
         }
+
         return list;
     }
-
-    // ── Parser JSON manual (pendiente: migrar a Gson) ─────────────────────────
-
-    private String extractJsonValue(String json, String field) {
-        if (json == null) return null;
-
-        String pattern = "\"" + field + "\"";
-        int fieldIdx = json.indexOf(pattern);
-        if (fieldIdx == -1) return null;
-
-        int colonIdx = json.indexOf(':', fieldIdx + pattern.length());
-        if (colonIdx == -1) return null;
-
-        int pos = colonIdx + 1;
-        while (pos < json.length() && json.charAt(pos) == ' ') pos++;
-
-        if (pos >= json.length()) return null;
-
-        // Si el valor es null
-        if (json.startsWith("null", pos)) return null;
-
-        // Si el valor es un string entre comillas
-        if (json.charAt(pos) == '"') {
-            int startVal = pos + 1;
-            int endVal = startVal;
-            while (endVal < json.length()) {
-                if (json.charAt(endVal) == '\\') {
-                    endVal += 2;
-                    continue;
-                }
-                if (json.charAt(endVal) == '"') break;
-                endVal++;
-            }
-            if (endVal > startVal) {
-                return json.substring(startVal, endVal);
-            }
-        }
-
-        return null;
-    }
-
-    private String toJsonString(String s) {
-        if (s == null) return "null";
-        return "\"" + s.replace("\\", "\\\\")
-                       .replace("\"", "\\\"")
-                       .replace("\n", "\\n")
-                       .replace("\r", "\\r")
-                       .replace("\t", "\\t") + "\"";
-    }
-
-    // CORS y preflight OPTIONS los maneja el CorsFilter global (@WebFilter("/*")).
 }
