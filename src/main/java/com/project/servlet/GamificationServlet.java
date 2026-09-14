@@ -1,11 +1,14 @@
 package com.project.servlet;
 
 import java.io.IOException;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.project.dao.implementation.ContentDAOImpl;
+import com.project.dao.interfaces.IContentDAO;
 import com.project.util.GamificationService;
 
 import jakarta.servlet.ServletException;
@@ -21,11 +24,50 @@ import jakarta.servlet.http.HttpServletResponse;
  * Endpoints:
  *   GET  /api/gamification/stats     → Stats actuales del jugador
  *   POST /api/gamification/reward    → Registrar actividad y dar rewards
+ *
+ * ═══════════════════════════════════════════════════════════════════════
+ *  [SEGURIDAD] POST /reward es un endpoint público (cualquier usuario
+ *  autenticado lo puede llamar directo, sin pasar por la UI). Antes
+ *  confiaba ciegamente en "activityType" y "scorePercent" del body, lo que
+ *  permitía farmear XP/monedas llamándolo repetidamente sin jugar nada.
+ *  Ahora:
+ *   1. Los tipos de duelo (duelo_ganado/perdido/empate) están BLOQUEADOS
+ *      acá — esos solo los puede otorgar el servidor internamente desde
+ *      DuelServlet/DuelWebSocket cuando un duelo realmente termina, nunca
+ *      un POST directo del cliente.
+ *   2. Los tipos ligados a contenido (quiz, expert_exam, flashcards,
+ *      resumen, generar) exigen un contentId real, que se valida contra
+ *      study_content: debe existir, ser del usuario autenticado, y ser del
+ *      tipo que dice ser. Ya no se puede inventar un UUID o mandar el id
+ *      de otro contenido para cobrar la recompensa.
+ * ═══════════════════════════════════════════════════════════════════════
  */
 @WebServlet({"/api/gamification/stats", "/api/gamification/reward"})
 public class GamificationServlet extends HttpServlet {
 
     private final Gson gson = new Gson();
+    private final IContentDAO contentDAO = new ContentDAOImpl();
+
+    // Tipos que SÍ se pueden pedir directo desde el cliente vía este endpoint.
+    private static final Set<String> CLIENT_ALLOWED_TYPES = Set.of(
+        "quiz", "expert_exam", "flashcards", "resumen", "generar", "abandon_exam"
+    );
+
+    // Tipos que exigen contentId real y verificado contra study_content.
+    private static final Set<String> CONTENT_REQUIRED_TYPES = Set.of(
+        "quiz", "expert_exam", "flashcards", "resumen"
+    );
+
+    // activityType del reward → type esperado en study_content.
+    private static String expectedContentType(String activityType) {
+        return switch (activityType) {
+            case "quiz"         -> "quiz";
+            case "expert_exam"  -> "expert_exam";
+            case "flashcards"   -> "flashcard";
+            case "resumen"      -> "summary";
+            default             -> null; // "generar" acepta cualquier tipo propio
+        };
+    }
 
     // ─── GET: obtener stats ─────────────────────────────────────────────────
     @Override
@@ -89,9 +131,21 @@ public class GamificationServlet extends HttpServlet {
                 return;
             }
 
+            // [SEGURIDAD] Los rewards de duelo solo los otorga el servidor
+            // internamente (DuelServlet/DuelWebSocket → GamificationService
+            // directo, sin pasar por este endpoint HTTP). Un cliente nunca
+            // puede pedir "duelo_ganado" por su cuenta.
+            if (!CLIENT_ALLOWED_TYPES.contains(activityType)) {
+                sendError(res, 400, "activityType no permitido en este endpoint: " + activityType);
+                return;
+            }
+
             double scorePercent = data.has("scorePercent")
                 ? data.get("scorePercent").getAsDouble()
                 : 0;
+            // Clamp defensivo — nunca confiar en el rango que manda el cliente.
+            if (scorePercent < 0)   scorePercent = 0;
+            if (scorePercent > 100) scorePercent = 100;
 
             String contentId = (data.has("contentId") && !data.get("contentId").isJsonNull())
                 ? data.get("contentId").getAsString()
@@ -100,10 +154,37 @@ public class GamificationServlet extends HttpServlet {
             int timeTakenSecs = data.has("timeTakenSecs")
                 ? data.get("timeTakenSecs").getAsInt()
                 : 0;
+            if (timeTakenSecs < 0) timeTakenSecs = 0;
 
             double maxScore = data.has("maxScore")
                 ? data.get("maxScore").getAsDouble()
                 : 100;
+            if (maxScore <= 0) maxScore = 100;
+
+            // [SEGURIDAD] Verificar que el contenido exista, sea del usuario
+            // autenticado y sea del tipo que dice ser.
+            if (CONTENT_REQUIRED_TYPES.contains(activityType)) {
+                if (contentId == null || contentId.isBlank()) {
+                    sendError(res, 400, "Esta actividad requiere contentId.");
+                    return;
+                }
+                String realType = contentDAO.getContentType(contentId, userId);
+                if (realType == null) {
+                    sendError(res, 403, "El contenido no existe o no te pertenece.");
+                    return;
+                }
+                String expected = expectedContentType(activityType);
+                if (expected != null && !expected.equals(realType)) {
+                    sendError(res, 400, "El contentId no coincide con el tipo de actividad.");
+                    return;
+                }
+            } else if ("generar".equals(activityType) && contentId != null && !contentId.isBlank()) {
+                // Si mandan contentId para "generar", igual se valida dueño.
+                if (contentDAO.getContentType(contentId, userId) == null) {
+                    sendError(res, 403, "El contenido no existe o no te pertenece.");
+                    return;
+                }
+            }
 
             JsonObject result = GamificationService.processActivity(
                 userId, activityType, scorePercent, contentId, timeTakenSecs, maxScore

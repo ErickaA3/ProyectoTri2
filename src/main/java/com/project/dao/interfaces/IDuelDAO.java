@@ -59,9 +59,19 @@ public interface IDuelDAO {
 
     /**
      * Guardar el resultado de un jugador en un duelo.
+     *
+     * [SOLO USO INTERNO — NO EXPONER DIRECTO A UN ENDPOINT HTTP]
+     * El score/maxScore/isCorrect de cada respuesta se reciben ya
+     * calculados y confiables porque el único llamador es
+     * DuelWebSocket, que valida cada respuesta contra las preguntas
+     * reales en DuelRoom ANTES de llegar acá (ver DuelRoom.isCorrectAnswer).
+     * Para un submit que viene directo de un request HTTP (sin pasar por el
+     * WebSocket), usar submitDuelResultGraded(), que recalcula todo en el
+     * servidor y no confía en nada del cliente.
+     *
      * @param duelId     UUID del duelo
      * @param userId     UUID del jugador que terminó
-     * @param score      Puntaje (correctas)
+     * @param score      Puntaje (correctas) — ya validado por el llamador
      * @param maxScore   Total de preguntas
      * @param timeSecs   Tiempo en segundos
      * @param answers    JSON array con las respuestas [{questionIndex, answerGiven, isCorrect, timeMs}]
@@ -69,6 +79,28 @@ public interface IDuelDAO {
      */
     JsonObject submitDuelResult(String duelId, String userId, int score,
                                 int maxScore, int timeSecs, String answersJson) throws Exception;
+
+    /**
+     * Guardar el resultado de un jugador en un duelo, cuando el submit viene
+     * DIRECTO de un endpoint HTTP (POST /api/duels/submit) y por lo tanto
+     * nada de lo que mande el cliente es confiable.
+     *
+     * A diferencia de submitDuelResult(), acá el score y la corrección de
+     * cada respuesta NO se reciben del cliente: se recalculan en el
+     * servidor comparando cada "answerGiven" contra la respuesta correcta
+     * real, guardada en study_content para ese duelo. El maxScore también
+     * se toma del question_count real del duelo, nunca del body.
+     *
+     * @param duelId      UUID del duelo
+     * @param userId      UUID del jugador que terminó
+     * @param rawAnswers  JSON array [{questionIndex, answerGiven}] — solo el
+     *                    índice de la opción elegida, nada de "isCorrect"
+     * @param timeSecsRaw Tiempo reportado por el cliente (se acota en servidor
+     *                    a un rango razonable antes de guardarse)
+     * @return mismo shape de respuesta que submitDuelResult()
+     */
+    JsonObject submitDuelResultGraded(String duelId, String userId,
+                                      JsonArray rawAnswers, int timeSecsRaw) throws Exception;
 
     /** Obtener preguntas del quiz del duelo (desde study_content). */
     JsonObject getDuelQuestions(String duelId, String userId) throws Exception;

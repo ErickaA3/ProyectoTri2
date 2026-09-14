@@ -81,7 +81,20 @@ public class GamificationDAOImpl implements IGamificationDAO {
     public String saveActivityResult(String userId, String contentId,
                                      double score, double maxScore,
                                      int timeTakenSeconds) throws Exception {
-        String sql = """
+        // [SEGURIDAD] Chequeo de duplicado ANTES de insertar: si ya existe un
+        // resultado para este (userId, contentId), se devuelve null y
+        // processActivity() lo interpreta como "alreadyRewarded" → no se
+        // vuelve a pagar XP/monedas por el mismo contenido.
+        // No se asume que exista un UNIQUE constraint en la BD para esto
+        // (por eso el check explícito acá, no un ON CONFLICT); si se agrega
+        // el constraint en Supabase más adelante, este método sigue
+        // funcionando igual.
+        String checkSql = """
+            SELECT id FROM activity_results
+            WHERE user_id = ?::uuid AND content_id = ?::uuid
+            LIMIT 1
+            """;
+        String insertSql = """
             INSERT INTO activity_results
                 (user_id, content_id, score, max_score, time_taken_seconds)
             VALUES
@@ -89,20 +102,37 @@ public class GamificationDAOImpl implements IGamificationDAO {
             RETURNING id
             """;
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DatabaseConnection.getConnection()) {
 
-            stmt.setString(1, userId);
-            stmt.setString(2, contentId);
-            stmt.setDouble(3, score);
-            stmt.setDouble(4, maxScore);
-            stmt.setInt(5, timeTakenSeconds);
-
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                return rs.getString("id");
+            try (PreparedStatement check = conn.prepareStatement(checkSql)) {
+                check.setString(1, userId);
+                check.setString(2, contentId);
+                ResultSet rsCheck = check.executeQuery();
+                if (rsCheck.next()) {
+                    return null; // ya existe → alreadyRewarded
+                }
             }
-            throw new Exception("No se pudo guardar el resultado de actividad.");
+
+            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+                stmt.setString(1, userId);
+                stmt.setString(2, contentId);
+                stmt.setDouble(3, score);
+                stmt.setDouble(4, maxScore);
+                stmt.setInt(5, timeTakenSeconds);
+
+                ResultSet rs = stmt.executeQuery();
+                if (rs.next()) {
+                    return rs.getString("id");
+                }
+                throw new Exception("No se pudo guardar el resultado de actividad.");
+            } catch (SQLException e) {
+                // Por si sí existe un UNIQUE constraint en la BD y hubo una
+                // carrera entre el check y el insert (dos requests casi
+                // simultáneos con el mismo contentId): tratarlo también
+                // como "ya recompensado" en vez de reventar con un 500.
+                if ("23505".equals(e.getSQLState())) return null;
+                throw e;
+            }
         }
     }
 

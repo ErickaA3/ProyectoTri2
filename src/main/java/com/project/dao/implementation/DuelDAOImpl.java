@@ -534,6 +534,232 @@ public class DuelDAOImpl implements IDuelDAO {
         }
     }
 
+    /**
+     * [SEGURIDAD] Versión "graded" de submitDuelResult, para usar cuando el
+     * submit llega directo de POST /api/duels/submit (sin pasar por el
+     * WebSocket). Acá NO se confía en nada que mande el cliente sobre si
+     * acertó o no: se recalcula todo contra las preguntas reales guardadas
+     * en study_content para ese duelo.
+     */
+    @Override
+    public JsonObject submitDuelResultGraded(String duelId, String userId,
+                                             JsonArray rawAnswers, int timeSecsRaw) throws Exception {
+        Connection conn = DatabaseConnection.getConnection();
+        try {
+            conn.setAutoCommit(false);
+
+            // 1. Info del duelo + preguntas reales (con la respuesta correcta)
+            String getDuel = """
+                SELECT d.challenger_id, d.opponent_id, d.status, d.question_count,
+                       d.challenger_score, d.opponent_score, d.time_per_question,
+                       sc.content::text AS content_json
+                FROM duels d
+                JOIN study_content sc ON sc.id = d.content_id
+                WHERE d.id = ?::uuid
+                FOR UPDATE
+                """;
+
+            String challengerId, opponentId, status, contentJson;
+            int questionCount, timePerQuestion;
+            boolean challengerPlayed, opponentPlayed;
+
+            try (PreparedStatement ps = conn.prepareStatement(getDuel)) {
+                ps.setString(1, duelId);
+                ResultSet rs = ps.executeQuery();
+                if (!rs.next()) { conn.rollback(); throw new Exception("Duelo no encontrado."); }
+                challengerId     = rs.getString("challenger_id");
+                opponentId       = rs.getString("opponent_id");
+                status           = rs.getString("status");
+                questionCount    = rs.getInt("question_count");
+                timePerQuestion  = rs.getInt("time_per_question");
+                contentJson      = rs.getString("content_json");
+                challengerPlayed = rs.getBigDecimal("challenger_score") != null;
+                opponentPlayed   = rs.getBigDecimal("opponent_score") != null;
+            }
+
+            if ("finished".equals(status) || "declined".equals(status)) {
+                conn.rollback();
+                throw new Exception("Este duelo ya terminó.");
+            }
+
+            if (!userId.equals(challengerId) && !userId.equals(opponentId)) {
+                conn.rollback();
+                throw new Exception("No eres participante de este duelo.");
+            }
+
+            boolean isChallenger = userId.equals(challengerId);
+
+            if ((isChallenger && challengerPlayed) || (!isChallenger && opponentPlayed)) {
+                conn.rollback();
+                throw new Exception("Ya jugaste este duelo.");
+            }
+
+            // 2. Calificar cada respuesta EN EL SERVIDOR contra la pregunta real.
+            //    Se ignora por completo cualquier "isCorrect"/"score" que
+            //    venga del cliente — solo se usa el índice de la opción elegida.
+            JsonObject content = JsonParser.parseString(contentJson).getAsJsonObject();
+            JsonArray questions = content.has("questions")
+                ? content.getAsJsonArray("questions") : new JsonArray();
+
+            int score = 0;
+            JsonArray gradedAnswers = new JsonArray();
+            for (int i = 0; i < rawAnswers.size(); i++) {
+                JsonObject a;
+                try {
+                    a = rawAnswers.get(i).getAsJsonObject();
+                } catch (Exception e) {
+                    continue; // ítem malformado → se ignora, no tumba el submit
+                }
+
+                int qIndex = a.has("questionIndex") ? safeInt(a.get("questionIndex"), -1) : -1;
+                int answerGiven = a.has("answerGiven") ? safeInt(a.get("answerGiven"), -1) : -1;
+
+                boolean correct = false;
+                if (qIndex >= 0 && qIndex < questions.size()) {
+                    JsonObject q = questions.get(qIndex).getAsJsonObject();
+                    int correctIdx = q.has("correct")       ? q.get("correct").getAsInt()
+                                    : q.has("correctAnswer") ? q.get("correctAnswer").getAsInt()
+                                    : -1;
+                    correct = (correctIdx == answerGiven);
+                }
+                if (correct) score++;
+
+                JsonObject graded = new JsonObject();
+                graded.addProperty("questionIndex", qIndex);
+                graded.addProperty("answerGiven",   String.valueOf(answerGiven));
+                graded.addProperty("isCorrect",     correct);
+                graded.addProperty("timeMs",        a.has("timeMs") ? safeInt(a.get("timeMs"), 0) : 0);
+                gradedAnswers.add(graded);
+            }
+
+            int maxScore = questionCount > 0 ? questionCount : questions.size();
+
+            // Tiempo: se acota a un rango razonable, nunca se confía tal cual
+            // en lo que mande el cliente (afecta el desempate por tiempo).
+            int maxTime  = Math.max(1, questionCount) * Math.max(5, timePerQuestion);
+            int timeSecs = Math.max(0, Math.min(timeSecsRaw, maxTime));
+
+            // 3. Guardar las respuestas ya calificadas
+            String insertAnswer = """
+                INSERT INTO duel_answers (duel_id, user_id, question_index, answer_given, is_correct, time_ms)
+                VALUES (?::uuid, ?::uuid, ?, ?, ?, ?)
+                """;
+            try (PreparedStatement ps = conn.prepareStatement(insertAnswer)) {
+                for (int i = 0; i < gradedAnswers.size(); i++) {
+                    JsonObject a = gradedAnswers.get(i).getAsJsonObject();
+                    ps.setString(1, duelId);
+                    ps.setString(2, userId);
+                    ps.setInt(3, a.get("questionIndex").getAsInt());
+                    ps.setString(4, a.get("answerGiven").getAsString());
+                    ps.setBoolean(5, a.get("isCorrect").getAsBoolean());
+                    ps.setInt(6, a.get("timeMs").getAsInt());
+                    ps.addBatch();
+                }
+                if (gradedAnswers.size() > 0) ps.executeBatch();
+            }
+
+            // 4. Guardar el score CALCULADO (nunca el que mandó el cliente)
+            String updateScore = isChallenger
+                ? "UPDATE duels SET challenger_score = ?, challenger_time = ? WHERE id = ?::uuid"
+                : "UPDATE duels SET opponent_score = ?, opponent_time = ? WHERE id = ?::uuid";
+            try (PreparedStatement ps = conn.prepareStatement(updateScore)) {
+                ps.setInt(1, score);
+                ps.setInt(2, timeSecs);
+                ps.setString(3, duelId);
+                ps.executeUpdate();
+            }
+
+            // 5. ¿Ambos ya jugaron? → declarar ganador (misma lógica que submitDuelResult)
+            boolean otherPlayed = isChallenger ? opponentPlayed : challengerPlayed;
+            JsonObject result = new JsonObject();
+            result.addProperty("success",  true);
+            result.addProperty("score",    score);
+            result.addProperty("maxScore", maxScore);
+            result.addProperty("timeSecs", timeSecs);
+
+            if (otherPlayed) {
+                String getOther = isChallenger
+                    ? "SELECT opponent_score, opponent_time FROM duels WHERE id = ?::uuid"
+                    : "SELECT challenger_score, challenger_time FROM duels WHERE id = ?::uuid";
+
+                int otherScore, otherTime;
+                try (PreparedStatement ps = conn.prepareStatement(getOther)) {
+                    ps.setString(1, duelId);
+                    ResultSet rs = ps.executeQuery();
+                    rs.next();
+                    otherScore = rs.getInt(1);
+                    otherTime  = rs.getInt(2);
+                }
+
+                String winnerId;
+                String resultType;
+                if (score > otherScore) {
+                    winnerId = userId;
+                    resultType = "win";
+                } else if (score < otherScore) {
+                    winnerId = isChallenger ? opponentId : challengerId;
+                    resultType = "loss";
+                } else {
+                    if (timeSecs < otherTime) {
+                        winnerId = userId;
+                        resultType = "win";
+                    } else if (timeSecs > otherTime) {
+                        winnerId = isChallenger ? opponentId : challengerId;
+                        resultType = "loss";
+                    } else {
+                        winnerId = null;
+                        resultType = "draw";
+                    }
+                }
+
+                String finish = """
+                    UPDATE duels SET status = 'finished', winner_id = ?::uuid, finished_at = NOW()
+                    WHERE id = ?::uuid
+                    """;
+                try (PreparedStatement ps = conn.prepareStatement(finish)) {
+                    ps.setString(1, winnerId);
+                    ps.setString(2, duelId);
+                    ps.executeUpdate();
+                }
+
+                result.addProperty("duelFinished", true);
+                result.addProperty("result",       resultType);
+                result.addProperty("winnerId",     winnerId);
+                result.addProperty("otherScore",   otherScore);
+                result.addProperty("otherTime",    otherTime);
+            } else {
+                String updateStatus = "UPDATE duels SET status = 'in_progress' WHERE id = ?::uuid";
+                try (PreparedStatement ps = conn.prepareStatement(updateStatus)) {
+                    ps.setString(1, duelId);
+                    ps.executeUpdate();
+                }
+
+                result.addProperty("duelFinished", false);
+                result.addProperty("waitingForOpponent", true);
+            }
+
+            conn.commit();
+            return result;
+
+        } catch (Exception e) {
+            conn.rollback();
+            throw e;
+        } finally {
+            conn.setAutoCommit(true);
+            conn.close();
+        }
+    }
+
+    /** Parsea un JsonElement a int de forma defensiva; devuelve fallback si falla. */
+    private static int safeInt(com.google.gson.JsonElement el, int fallback) {
+        try {
+            if (el == null || el.isJsonNull()) return fallback;
+            return el.getAsInt();
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
     @Override
     public JsonObject getDuelQuestions(String duelId, String userId) throws Exception {
         // Primero verificar que el usuario no haya jugado ya
