@@ -96,7 +96,7 @@ public class AIService {
     // SYSTEM PROMPTS
     // ═══════════════════════════════════════════════════════════════════════════
 
-       private static String buildSystemPrompt(String type, JsonObject config) {
+           private static String buildSystemPrompt(String type, JsonObject config) {
         String base = "Eres un experto en pedagogía y diseño instruccional. "
             + "Tu trabajo es transformar contenido académico en recursos de estudio de alta calidad.\n\n"
             + "REGLAS ABSOLUTAS:\n"
@@ -291,7 +291,6 @@ public class AIService {
                 return base;
         }
     }
-    
     // ═══════════════════════════════════════════════════════════════════════════
     // USER PROMPTS
     // ═══════════════════════════════════════════════════════════════════════════
