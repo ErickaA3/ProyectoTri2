@@ -7,6 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 
 import com.google.gson.Gson;
@@ -26,6 +27,71 @@ public class AIService {
         .build();
 
     private static final Gson gson = new Gson();
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // REINTENTOS CON BACKOFF EXPONENCIAL
+    // Absorbe errores transitorios (429 rate limit, 5xx del lado de OpenAI,
+    // cortes de red) sin exponer el fallo al estudiante en el primer intento.
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    private static final int MAX_RETRIES = 3;          // 4 intentos en total
+    private static final long BASE_BACKOFF_MS = 1000;  // 1s, 2s, 4s
+    private static final long MAX_BACKOFF_MS = 30_000;
+
+    private static HttpResponse<String> sendWithRetry(HttpRequest request) throws Exception {
+        Exception lastError = null;
+
+        for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                int status = response.statusCode();
+
+                if (status == 200) return response;
+
+                boolean esTransitorio = status == 429 || (status >= 500 && status < 600);
+                if (!esTransitorio || attempt == MAX_RETRIES) {
+                    // Error del cliente (4xx que no sea 429) o se agotaron los intentos:
+                    // se devuelve tal cual para que el llamador lance su excepción normal.
+                    return response;
+                }
+
+                long esperaMs = calcularEspera(response, attempt);
+                System.err.println("[AIService] Status " + status + " de OpenAI (intento "
+                    + (attempt + 1) + "/" + (MAX_RETRIES + 1) + "). Reintentando en " + esperaMs + "ms.");
+                Thread.sleep(esperaMs);
+
+            } catch (java.io.IOException e) {
+                lastError = e;
+                if (attempt == MAX_RETRIES) throw e;
+                long esperaMs = Math.min(BASE_BACKOFF_MS * (1L << attempt), MAX_BACKOFF_MS);
+                System.err.println("[AIService] Error de red (intento " + (attempt + 1) + "/"
+                    + (MAX_RETRIES + 1) + "): " + e.getMessage() + ". Reintentando en " + esperaMs + "ms.");
+                Thread.sleep(esperaMs);
+            }
+        }
+
+        throw lastError != null ? lastError : new Exception("Fallo desconocido al llamar a la API tras reintentos.");
+    }
+
+    /**
+     * Respeta el header Retry-After si OpenAI lo envía (típico en 429).
+     * Si no viene, usa backoff exponencial con jitter para evitar que varias
+     * peticiones reintenten exactamente en el mismo instante.
+     */
+    private static long calcularEspera(HttpResponse<String> response, int attempt) {
+        Optional<String> retryAfter = response.headers().firstValue("Retry-After");
+        if (retryAfter.isPresent()) {
+            try {
+                long segundos = Long.parseLong(retryAfter.get().trim());
+                return Math.min(segundos * 1000, MAX_BACKOFF_MS);
+            } catch (NumberFormatException ignored) {
+                // Si el header viene en un formato inesperado, se ignora y se usa el backoff normal.
+            }
+        }
+        long base = Math.min(BASE_BACKOFF_MS * (1L << attempt), MAX_BACKOFF_MS);
+        long jitter = (long) (Math.random() * 300);
+        return base + jitter;
+    }
 
     private static String loadApiKey() {
         String envKey = System.getenv("OPENAI_API_KEY");
@@ -96,7 +162,7 @@ public class AIService {
     // SYSTEM PROMPTS
     // ═══════════════════════════════════════════════════════════════════════════
 
-           private static String buildSystemPrompt(String type, JsonObject config) {
+    private static String buildSystemPrompt(String type, JsonObject config) {
         String base = "Eres un experto en pedagogía y diseño instruccional. "
             + "Tu trabajo es transformar contenido académico en recursos de estudio de alta calidad.\n\n"
             + "REGLAS ABSOLUTAS:\n"
@@ -291,6 +357,7 @@ public class AIService {
                 return base;
         }
     }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // USER PROMPTS
     // ═══════════════════════════════════════════════════════════════════════════
@@ -632,7 +699,7 @@ public class AIService {
             .timeout(Duration.ofSeconds(30))
             .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = sendWithRetry(request);
 
         if (response.statusCode() != 200) {
             throw new Exception("Error en la API de IA. Status: " + response.statusCode()
@@ -697,7 +764,7 @@ public class AIService {
             .timeout(Duration.ofSeconds(90))
             .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = sendWithRetry(request);
 
         if (response.statusCode() != 200) {
             throw new Exception("Error API OpenAI. Status: " + response.statusCode()
@@ -752,7 +819,7 @@ public class AIService {
             .timeout(Duration.ofSeconds(30))
             .build();
 
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = sendWithRetry(request);
 
         if (response.statusCode() != 200) {
             throw new Exception("Error API embeddings. Status: " + response.statusCode()
