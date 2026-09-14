@@ -11,6 +11,7 @@ import com.project.model.users.Statistics;
 import com.project.model.users.User;
 import com.project.util.JsonUtil;
 import com.project.util.JwtUtil;
+import com.project.util.LoginRateLimiter;
 import com.project.util.PasswordUtil;
 
 import jakarta.servlet.ServletException;
@@ -44,18 +45,32 @@ public class LoginServlet extends HttpServlet {
             return;
         }
 
+        // Límite de intentos: frena fuerza bruta y el DoS por BCrypt (#146).
+        String rlKey = LoginRateLimiter.keyFor(clientIp(request), email);
+        long retryAfter = LoginRateLimiter.retryAfterSeconds(rlKey);
+        if (retryAfter > 0) {
+            response.setHeader("Retry-After", String.valueOf(retryAfter));
+            JsonUtil.sendError(response, 429,
+                    "Demasiados intentos. Esperá " + retryAfter + " segundos e intentá de nuevo.");
+            return;
+        }
+
         try {
             Optional<User> optUser = userDAO.findByEmail(email.trim().toLowerCase());
             if (optUser.isEmpty()) {
+                LoginRateLimiter.recordFailure(rlKey);
                 JsonUtil.sendError(response, 401, "Credenciales incorrectas.");
                 return;
             }
 
             User user = optUser.get();
             if (!PasswordUtil.verify(password, user.getPasswordHash())) {
+                LoginRateLimiter.recordFailure(rlKey);
                 JsonUtil.sendError(response, 401, "Credenciales incorrectas.");
                 return;
             }
+
+            LoginRateLimiter.reset(rlKey);   // login correcto: limpia el contador
 
             Optional<Statistics> optStats = userDAO.getStatsByUserId(user.getId());
             Statistics stats = optStats.orElse(null);
@@ -89,6 +104,17 @@ public class LoginServlet extends HttpServlet {
         response.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
         response.setHeader("Access-Control-Allow-Headers", "Content-Type");
         response.setHeader("Access-Control-Allow-Credentials", "true");
+    }
+
+    /** IP real del cliente: primer salto de X-Forwarded-For (Railway va tras proxy),
+     *  con fallback a la dirección remota directa. */
+    private String clientIp(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            int comma = xff.indexOf(',');
+            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
+        }
+        return request.getRemoteAddr();
     }
 
     private String extractJsonField(String json, String field) {
