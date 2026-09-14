@@ -4,7 +4,7 @@ const API_BASE = window.API_BASE || '';
 
 let chatHistory    = [];
 let currentSession = null;
-let attachedPdf    = null;  // { name, base64 } cuando hay PDF adjunto
+let attachedPdf    = null;
 let busy           = false;
 let msgCount       = 0;
 
@@ -157,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function send() {
     const inp = document.getElementById('userInput');
     const txt = inp.value.trim();
-    if (!txt || busy) return;
+    if ((!txt && !attachedPdf) || busy) return;
 
     const userId = getUserId();
     if (!userId) {
@@ -180,7 +180,7 @@ async function send() {
             method: 'POST',
             headers: getAuthHeaders(),
             credentials: 'include',
-            body: JSON.stringify(Object.assign({ mensaje: txt, sessionId: currentSession, userId }, attachedPdf ? { pdfBase64: attachedPdf.base64, pdfName: attachedPdf.name } : {}))
+            body: JSON.stringify(Object.assign({ mensaje: txt || '(Ver PDF adjunto)', sessionId: currentSession, userId }, attachedPdf ? { pdfBase64: attachedPdf.base64, pdfName: attachedPdf.name } : {}))
         });
 
         const data = await res.json();
@@ -191,7 +191,6 @@ async function send() {
             return;
         }
 
-        // Limpiar PDF adjunto después de enviar
         removePdf();
 
         if (!currentSession) {
@@ -590,12 +589,10 @@ function handlePdfUpload(event) {
     reader.onload = function(e) {
         const base64 = e.target.result.split(',')[1];
         attachedPdf = { name: file.name, base64: base64 };
-
-        document.getElementById('pdfAttachedName').textContent = '📄 ' + file.name;
-        document.getElementById('pdfAttachedBar').style.display = 'flex';
-        document.getElementById('pdfBtn').style.opacity = '0.4';
-        document.getElementById('pdfBtn').style.pointerEvents = 'none';
-        document.getElementById('userInput').placeholder = '¿Qué querés saber sobre el PDF?';
+        document.getElementById('pdfChip').querySelector('.pdf-chip-name').textContent = file.name;
+        document.getElementById('pdfChip').style.display = 'flex';
+        document.getElementById('pdfBtn').style.display = 'none';
+        document.getElementById('userInput').placeholder = '¿Qué querés saber sobre el PDF? (opcional)';
         document.getElementById('userInput').focus();
     };
     reader.readAsDataURL(file);
@@ -604,11 +601,12 @@ function handlePdfUpload(event) {
 
 function removePdf() {
     attachedPdf = null;
-    document.getElementById('pdfAttachedBar').style.display = 'none';
-    document.getElementById('pdfAttachedName').textContent = '';
-    document.getElementById('pdfBtn').style.opacity = '';
-    document.getElementById('pdfBtn').style.pointerEvents = '';
+    const chip = document.getElementById('pdfChip');
+    if (chip) chip.style.display = 'none';
+    const btn = document.getElementById('pdfBtn');
+    if (btn) btn.style.display = 'flex';
     const fi = document.getElementById('pdfFileInput');
     if (fi) fi.value = '';
-    document.getElementById('userInput').placeholder = 'Escríbeme tu pregunta...';
+    const inp = document.getElementById('userInput');
+    if (inp) inp.placeholder = 'Escríbeme tu pregunta...';
 }
