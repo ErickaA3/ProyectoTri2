@@ -1,4 +1,3 @@
-
 // ═══════════════════════════════════════════════════════════════
 // ESTADO
 // ═══════════════════════════════════════════════════════════════
@@ -9,6 +8,14 @@ let isFlipped    = false;
 let answers      = [];    // { correct: bool } por cada card
 let highScore    = 0;
 let reviewMode   = false;
+
+// [FIX] id del contenido (study_content) que se está estudiando — se usa
+// para el reward de gamificación, el high score y el favorito. Antes no
+// se guardaba nada de esto.
+let contentId    = null;
+let isFavorite   = false;
+let sessionStart = 0;      // timestamp para calcular timeTakenSecs del reward
+let rewardSent   = false;  // evita mandar el reward más de una vez por sesión
 
 // ═══════════════════════════════════════════════════════════════
 // INICIALIZACIÓN
@@ -31,19 +38,28 @@ document.addEventListener('DOMContentLoaded', () => {
         // [FIX] Guardar copia del mazo original para poder restaurarlo en restart
         originalCards = [...cards];
         document.getElementById('topicLabel').textContent = data.title || 'Flashcards';
+
+        // [FIX] contentId real, para reward/favorito/high score por-contenido
+        contentId  = data.id || null;
+        isFavorite = !!data.isFavorite;
+        updateFavoriteButton();
     } catch (e) {
         console.error('Error parsing flashcards:', e);
         goBack(); return;
     }
 
-    // Cargar high score
-    const savedHS = localStorage.getItem('fc_highscore_' + originalCards.length);
+    // Cargar high score — [FIX] la clave ahora es por contentId, no por
+    // cantidad de tarjetas (dos mazos distintos con el mismo número de
+    // tarjetas compartían high score antes de este fix).
+    const hsKey = contentId ? ('fc_highscore_' + contentId) : ('fc_highscore_len_' + originalCards.length);
+    const savedHS = localStorage.getItem(hsKey);
     if (savedHS) highScore = parseInt(savedHS);
     document.getElementById('highScoreDisplay').textContent = highScore + '%';
 
     // Inicializar
     answers = new Array(cards.length).fill(null);
     document.getElementById('totalNum').textContent = cards.length;
+    sessionStart = Date.now();
     buildDots();
     showCard(0);
 });
@@ -193,14 +209,20 @@ function showResults() {
     document.getElementById('scoreNumber').textContent = score + '%';
 
     // High score (basado en el mazo original para consistencia)
+    // [FIX] misma clave por-contentId que en la carga inicial.
+    const hsKey = contentId ? ('fc_highscore_' + contentId) : ('fc_highscore_len_' + originalCards.length);
     const isNewHS = score > highScore;
     if (isNewHS) {
         highScore = score;
-        localStorage.setItem('fc_highscore_' + originalCards.length, highScore);
+        localStorage.setItem(hsKey, highScore);
     }
     document.getElementById('highScoreResult').textContent = highScore + '%';
     document.getElementById('highScoreDisplay').textContent = highScore + '%';
-    document.getElementById('newHighscore').style.display = isNewHS ? 'flex' : 'none';
+    // [FIX] antes solo se ponía display:flex por inline style, pero el
+    // centrado/gap de este elemento vive en la clase CSS ".show" — sin
+    // agregar la clase, el contenido (estrellas + texto) queda pegado a la
+    // izquierda en vez de centrado. Se usa la clase en vez del inline style.
+    document.getElementById('newHighscore').classList.toggle('show', isNewHS);
 
     // Score ring animation
     const ring = document.getElementById('scoreRing');
@@ -236,13 +258,27 @@ function showResults() {
     // Confetti si score > 70
     if (score >= 70) launchConfetti();
 
-    // XP por completar
-    showXPToast('+25 XP');
-
-    // Gamification hook (si existe)
-    if (typeof Gamification !== 'undefined' && Gamification.addXP) {
-        const xp = score >= 90 ? 50 : score >= 70 ? 35 : 25;
-        Gamification.addXP(xp);
+    // [FIX] Registro REAL de XP/monedas en el servidor.
+    // Antes esto chequeaba `typeof Gamification !== 'undefined' && Gamification.addXP`,
+    // pero ese objeto "Gamification" nunca existió en gamification.js (que solo
+    // define funciones sueltas: sendReward, fetchPlayerStats, etc). Esa condición
+    // siempre era falsa, así que estudiar flashcards NUNCA llamaba a
+    // /api/gamification/reward — el toast de "+25 XP" era puramente visual,
+    // no se guardaba xp/monedas/racha/misiones/objetivos en la base de datos.
+    if (!rewardSent && typeof sendReward === 'function') {
+        rewardSent = true;
+        const timeTakenSecs = Math.round((Date.now() - sessionStart) / 1000);
+        sendReward('flashcards', score, contentId, timeTakenSecs, cards.length)
+            .then(result => {
+                if (result && result.success && result.xpEarned) {
+                    showXPToast('+' + result.xpEarned + ' XP');
+                }
+            })
+            .catch(err => console.error('[flashcards] Error registrando reward:', err));
+    } else {
+        // Toast visual (sin backend) — reintentos dentro de la misma sesión
+        // ya fueron recompensados una vez, o sendReward no está disponible.
+        showXPToast('+25 XP');
     }
 }
 
@@ -345,11 +381,55 @@ confettiStyle.textContent = `
 document.head.appendChild(confettiStyle);
 
 // ═══════════════════════════════════════════════════════════════
+// FAVORITO
+// ═══════════════════════════════════════════════════════════════
+// [FIX] Flashcards no tenía botón de favorito — sí lo tiene resumenes.js,
+// pero flashcards nunca lo implementó. Usa el endpoint genérico
+// /api/favoritos (FavoritesServlet), que funciona para cualquier tipo de
+// contenido, no uno propio de resúmenes.
+async function toggleFavorite() {
+    if (!contentId) return;
+    const newValue = !isFavorite;
+
+    try {
+        const res = await fetch((window.API_BASE || '') + '/api/favoritos', {
+            method:  'PUT',
+            headers: getAuthHeaders(),
+            body:    JSON.stringify({ contentId, isFavorite: newValue })
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.error || 'Error al actualizar favorito');
+
+        isFavorite = newValue;
+        updateFavoriteButton();
+        showXPToast(newValue ? 'Añadido a favoritos' : 'Eliminado de favoritos');
+    } catch (err) {
+        console.error('[flashcards] toggleFavorite:', err);
+    }
+}
+
+function updateFavoriteButton() {
+    const btn  = document.getElementById('favoriteBtn');
+    const icon = btn?.querySelector('i');
+    if (!btn || !icon) return;
+    if (isFavorite) { icon.classList.replace('far', 'fas'); btn.classList.add('active'); }
+    else            { icon.classList.replace('fas', 'far'); btn.classList.remove('active'); }
+}
+
+// ═══════════════════════════════════════════════════════════════
 // NAVEGACIÓN
 // ═══════════════════════════════════════════════════════════════
 function goBack(e) {
     if (e) e.preventDefault();
-    window.location.href = '../pages/sesion-estudio.html';
+    // [FIX] Antes mandaba siempre a sesion-estudio.html, sin importar de
+    // dónde venías (Historial, Modo Estudio, etc). Ahora usa el historial
+    // real del navegador, igual que resumenes.js y examen-quiz.js — así
+    // "volver" te regresa a donde realmente estabas antes.
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        window.location.href = '../pages/sesion-estudio.html';
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════

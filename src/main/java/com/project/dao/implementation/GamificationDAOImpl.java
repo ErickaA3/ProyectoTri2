@@ -138,16 +138,20 @@ public class GamificationDAOImpl implements IGamificationDAO {
 
     // ─── ADVANCE DAILY MISSIONS ─────────────────────────────────────────────
     @Override
-    public int advanceDailyMissions(String userId, String missionType) throws Exception {
+    public int advanceDailyMissions(String userId, String missionType, LocalDate today) throws Exception {
         // Incrementa progress en misiones del día que coincidan con el tipo
-        // y que aún no estén completadas
+        // y que aún no estén completadas.
+        // [BUG] Antes usaba CURRENT_DATE (zona horaria del servidor de BD,
+        // típicamente UTC) en vez de recibir la fecha ya calculada en la
+        // zona horaria de la app — podía no coincidir con la fecha con la
+        // que ensureDailyMissions() había insertado la misión de "hoy".
         String sql = """
             UPDATE user_daily_missions udm
             SET progress = progress + 1
             FROM missions m
             WHERE udm.mission_id = m.id
               AND udm.user_id = ?::uuid
-              AND udm.date = CURRENT_DATE
+              AND udm.date = ?
               AND udm.completed = false
               AND m.type = ?
             """;
@@ -156,7 +160,8 @@ public class GamificationDAOImpl implements IGamificationDAO {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, userId);
-            stmt.setString(2, missionType);
+            stmt.setDate(2, java.sql.Date.valueOf(today));
+            stmt.setString(3, missionType);
 
             return stmt.executeUpdate();
         }
@@ -164,12 +169,12 @@ public class GamificationDAOImpl implements IGamificationDAO {
 
     // ─── ADVANCE WEEKLY OBJECTIVES ──────────────────────────────────────────
     @Override
-    public int advanceWeeklyObjectives(String userId, String objectiveType) throws Exception {
+    public int advanceWeeklyObjectives(String userId, String objectiveType, LocalDate weekStart) throws Exception {
         String sql = """
             UPDATE user_weekly_objectives
             SET progress = progress + 1
             WHERE user_id = ?::uuid
-              AND week_start = date_trunc('week', CURRENT_DATE)::date
+              AND week_start = ?
               AND completed = false
               AND type = ?
             """;
@@ -178,7 +183,8 @@ public class GamificationDAOImpl implements IGamificationDAO {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, userId);
-            stmt.setString(2, objectiveType);
+            stmt.setDate(2, java.sql.Date.valueOf(weekStart));
+            stmt.setString(3, objectiveType);
 
             return stmt.executeUpdate();
         }
@@ -186,7 +192,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
 
     // ─── CHECK COMPLETED MISSIONS ───────────────────────────────────────────
     @Override
-    public JsonObject checkCompletedMissions(String userId) throws Exception {
+    public JsonObject checkCompletedMissions(String userId, LocalDate today) throws Exception {
         // Marca como completadas las misiones que alcanzaron su required_count
         // y devuelve sus rewards
         String sql = """
@@ -195,7 +201,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
             FROM missions m
             WHERE udm.mission_id = m.id
               AND udm.user_id = ?::uuid
-              AND udm.date = CURRENT_DATE
+              AND udm.date = ?
               AND udm.completed = false
               AND udm.progress >= m.required_count
             RETURNING m.description, m.xp_reward, m.coin_reward
@@ -205,6 +211,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, userId);
+            stmt.setDate(2, java.sql.Date.valueOf(today));
             ResultSet rs = stmt.executeQuery();
 
             JsonObject result = new JsonObject();
@@ -230,12 +237,12 @@ public class GamificationDAOImpl implements IGamificationDAO {
 
     // ─── CHECK COMPLETED OBJECTIVES ─────────────────────────────────────────
     @Override
-    public JsonObject checkCompletedObjectives(String userId) throws Exception {
+    public JsonObject checkCompletedObjectives(String userId, LocalDate weekStart) throws Exception {
         String sql = """
             UPDATE user_weekly_objectives
             SET completed = true
             WHERE user_id = ?::uuid
-              AND week_start = date_trunc('week', CURRENT_DATE)::date
+              AND week_start = ?
               AND completed = false
               AND progress >= required_count
             RETURNING objective_description, xp_reward, coin_reward
@@ -245,6 +252,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, userId);
+            stmt.setDate(2, java.sql.Date.valueOf(weekStart));
             ResultSet rs = stmt.executeQuery();
 
             JsonObject result = new JsonObject();
