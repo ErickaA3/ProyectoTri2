@@ -23,8 +23,6 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
     private static final Logger LOG = Logger.getLogger(DuelWebSocket.class.getName());
     private static final Gson GSON = new Gson();
 
-    // Lock por sesión — evita escrituras concurrentes sobre el mismo Session,
-    // que Jakarta WebSocket no permite (tira IllegalStateException TEXT_FULL_WRITING).
     private static final ConcurrentHashMap<Session, Object> SESSION_LOCKS = new ConcurrentHashMap<>();
 
     private final IDuelDAO duelDAO = new DuelDAOImpl();
@@ -86,6 +84,27 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             sendError("Este duelo ya terminó."); session.close(); return;
         }
 
+        DuelRoom room = DuelRoomManager.INSTANCE.getOrCreate(duelId);
+
+        // JOIN repetido a una sala ya en curso → tratar como reconexión,
+        // NUNCA reinicializar preguntas ni timePerQuestion a mitad de partida.
+        if (room.getState() != DuelRoom.State.WAITING) {
+            room.join(userId, session, this);
+
+            JsonObject stateSync = new JsonObject();
+            stateSync.addProperty("type",            "STATE_SYNC");
+            stateSync.addProperty("currentQuestion", room.getCurrentQuestion(userId));
+            stateSync.addProperty("totalQuestions",  room.getTotalQuestions());
+            stateSync.addProperty("myScore",         room.getScore(userId));
+            send(stateSync);
+
+            int idx = room.getCurrentQuestion(userId);
+            int tpq = room.getTimePerQuestion();
+            sendQuestionTo(session, room, room.getQuestions(), idx, tpq);
+            room.scheduleQuestionTimer(userId, idx, tpq);
+            return;
+        }
+
         JsonObject questionsData;
         try {
             questionsData = duelDAO.getDuelQuestions(duelId, userId);
@@ -93,7 +112,6 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             sendError(e.getMessage()); session.close(); return;
         }
 
-        DuelRoom room = DuelRoomManager.INSTANCE.getOrCreate(duelId);
         boolean bothReady = room.join(userId, session, this);
 
         if (!bothReady) { send(buildWaiting("Esperando a tu oponente...")); return; }
@@ -119,8 +137,8 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             }
         }
 
-        room.scheduleQuestionTimer(userId, timePerQ);
-        if (rival != null) room.scheduleQuestionTimer(rival, timePerQ);
+        room.scheduleQuestionTimer(userId, 0, timePerQ);
+        if (rival != null) room.scheduleQuestionTimer(rival, 0, timePerQ);
     }
 
     private void handleAnswer(JsonObject msg) throws Exception {
@@ -135,12 +153,13 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
         int answerIdx     = msg.has("answerIdx") ? msg.get("answerIdx").getAsInt() : -1;
         int timeSecs      = msg.has("timeSecs")  ? msg.get("timeSecs").getAsInt()  : 0;
 
-        if (questionIndex != room.getCurrentQuestion(userId)) return;
-
         boolean correct  = room.isCorrectAnswer(questionIndex, answerIdx);
         int correctIdx   = room.getCorrectIdx(questionIndex);
 
-        boolean playerFinished = room.registerAnswer(userId, correct, timeSecs);
+        // Atómico: si ya se procesó esta pregunta (por ejemplo, el timeout
+        // del servidor ganó la carrera), esto retorna false y no hacemos nada más.
+        boolean applied = room.tryRegisterAnswer(userId, questionIndex, correct, timeSecs);
+        if (!applied) return;
 
         JsonObject feedback = new JsonObject();
         feedback.addProperty("type",          "ANSWER_RESULT");
@@ -162,7 +181,7 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             }
         }
 
-        if (playerFinished) {
+        if (room.isFinished(userId)) {
             try {
                 duelDAO.submitDuelResult(duelId, userId,
                         room.getScore(userId), room.getTotalQuestions(),
@@ -180,7 +199,7 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             int nextIndex = room.getCurrentQuestion(userId);
             int tpq = room.getTimePerQuestion();
             sendQuestionTo(session, room, room.getQuestions(), nextIndex, tpq);
-            room.scheduleQuestionTimer(userId, tpq);
+            room.scheduleQuestionTimer(userId, nextIndex, tpq);
         }
     }
 
@@ -269,15 +288,18 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
         Session userSession = room.getSession(userId);
         if (userSession == null || !userSession.isOpen()) return;
 
+        // Atómico: si la respuesta real del cliente ya se procesó para esta
+        // pregunta (ganó la carrera), esto retorna false y no hacemos nada.
+        boolean applied = room.tryRegisterAnswer(userId, questionIndex, false, 0);
+        if (!applied) return;
+
         JsonObject timeout = new JsonObject();
         timeout.addProperty("type",          "TIMEOUT");
         timeout.addProperty("questionIndex", questionIndex);
         sendTo(userSession, timeout);
 
         try {
-            boolean playerFinished = room.registerAnswer(userId, false, 0);
-
-            if (playerFinished) {
+            if (room.isFinished(userId)) {
                 try {
                     duelDAO.submitDuelResult(duelId, userId,
                             room.getScore(userId), room.getTotalQuestions(),
@@ -293,7 +315,7 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
                 int nextIndex = room.getCurrentQuestion(userId);
                 int tpq = room.getTimePerQuestion();
                 sendQuestionTo(userSession, room, room.getQuestions(), nextIndex, tpq);
-                room.scheduleQuestionTimer(userId, tpq);
+                room.scheduleQuestionTimer(userId, nextIndex, tpq);
             }
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "[WS] Error en timeout de " + userId, e);
@@ -438,14 +460,6 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
     private void send(JsonObject msg) { sendTo(session, msg); }
     private void sendError(String message) { send(buildError(message)); }
 
-    /**
-     * Envía un mensaje a una sesión con lock por sesión.
-     * Jakarta WebSocket no permite escrituras concurrentes sobre el mismo
-     * Session — si dos hilos (ej. el scheduler de timeout y el hilo que
-     * procesa un ANSWER) intentan escribir a la vez, tira
-     * IllegalStateException con estado TEXT_FULL_WRITING. Sincronizamos
-     * por sesión para serializar esas escrituras.
-     */
     private void sendTo(Session target, JsonObject msg) {
         if (target == null || !target.isOpen()) return;
         Object lock = SESSION_LOCKS.computeIfAbsent(target, k -> new Object());

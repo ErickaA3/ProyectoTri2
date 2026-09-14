@@ -12,6 +12,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 /**
  * Servlet de Leaderboard de Duelos.
@@ -21,7 +22,8 @@ import jakarta.servlet.http.HttpServletResponse;
  *       ?period=week|month|all     (default: week)
  *       ?scope=global|friends      (default: friends)
  *
- * Header requerido: X-User-Id (UUID del usuario actual)
+ * Autenticación: Authorization: Bearer <JWT>. La identidad la resuelve JwtFilter
+ * y queda en req.getAttribute("userId"); ya no se acepta el header X-User-Id.
  *
  * Respuesta:
  * {
@@ -46,9 +48,9 @@ public class LeaderboardServlet extends HttpServlet {
         res.setContentType("application/json");
         res.setCharacterEncoding("UTF-8");
 
-        String userId = req.getHeader("X-User-Id");
+        String userId = getUserId(req);
         if (userId == null || userId.isBlank()) {
-            sendError(res, 401, "Falta X-User-Id.");
+            sendError(res, 401, "No autenticado.");
             return;
         }
 
@@ -84,7 +86,23 @@ public class LeaderboardServlet extends HttpServlet {
         }
     }
 
-    // ─── Helper ──────────────────────────────────────────────────
+    // ─── Helpers ─────────────────────────────────────────────────
+
+    /**
+     * Obtiene el userId desde el JWT validado por JwtFilter (req.getAttribute),
+     * con fallback a HttpSession. Ya no se acepta el header X-User-Id (spoofable).
+     */
+    private String getUserId(HttpServletRequest req) {
+        Object attr = req.getAttribute("userId");
+        if (attr != null) return attr.toString();
+        HttpSession session = req.getSession(false);
+        if (session != null) {
+            Object uid = session.getAttribute("userId");
+            if (uid != null) return uid.toString();
+        }
+        return null;
+    }
+
     private void sendError(HttpServletResponse res, int status, String message) throws IOException {
         res.setStatus(status);
         JsonObject error = new JsonObject();

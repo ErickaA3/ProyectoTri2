@@ -13,6 +13,7 @@ import com.project.model.users.DailyMission;
 import com.project.model.users.Statistics;
 import com.project.model.users.User;
 import com.project.model.users.WeeklyObjective;
+import com.project.util.GamificationService;
 import com.project.util.JsonUtil;
 
 import jakarta.servlet.ServletException;
@@ -53,6 +54,19 @@ public class ProfileServlet extends HttpServlet {
             User user                       = optUser.get();
             Optional<Statistics> optStats  = userDAO.getStatsByUserId(userId);
             Statistics stats               = optStats.orElse(null);
+
+            // ── Recalcular racha real (arregla Bug B: racha "congelada" en el perfil) ──
+            // Si ya pasó más de 1 día (o 2 con escudo sin usar) desde la última
+            // actividad, la racha mostrada debe ser 0, sin esperar a que el usuario
+            // vuelva a hacer una actividad para que se "refresque" en la base.
+            if (stats != null) {
+                int rachaReal = GamificationService.effectiveStreak(
+                        stats.getStreakCurrent(),
+                        stats.getStreakLastActivity(),
+                        stats.isHasStreakShield()
+                );
+                stats.setStreakCurrent(rachaReal);
+            }
 
             // ── AUTO-CREAR misiones/objetivos si no existen para hoy/esta semana ──
             userDAO.ensureWeeklyObjectives(userId);

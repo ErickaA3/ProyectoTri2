@@ -266,6 +266,24 @@ public class ContentDAOImpl implements IContentDAO {
         }
     }
 
+    @Override
+    public String getContentType(String contentId, String userId) throws Exception {
+        String sql = """
+            SELECT type FROM study_content
+            WHERE id = ?::uuid AND user_id = ?::uuid
+            """;
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, contentId);
+            stmt.setString(2, userId);
+
+            ResultSet rs = stmt.executeQuery();
+            return rs.next() ? rs.getString("type") : null;
+        }
+    }
+
     public String[] getMetadata(String contentId, String userId) throws Exception {
         String sql = """
             SELECT created_at::text, session_id::text
