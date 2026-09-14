@@ -96,7 +96,7 @@ public class AIService {
     // SYSTEM PROMPTS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    private static String buildSystemPrompt(String type, JsonObject config) {
+       private static String buildSystemPrompt(String type, JsonObject config) {
         String base = "Eres un experto en pedagogía y diseño instruccional. "
             + "Tu trabajo es transformar contenido académico en recursos de estudio de alta calidad.\n\n"
             + "REGLAS ABSOLUTAS:\n"
@@ -122,7 +122,17 @@ public class AIService {
                     + "- Varía el tipo de preguntas: definiciones, procesos, comparaciones, ejemplos.\n"
                     + "- Ordena las flashcards de lo más fundamental a lo más específico.\n"
                     + "- NO repitas información entre tarjetas.\n"
-                    + "- Genera entre 8 y 15 flashcards dependiendo de la densidad del contenido.\n";
+                    + "- Genera entre 8 y 15 flashcards dependiendo de la densidad del contenido.\n"
+                    + "\nEJEMPLOS DE CALIDAD:\n"
+                    + "BIEN: front=\"¿Qué diferencia a una clave primaria de una clave foránea?\" "
+                    + "back=\"La clave primaria identifica de forma única cada fila de su propia tabla; "
+                    + "la clave foránea referencia la clave primaria de otra tabla para crear una relación.\"\n"
+                    + "MAL: front=\"Clave primaria\" back=\"Es importante en las bases de datos.\"\n"
+                    + "\nEVITA:\n"
+                    + "- Un \"front\" que es solo un sustantivo suelto, sin forma de pregunta o consigna clara.\n"
+                    + "- Un \"back\" genérico que podría aplicar a cualquier tema (\"Es importante porque ayuda a organizar la información\").\n"
+                    + "- Un \"back\" que es una lista de 4 o más puntos: si el concepto necesita eso, son 2 flashcards, no una.\n"
+                    + "- Repetir la misma idea con distinta redacción en dos tarjetas distintas.\n";
 
             case "schema": {
                 String tipoEsquema = config.has("tipo") ? config.get("tipo").getAsString() : "jerarquico";
@@ -137,7 +147,8 @@ public class AIService {
                             + "- Los nodos del ÚLTIMO nivel (hojas) DEBEN incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
                             + "- El \"detail\" es un párrafo breve que explica ese concepto específico.\n"
                             + "- Cada label debe ser corto: máximo 4-5 palabras.\n"
-                            + "- La estructura debe reflejar la jerarquía lógica del contenido.\n";
+                            + "- La estructura debe reflejar la jerarquía lógica del contenido.\n"
+                            + "- Evita que dos subtemas hermanos terminen cubriendo lo mismo desde ángulos distintos.\n";
                         break;
                     case "conceptual":
                         instrEsquema = "TIPO DE ESQUEMA: Mapa Conceptual (nodo central con conexiones radiales).\n"
@@ -146,7 +157,9 @@ public class AIService {
                             + "- Cada concepto principal DEBE tener 2-4 sub-conceptos como children.\n"
                             + "- Cada sub-concepto DEBE incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
                             + "- Los labels deben ser conceptos concretos, máx 3-5 palabras.\n"
-                            + "- Piensa en RELACIONES entre ideas, no solo en jerarquía.\n";
+                            + "- Piensa en RELACIONES entre ideas, no solo en jerarquía.\n"
+                            + "- Las conexiones deben representar relaciones reales (causa, dependencia, comparación), "
+                            + "no jerarquía disfrazada de \"concepto → sub-concepto\".\n";
                         break;
                     case "timeline":
                         instrEsquema = "TIPO DE ESQUEMA: Línea del Tiempo (eventos cronológicos).\n"
@@ -154,7 +167,9 @@ public class AIService {
                             + "- Los children directos son los eventos/etapas EN ORDEN CRONOLÓGICO (4-8 eventos).\n"
                             + "- Cada evento DEBE tener 2-4 sub-children con detalles o consecuencias.\n"
                             + "- Cada sub-child DEBE incluir un campo \"detail\" con 1-2 oraciones que expliquen ese punto.\n"
-                            + "- Si el texto no tiene fechas, usa orden lógico de pasos/fases.\n";
+                            + "- Si el texto no tiene fechas, usa orden lógico de pasos/fases.\n"
+                            + "- El orden cronológico debe basarse en la secuencia real del texto; usa el orden lógico "
+                            + "de fases SOLO si el texto genuinamente no trae cronología.\n";
                         break;
                     case "causa-efecto":
                         instrEsquema = "TIPO DE ESQUEMA: Causa y Efecto (diagrama Ishikawa/espina de pescado).\n"
@@ -164,7 +179,9 @@ public class AIService {
                             + "- Cada sub-causa DEBE incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
                             + "- Distribuye las causas de forma equilibrada.\n"
                             + "- Cada label debe ser conciso: máximo 4-5 palabras.\n"
-                            + "- Las causas deben ser categorías distintas, no repeticiones.\n";
+                            + "- Las causas deben ser categorías distintas, no repeticiones.\n"
+                            + "- Cada causa debe ser una causa raíz distinta, no el mismo problema reformulado. "
+                            + "Si dos causas se sienten intercambiables, son la misma causa mal dividida.\n";
                         break;
                     case "ciclico":
                         instrEsquema = "TIPO DE ESQUEMA: Cíclico (proceso que se repite en ciclo).\n"
@@ -173,18 +190,34 @@ public class AIService {
                             + "- La última fase debe conectar lógicamente con la primera.\n"
                             + "- Cada fase DEBE tener 2-3 sub-children con detalles del proceso.\n"
                             + "- Cada sub-child DEBE incluir un campo \"detail\" con 1-2 oraciones explicativas.\n"
-                            + "- Labels cortos: máximo 4-5 palabras por fase.\n";
+                            + "- Labels cortos: máximo 4-5 palabras por fase.\n"
+                            + "- El \"detail\" de la última fase debe mencionar explícitamente cómo conecta de vuelta "
+                            + "con la primera, para que el ciclo se sienta cerrado y no como una lista lineal.\n";
                         break;
                     default:
                         instrEsquema = "TIPO DE ESQUEMA: Jerárquico. Organiza de lo general a lo específico.\n";
                 }
-                return base + "\nMODO: Generador de Esquemas.\n" + instrEsquema;
+                String estandarCalidadEsquema = "\nESTÁNDAR DE CALIDAD (aplica a todos los tipos de esquema):\n"
+                    + "- Cada label debe nombrar algo específico del contenido, NUNCA un placeholder "
+                    + "(\"Concepto clave\", \"Aspecto importante\", \"Punto relevante\").\n"
+                    + "- El \"detail\" de un nodo hoja debe aportar información NUEVA respecto a su label, "
+                    + "no repetirlo con otras palabras.\n"
+                    + "- Los nodos hermanos deben ser categorías realmente distintas entre sí, no la misma idea dos veces.\n"
+                    + "- Reparte el contenido de forma equilibrada entre ramas: evita una rama con 5+ hijos y otra con 1 solo.\n";
+                return base + "\nMODO: Generador de Esquemas.\n" + instrEsquema + estandarCalidadEsquema;
             }
 
             case "quiz": {
                 String tipo = config.has("tipo") ? config.get("tipo").getAsString() : "quiz";
                 String dificultad = config.has("dificultad") ? config.get("dificultad").getAsString() : "medio";
                 boolean esExperto = "expert_exam".equals(tipo);
+
+                String nivelesCognitivos = "\nNIVELES POR OPERACIÓN COGNITIVA (no por \"tema difícil o fácil\"):\n"
+                    + "- RECORDAR: la respuesta está textual o casi textual en el contenido.\n"
+                    + "- APLICAR: requiere usar una definición o regla del contenido en un caso nuevo, no solo repetirla.\n"
+                    + "- ANALIZAR: requiere comparar, detectar una excepción, o distinguir entre dos conceptos parecidos.\n"
+                    + "Esta escala funciona igual sin importar la materia: úsala para calibrar la dificultad pedida "
+                    + "(facil→RECORDAR, medio→mezcla RECORDAR/APLICAR, dificil→APLICAR/ANALIZAR).\n";
 
                 String instrDif;
                 switch (dificultad) {
@@ -220,7 +253,18 @@ public class AIService {
                         + "- Ayuda al estudiante a entender, no solo a memorizar.\n";
                 }
 
-                return base + "\nMODO: Generador de Evaluaciones.\n" + instrTipo + instrDif;
+                String estandarCalidadQuiz = "\nESTÁNDAR DE CALIDAD:\n"
+                    + "BIEN: cada opción incorrecta representa un error conceptual real y plausible "
+                    + "(ej. confundir clave foránea con índice).\n"
+                    + "MAL: una opción incorrecta evidentemente absurda o de otro tema, que no exige conocimiento real "
+                    + "para descartarla.\n"
+                    + "\nEVITA:\n"
+                    + "- Preguntas respondibles con sentido común sin haber leído el material.\n"
+                    + "- Una sola opción visiblemente más larga o detallada que las demás (delata la respuesta correcta).\n"
+                    + "- Repetir la misma pregunta con distintas palabras entre dos preguntas del mismo quiz.\n";
+
+                return base + "\nMODO: Generador de Evaluaciones.\n" + instrTipo + instrDif
+                    + nivelesCognitivos + estandarCalidadQuiz;
             }
 
             case "summary":
@@ -231,13 +275,23 @@ public class AIService {
                     + "- El highlight es un dato clave, cifra, o concepto crucial de esa sección (o null).\n"
                     + "- Los keywords deben ser términos técnicos o conceptos clave del texto.\n"
                     + "- readingMinutes: estima cuántos minutos toma leer tu resumen (mínimo 2).\n"
-                    + "- NO copies oraciones textuales del original. Parafrasea con claridad.\n";
+                    + "- NO copies oraciones textuales del original. Parafrasea con claridad.\n"
+                    + "\nEJEMPLOS DE CALIDAD:\n"
+                    + "BIEN heading: \"Arquitectura de tres capas en sistemas web\"\n"
+                    + "MAL heading: \"Introducción\" / \"Desarrollo\" / \"Conclusión\" (genéricos, no dicen de qué trata la sección)\n"
+                    + "BIEN highlight: \"El patrón MVC separa datos, lógica y presentación en tres componentes independientes.\"\n"
+                    + "MAL highlight: \"Este tema es fundamental.\" (no es un dato, es relleno)\n"
+                    + "\nEVITA:\n"
+                    + "- Secciones con heading genérico que no menciona el contenido real de esa sección.\n"
+                    + "- Un highlight que es una opinión vacía en vez de un dato, cifra o concepto concreto del texto.\n"
+                    + "- Secciones que repiten la misma idea central con otras palabras.\n"
+                    + "- Keywords que son palabras comunes sin contexto (\"importante\", \"proceso\", \"sistema\" sueltos).\n";
 
             default:
                 return base;
         }
     }
-
+    
     // ═══════════════════════════════════════════════════════════════════════════
     // USER PROMPTS
     // ═══════════════════════════════════════════════════════════════════════════
