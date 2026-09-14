@@ -48,27 +48,31 @@ public interface IGamificationDAO {
      * Incrementa el progreso de misiones diarias que coincidan con el tipo de actividad.
      * @param userId       UUID del usuario
      * @param missionType  Tipo de misión: "evaluacion", "flashcard", "contenido", "duelo", "actividad"
+     * @param today        Fecha de "hoy" calculada en Java (con la zona horaria de la app,
+     *                     NO se usa CURRENT_DATE de Postgres — esa corre en la zona del
+     *                     servidor de BD, que puede no coincidir con la del usuario)
      * @return Número de misiones actualizadas
      */
-    int advanceDailyMissions(String userId, String missionType) throws Exception;
+    int advanceDailyMissions(String userId, String missionType, java.time.LocalDate today) throws Exception;
 
     /**
      * Incrementa el progreso de objetivos semanales que coincidan.
-     * @param userId       UUID del usuario
+     * @param userId        UUID del usuario
      * @param objectiveType Tipo: "racha", "actividades", "duelos", "examen_perfecto"
+     * @param weekStart     Lunes de la semana actual, calculado en Java con la zona de la app
      * @return Número de objetivos actualizados
      */
-    int advanceWeeklyObjectives(String userId, String objectiveType) throws Exception;
+    int advanceWeeklyObjectives(String userId, String objectiveType, java.time.LocalDate weekStart) throws Exception;
 
     /**
      * Obtiene misiones diarias completadas (para dar rewards).
      * @return JsonObject con misiones recién completadas y sus rewards
      */
-    JsonObject checkCompletedMissions(String userId) throws Exception;
+    JsonObject checkCompletedMissions(String userId, java.time.LocalDate today) throws Exception;
 
     /**
      * Obtiene objetivos semanales completados (para dar rewards).
      * @return JsonObject con objetivos recién completados y sus rewards
      */
-    JsonObject checkCompletedObjectives(String userId) throws Exception;
+    JsonObject checkCompletedObjectives(String userId, java.time.LocalDate weekStart) throws Exception;
 }

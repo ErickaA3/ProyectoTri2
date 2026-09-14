@@ -7,6 +7,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -21,6 +22,12 @@ import com.project.model.users.User;
 import com.project.model.users.WeeklyObjective;
 
 public class UserDAOImpl implements IUserDAO {
+
+    // [BUG] Ver mismo comentario en GamificationService.APP_ZONE: sin esto,
+    // "hoy" y "esta semana" se calculaban con la zona horaria del servidor
+    // (UTC en Railway) en vez de la de Costa Rica, corriendo el reset de
+    // misiones/objetivos ~6 horas antes de la medianoche real del usuario.
+    private static final ZoneId APP_ZONE = ZoneId.of("America/Costa_Rica");
 
     // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -215,7 +222,7 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public void ensureWeeklyObjectives(UUID userId) throws SQLException {
-        LocalDate weekStart = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+        LocalDate weekStart = LocalDate.now(APP_ZONE).with(java.time.DayOfWeek.MONDAY);
 
         // ¿Ya existen para esta semana?
         String checkSql = "SELECT COUNT(*) FROM user_weekly_objectives WHERE user_id = ?::uuid AND week_start = ?";
@@ -229,12 +236,17 @@ public class UserDAOImpl implements IUserDAO {
         }
 
         // Pool: {type, description, requiredCount, xpReward, coinReward}
+        // [FIX] Antes había dos entradas separadas para "ganar duelos"
+        // ("duels_won" y "win_duel"), y el código que avanza el progreso
+        // solo reconocía "win_duel" — la entrada "duels_won" nunca
+        // avanzaba, se quedaba pegada en 0 para siempre. Se deja una sola
+        // entrada de "ganar duelos" en el pool (elimina la redundante) para
+        // que no puedan tocarle las dos variantes la misma semana.
         String[][] pool = {
             {"streak_days",        "Mantener racha por 3 d\u00edas",       "3",  "25", "20"},
             {"streak_days",        "Mantener racha por 5 d\u00edas",       "5",  "50", "40"},
             {"activities",         "Completar 5 actividades",         "5",  "30", "25"},
             {"activities",         "Completar 10 actividades",       "10",  "60", "50"},
-            {"duels_won",          "Ganar 2 duelos",                  "2",  "40", "30"},
             {"perfect_exam",       "Obtener 100% en un examen",       "1",  "35", "25"},
             {"complete_flashcard", "Estudiar 3 sets de flashcards",   "3",  "30", "20"},
             {"complete_quiz",      "Completar 3 quizzes",             "3",  "30", "25"},
@@ -273,7 +285,7 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public List<WeeklyObjective> getWeeklyObjectives(UUID userId) throws SQLException {
-        LocalDate weekStart = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+        LocalDate weekStart = LocalDate.now(APP_ZONE).with(java.time.DayOfWeek.MONDAY);
         String sql = """
                 SELECT user_id, type, week_start, objective_description,
                        required_count, progress, completed, xp_reward, coin_reward
@@ -310,7 +322,7 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public void ensureDailyMissions(UUID userId) throws SQLException {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(APP_ZONE);
 
         // ¿Ya existen para hoy?
         String checkSql = "SELECT COUNT(*) FROM user_daily_missions WHERE user_id = ?::uuid AND date = ?";
@@ -370,7 +382,7 @@ public class UserDAOImpl implements IUserDAO {
         try (Connection c = conn();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, userId.toString());
-            ps.setDate(2, Date.valueOf(LocalDate.now()));
+            ps.setDate(2, Date.valueOf(LocalDate.now(APP_ZONE)));
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 DailyMission dm = new DailyMission();
