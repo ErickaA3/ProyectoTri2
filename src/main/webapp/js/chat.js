@@ -4,7 +4,6 @@ const API_BASE = window.API_BASE || '';
 
 let chatHistory    = [];
 let currentSession = null;
-let attachedPdf    = null;
 let busy           = false;
 let msgCount       = 0;
 
@@ -157,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function send() {
     const inp = document.getElementById('userInput');
     const txt = inp.value.trim();
-    if ((!txt && !attachedPdf) || busy) return;
+    if (!txt || busy) return;
 
     const userId = getUserId();
     if (!userId) {
@@ -180,7 +179,7 @@ async function send() {
             method: 'POST',
             headers: getAuthHeaders(),
             credentials: 'include',
-            body: JSON.stringify(Object.assign({ mensaje: txt || '(Ver PDF adjunto)', sessionId: currentSession, userId }, attachedPdf ? { pdfBase64: attachedPdf.base64, pdfName: attachedPdf.name } : {}))
+            body: JSON.stringify({ mensaje: txt, sessionId: currentSession, userId })
         });
 
         const data = await res.json();
@@ -190,8 +189,6 @@ async function send() {
             addBotMsg('Hubo un error: ' + (data.message || 'Intenta de nuevo.'));
             return;
         }
-
-        removePdf();
 
         if (!currentSession) {
             currentSession = data.data.sessionId;
@@ -465,148 +462,4 @@ async function loadEquippedBackground() {
 
 document.addEventListener('click', function(e) {
     if (e.target.id === 'deleteConfirmModal') closeDeleteModal();
-    if (e.target.id === 'wrappedModal') closeWrapped();
 });
-
-// ── Resumen semanal (Wrapped) ────────────────────────────────
-const WRAPPED_SLIDES = ['ws1','ws2','ws3','wsfreq','ws4','ws5'];
-let wrappedIdx = 0;
-let wrappedDataLoaded = false;
-
-function buildWrappedNav() {
-    const nav = document.getElementById('wrappedNav');
-    if (!nav || nav.children.length) return;
-    WRAPPED_SLIDES.forEach((_, i) => {
-        const d = document.createElement('div');
-        d.className = 'wdot' + (i === 0 ? ' active' : '');
-        nav.appendChild(d);
-    });
-}
-function renderWrappedSlide() {
-    WRAPPED_SLIDES.forEach((id, i) => {
-        const el = document.getElementById(id);
-        if (el) el.classList.toggle('show', i === wrappedIdx);
-    });
-    const nav = document.getElementById('wrappedNav');
-    if (nav) [...nav.children].forEach((d, i) => d.classList.toggle('active', i === wrappedIdx));
-}
-function nextWrappedSlide() { wrappedIdx = Math.min(wrappedIdx + 1, WRAPPED_SLIDES.length - 1); renderWrappedSlide(); }
-function prevWrappedSlide() { wrappedIdx = Math.max(wrappedIdx - 1, 0); renderWrappedSlide(); }
-
-async function loadWrappedData() {
-    const userId = getUserId();
-    let data = {
-        studyHours: '--', studyCompare: 'Aún no hay suficientes datos.',
-        topSubject: 'Sin datos', topPct: '', weakSubject: 'Sin datos', questionsCount: '0',
-        freqTopic: 'Sin datos aún', freqDetail: 'Pregúntale más cosas a tu asistente esta semana.',
-        streak: '0 días', xp: '+0 XP', coins: '+0 monedas',
-        suggestionTitle: 'Sigue chateando esta semana',
-        suggestionText: 'Cuantas más dudas resuelvas, más preciso será tu resumen la próxima semana.'
-    };
-    try {
-        if (userId) {
-            const res = await fetch(`${API_BASE}/api/wrapped?userId=${userId}`, {
-                headers: getAuthHeaders(), credentials: 'include'
-            });
-            if (res.ok) {
-                const json = await res.json();
-                if (json.success && json.data) data = { ...data, ...json.data };
-            }
-        }
-    } catch(e) { console.error('[Wrapped] usando datos de respaldo:', e); }
-
-    document.getElementById('wStudyTime').textContent       = data.studyHours;
-    document.getElementById('wStudyCompare').textContent    = data.studyCompare;
-    document.getElementById('wTopSubject').textContent      = data.topSubject;
-    document.getElementById('wTopPct').textContent          = data.topPct;
-    document.getElementById('wWeakSubject').textContent     = data.weakSubject;
-    document.getElementById('wQuestionsCount').textContent  = data.questionsCount;
-    document.getElementById('wFreqTopic').textContent       = data.freqTopic;
-    document.getElementById('wFreqDetail').textContent      = data.freqDetail;
-    document.getElementById('wStreak').textContent          = data.streak;
-    document.getElementById('wXp').textContent              = data.xp;
-    document.getElementById('wCoins').textContent           = data.coins;
-    document.getElementById('wSuggestionTitle').textContent = data.suggestionTitle;
-    document.getElementById('wSuggestionText').textContent  = data.suggestionText;
-    wrappedDataLoaded = true;
-}
-
-function openWrapped() {
-    buildWrappedNav();
-    wrappedIdx = 0;
-    renderWrappedSlide();
-    document.getElementById('wrappedModal').classList.add('show');
-    if (!wrappedDataLoaded) loadWrappedData();
-}
-function closeWrapped() {
-    document.getElementById('wrappedModal').classList.remove('show');
-}
-
-async function shareWrappedCard(e) {
-    e.stopPropagation();
-    const status = document.getElementById('wrappedShareStatus');
-    if (typeof html2canvas === 'undefined') {
-        status.textContent = 'No se pudo cargar el generador de imagen.';
-        return;
-    }
-    status.textContent = 'Generando imagen...';
-    const target = document.getElementById('ws5');
-    try {
-        const canvas = await html2canvas(target, { backgroundColor: null, scale: 2 });
-        canvas.toBlob(async (blob) => {
-            const file = new File([blob], 'mi-resumen-profesoria.png', { type: 'image/png' });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                try {
-                    await navigator.share({ files: [file], title: 'Mi resumen semanal' });
-                    status.textContent = '¡Compartido!';
-                } catch(err) { status.textContent = 'Cancelado.'; }
-            } else {
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = 'mi-resumen-profesoria.png';
-                link.click();
-                status.textContent = 'Imagen descargada.';
-            }
-        }, 'image/png');
-    } catch(err) {
-        status.textContent = 'No se pudo generar la imagen.';
-        console.error('[Wrapped] Error al compartir:', err);
-    }
-}
-// ── PDF Upload ───────────────────────────────────────────────────────────────
-
-function handlePdfUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (file.size > 10 * 1024 * 1024) {
-        addBotMsg('⚠️ El PDF es demasiado grande. Máximo 10 MB.');
-        event.target.value = '';
-        return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const base64 = e.target.result.split(',')[1];
-        attachedPdf = { name: file.name, base64: base64 };
-        document.getElementById('pdfChip').querySelector('.pdf-chip-name').textContent = file.name;
-        document.getElementById('pdfChip').style.display = 'flex';
-        document.getElementById('pdfBtn').style.display = 'none';
-        document.getElementById('userInput').placeholder = '¿Qué querés saber sobre el PDF? (opcional)';
-        document.getElementById('userInput').focus();
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
-}
-
-function removePdf() {
-    attachedPdf = null;
-    const chip = document.getElementById('pdfChip');
-    if (chip) chip.style.display = 'none';
-    const btn = document.getElementById('pdfBtn');
-    if (btn) btn.style.display = 'flex';
-    const fi = document.getElementById('pdfFileInput');
-    if (fi) fi.value = '';
-    const inp = document.getElementById('userInput');
-    if (inp) inp.placeholder = 'Escríbeme tu pregunta...';
-}
