@@ -55,7 +55,12 @@ public class UserContextService {
     // ── Perfil ────────────────────────────────────────────────────────────
 
     private static void appendUserInfo(Connection conn, UUID userId, StringBuilder ctx) {
-        String sql = "SELECT username, full_name, country, created_at FROM users WHERE id = ?";
+        String sql = """
+                SELECT u.username, c.full_name, c.country, u.created_at
+                FROM users u
+                LEFT JOIN clientes c ON c.user_id = u.id
+                WHERE u.id = ?
+                """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ResultSet rs = ps.executeQuery();
@@ -69,7 +74,6 @@ public class UserContextService {
             }
         } catch (SQLException e) { logErr("userInfo", e); }
     }
-
     // ── Stats ─────────────────────────────────────────────────────────────
 
     private static void appendStats(Connection conn, UUID userId, StringBuilder ctx) {
