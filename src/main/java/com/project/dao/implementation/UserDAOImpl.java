@@ -366,44 +366,39 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public void ensureWeeklyObjectives(UUID userId) throws SQLException {
+        // Verificar si ya tiene objetivos esta semana
         String checkSql = """
                 SELECT COUNT(*) FROM user_weekly_objectives
                 WHERE user_id = ?::uuid
-                  AND week_start = date_trunc('week', CURRENT_DATE)::date
+                AND week_start = date_trunc('week', CURRENT_DATE)::date
                 """;
         try (Connection c = conn();
-             PreparedStatement ps = c.prepareStatement(checkSql)) {
+            PreparedStatement ps = c.prepareStatement(checkSql)) {
             ps.setString(1, userId.toString());
             ResultSet rs = ps.executeQuery();
             if (rs.next() && rs.getInt(1) > 0) return;
         }
 
-        List<String[]> objectives = List.of(
-            new String[]{"study_sessions", "Completar 3 sesiones de estudio esta semana",  "3",  "100", "25"},
-            new String[]{"flashcards",     "Repasar 20 flashcards esta semana",             "20", "80",  "20"},
-            new String[]{"quizzes",        "Completar 2 quizzes esta semana",               "2",  "90",  "22"},
-            new String[]{"streak",         "Mantener racha de 5 días esta semana",          "5",  "120", "30"}
-        );
-
+        // Insertar desde el catálogo objectives 
         String insertSql = """
                 INSERT INTO user_weekly_objectives
                     (user_id, type, week_start, objective_description,
-                     required_count, xp_reward, coin_reward)
-                VALUES (?::uuid, ?, date_trunc('week', CURRENT_DATE)::date, ?, ?, ?, ?)
+                    required_count, xp_reward, coin_reward)
+                SELECT
+                    ?::uuid,
+                    o.type,
+                    date_trunc('week', CURRENT_DATE)::date,
+                    o.description,
+                    o.required_count,
+                    o.xp_reward,
+                    o.coin_reward
+                FROM objectives o
                 ON CONFLICT DO NOTHING
                 """;
         try (Connection c = conn();
-             PreparedStatement ps = c.prepareStatement(insertSql)) {
-            for (String[] obj : objectives) {
-                ps.setString(1, userId.toString());
-                ps.setString(2, obj[0]);
-                ps.setString(3, obj[1]);
-                ps.setInt(4, Integer.parseInt(obj[2]));
-                ps.setInt(5, Integer.parseInt(obj[3]));
-                ps.setInt(6, Integer.parseInt(obj[4]));
-                ps.addBatch();
-            }
-            ps.executeBatch();
+            PreparedStatement ps = c.prepareStatement(insertSql)) {
+            ps.setString(1, userId.toString());
+            ps.executeUpdate();
         }
     }
 }
