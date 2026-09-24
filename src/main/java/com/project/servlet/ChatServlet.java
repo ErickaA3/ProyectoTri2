@@ -13,6 +13,11 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.io.RandomAccessReadBuffer;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -27,11 +32,6 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-
-import org.apache.pdfbox.Loader;
-import org.apache.pdfbox.io.RandomAccessReadBuffer;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 
 @WebServlet("/api/chat")
 public class ChatServlet extends HttpServlet {
@@ -183,6 +183,8 @@ public class ChatServlet extends HttpServlet {
     }
 
     // GET /api/chat?sessionId=xxx
+    // GET /api/chat?userId=xxx                → lista de sesiones
+    // GET /api/chat?userId=xxx&search=palabra → busca por palabra clave en TODO el contenido de los chats
     @Override
     protected void doGet(
             HttpServletRequest request,
@@ -193,6 +195,7 @@ public class ChatServlet extends HttpServlet {
         if (userId == null) { JsonUtil.sendError(response, 401, "No autenticado."); return; }
 
         String sessionId = request.getParameter("sessionId");
+        String search     = request.getParameter("search");
 
         try (Connection conn = DatabaseConnection.getConnection()) {
 
@@ -206,6 +209,24 @@ public class ChatServlet extends HttpServlet {
                     arr.add(o);
                 }
                 JsonUtil.sendSuccess(response, arr.toString());
+
+            } else if (search != null && !search.isBlank()) {
+                // [FEATURE] Búsqueda por palabra clave — recorre TODO el contenido
+                // de los mensajes guardados en chat_history, no solo el primer
+                // mensaje de cada sesión. Así "cuéntame de spiderman" encuentra
+                // un chat aunque esa palabra haya salido a mitad de conversación.
+                List<String[]> results = searchSessions(conn, userId, search.trim());
+                JsonArray arr = new JsonArray();
+                for (String[] s : results) {
+                    JsonObject o = new JsonObject();
+                    o.addProperty("sessionId",    s[0]);
+                    o.addProperty("firstMessage", s[1]);
+                    o.addProperty("createdAt",    s[2]);
+                    o.addProperty("snippet",      s[3]);
+                    arr.add(o);
+                }
+                JsonUtil.sendSuccess(response, arr.toString());
+
             } else {
                 List<String[]> sessions = loadSessions(conn, userId);
                 JsonArray arr = new JsonArray();
@@ -355,5 +376,73 @@ public class ChatServlet extends HttpServlet {
             }
         }
         return list;
+    }
+
+    /**
+     * [FEATURE] Busca sesiones cuyo contenido (en CUALQUIER mensaje, no solo el
+     * primero) contenga la palabra clave. Devuelve, por cada sesión que matchea:
+     * el sessionId, el primer mensaje (para el título en el sidebar), la fecha
+     * de creación, y un snippet del mensaje donde apareció la coincidencia
+     * (para mostrar contexto de por qué ese chat matcheó la búsqueda).
+     *
+     * Usa ILIKE (case-insensitive) sobre message, agrupado por session_id para
+     * no repetir la misma sesión si la palabra aparece en varios mensajes.
+     */
+    private List<String[]> searchSessions(Connection conn, UUID userId, String keyword) throws Exception {
+        String sql = """
+                WITH matches AS (
+                    SELECT DISTINCT ON (session_id)
+                        session_id, message AS snippet, created_at
+                    FROM chat_history
+                    WHERE user_id = ? AND message ILIKE ?
+                    ORDER BY session_id, created_at DESC
+                ),
+                first_msgs AS (
+                    SELECT DISTINCT ON (session_id)
+                        session_id, message AS first_message
+                    FROM chat_history
+                    WHERE user_id = ? AND role = 'user'
+                    ORDER BY session_id, created_at ASC
+                )
+                SELECT m.session_id::text, f.first_message, m.created_at::text, m.snippet
+                FROM matches m
+                LEFT JOIN first_msgs f ON f.session_id = m.session_id
+                ORDER BY m.created_at DESC
+                LIMIT 30
+                """;
+        List<String[]> list = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setObject(1, userId);
+            ps.setString(2, "%" + keyword + "%");
+            ps.setObject(3, userId);
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                String firstMessage = rs.getString("first_message");
+                String snippet      = rs.getString("snippet");
+                list.add(new String[]{
+                    rs.getString("session_id"),
+                    firstMessage != null ? firstMessage : snippet,
+                    rs.getString("created_at"),
+                    truncateSnippet(snippet, keyword)
+                });
+            }
+        }
+        return list;
+    }
+
+    /** Recorta el snippet alrededor de la palabra clave para no devolver mensajes larguísimos. */
+    private String truncateSnippet(String text, String keyword) {
+        if (text == null) return "";
+        if (text.length() <= 120) return text;
+
+        int idx = text.toLowerCase().indexOf(keyword.toLowerCase());
+        if (idx < 0) return text.substring(0, 120) + "...";
+
+        int start = Math.max(0, idx - 40);
+        int end   = Math.min(text.length(), idx + keyword.length() + 60);
+        String snippet = text.substring(start, end);
+        if (start > 0) snippet = "..." + snippet;
+        if (end < text.length()) snippet = snippet + "...";
+        return snippet;
     }
 }

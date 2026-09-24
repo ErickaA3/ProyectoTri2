@@ -4,6 +4,7 @@ const API_BASE = window.API_BASE || '';
 
 let chatHistory    = [];
 let currentSession = null;
+let attachedPdf    = null;
 let busy           = false;
 let msgCount       = 0;
 
@@ -156,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function send() {
     const inp = document.getElementById('userInput');
     const txt = inp.value.trim();
-    if (!txt || busy) return;
+    if ((!txt && !attachedPdf) || busy) return;
 
     const userId = getUserId();
     if (!userId) {
@@ -165,7 +166,8 @@ async function send() {
     }
 
     hideSuggestions();
-    addMsg('user', txt);
+    const pdfNameForBubble = attachedPdf ? attachedPdf.name : null;
+    addMsg('user', txt, pdfNameForBubble);
     inp.value = '';
     inp.style.height = 'auto';
     setTyping(true);
@@ -179,7 +181,7 @@ async function send() {
             method: 'POST',
             headers: getAuthHeaders(),
             credentials: 'include',
-            body: JSON.stringify({ mensaje: txt, sessionId: currentSession, userId })
+            body: JSON.stringify(Object.assign({ mensaje: txt || '(Ver PDF adjunto)', sessionId: currentSession, userId }, attachedPdf ? { pdfBase64: attachedPdf.base64, pdfName: attachedPdf.name } : {}))
         });
 
         const data = await res.json();
@@ -189,6 +191,8 @@ async function send() {
             addBotMsg('Hubo un error: ' + (data.message || 'Intenta de nuevo.'));
             return;
         }
+
+        removePdf();
 
         if (!currentSession) {
             currentSession = data.data.sessionId;
@@ -252,6 +256,80 @@ async function loadSessions() {
     } catch(e) { console.error('Error cargando sesiones:', e); }
 }
 
+// ── Búsqueda de chats por palabra clave ──────────────────────
+let searchDebounceTimer = null;
+let currentSearchTerm   = '';
+
+function handleChatSearch(value) {
+    clearTimeout(searchDebounceTimer);
+    const clearBtn = document.getElementById('chatSearchClear');
+    clearBtn.style.display = value ? 'flex' : 'none';
+
+    searchDebounceTimer = setTimeout(() => {
+        currentSearchTerm = value.trim();
+        if (currentSearchTerm.length === 0) {
+            document.getElementById('recentsLabel').textContent = 'Chats recientes';
+            loadSessions();
+        } else if (currentSearchTerm.length >= 2) {
+            runChatSearch(currentSearchTerm);
+        }
+    }, 350);
+}
+
+function clearChatSearch() {
+    document.getElementById('chatSearchInput').value = '';
+    document.getElementById('chatSearchClear').style.display = 'none';
+    document.getElementById('recentsLabel').textContent = 'Chats recientes';
+    currentSearchTerm = '';
+    loadSessions();
+}
+
+async function runChatSearch(term) {
+    const userId = getUserId();
+    if (!userId) return;
+
+    const container = document.querySelector('.recents');
+    container.querySelectorAll('.chat-item, .empty-sessions').forEach(el => el.remove());
+    document.getElementById('recentsLabel').textContent = 'Buscando...';
+
+    try {
+        const res = await fetch(`${API_BASE}/api/chat?userId=${userId}&search=${encodeURIComponent(term)}`, {
+            headers: getAuthHeaders(),
+            credentials: 'include'
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.success) return;
+
+        // Si el usuario ya escribió otra cosa mientras esta búsqueda volvía, descartar resultado viejo
+        if (currentSearchTerm !== term) return;
+
+        const results = data.data;
+        document.getElementById('recentsLabel').textContent =
+            results.length === 0 ? 'Sin resultados' : `${results.length} resultado${results.length === 1 ? '' : 's'}`;
+
+        if (results.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'empty-sessions';
+            empty.textContent = 'No se encontró nada con esa palabra.';
+            empty.style.cssText = 'color:var(--text-secondary);font-size:0.8rem;padding:1rem 0;text-align:center;';
+            container.appendChild(empty);
+            return;
+        }
+
+        results.forEach(s => addSessionToSidebar(s.firstMessage, s.sessionId, false, s.createdAt, s.snippet, term));
+    } catch(e) { console.error('Error buscando chats:', e); }
+}
+
+/** Resalta la palabra clave dentro de un snippet, escapando el resto del texto. */
+function highlightMatch(text, term) {
+    if (!text || !term) return esc(text || '');
+    const escText = esc(text);
+    const escTerm = esc(term);
+    const re = new RegExp('(' + escTerm.replace(/[.*+?^\${}()|[\]\\]/g, '\\$&') + ')', 'ig');
+    return escText.replace(re, '<mark class="search-highlight">$1</mark>');
+}
+
 // ── Fecha relativa (de develop) ─────────────────────────────
 function formatSessionDate(isoString) {
     if (!isoString) return '';
@@ -265,7 +343,7 @@ function formatSessionDate(isoString) {
     return fecha.toLocaleDateString('es', { day:'2-digit', month:'short' });
 }
 
-function addSessionToSidebar(firstMessage, sessionId, prepend = false, createdAt = null) {
+function addSessionToSidebar(firstMessage, sessionId, prepend = false, createdAt = null, snippet = null, searchTerm = null) {
     const container = document.querySelector('.recents');
     const empty = container.querySelector('.empty-sessions');
     if (empty) empty.remove();
@@ -274,6 +352,12 @@ function addSessionToSidebar(firstMessage, sessionId, prepend = false, createdAt
     const iconColors = { math:'#3b82f6', history:'#f59e0b', science:'#10b981', code:'#2dd4bf', default:'#8b5cf6' };
     const iconColor = iconColors[theme] || iconColors.default;
 
+    // Si viene de una búsqueda, mostramos el snippet donde matcheó (resaltado)
+    // en vez del primer mensaje — así se ve POR QUÉ ese chat apareció.
+    const snippetHTML = (snippet && searchTerm)
+        ? `<div class="chat-item-snippet">${highlightMatch(snippet, searchTerm)}</div>`
+        : '';
+
     const item = document.createElement('div');
     item.className = 'chat-item';
     item.dataset.sessionId = sessionId;
@@ -281,6 +365,7 @@ function addSessionToSidebar(firstMessage, sessionId, prepend = false, createdAt
     item.innerHTML = `
         <div class="chat-item-meta">
             <div class="chat-item-label">${esc(firstMessage ? firstMessage.substring(0,35) : 'Chat')}${firstMessage && firstMessage.length>35?'...':''}</div>
+            ${snippetHTML}
             <div class="chat-item-date">${formatSessionDate(createdAt)}</div>
         </div>
         <button class="chat-item-delete" title="Eliminar chat">
@@ -380,16 +465,32 @@ async function selectSession(el, sessionId) {
 
 function addBotMsg(txt) { return addMsg('bot', txt); }
 
-function addMsg(role, txt) {
+function addMsg(role, txt, pdfName) {
     const area   = document.getElementById('msgsArea');
     const typing = document.getElementById('typingRow');
     const div    = document.createElement('div');
     div.className = `msg ${role}`;
     const initials = document.getElementById('chatAvatar').textContent || 'U';
+
+    const pdfCardHTML = pdfName ? `
+        <div class="msg-pdf-card">
+            <div class="msg-pdf-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+            </div>
+            <div class="msg-pdf-info">
+                <div class="msg-pdf-name">${esc(pdfName)}</div>
+                <div class="msg-pdf-type">Documento PDF</div>
+            </div>
+        </div>` : '';
+
     if (role === 'bot') {
         div.innerHTML = `${BOT_AV}<div class="msg-body"><div class="msg-who">Mi ProfesorIA</div><div class="bubble bot-bubble">${txt}</div><div class="msg-time">${fmt(new Date())}</div></div>`;
     } else {
-        div.innerHTML = `<div class="msg-av user-av">${initials}</div><div class="msg-body"><div class="msg-who" style="text-align:right">Tú</div><div class="bubble">${esc(txt)}</div><div class="msg-time">${fmt(new Date())}</div></div>`;
+        const textBubble = txt ? `<div class="bubble">${esc(txt)}</div>` : '';
+        div.innerHTML = `<div class="msg-av user-av">${initials}</div><div class="msg-body"><div class="msg-who" style="text-align:right">Tú</div>${pdfCardHTML}${textBubble}<div class="msg-time">${fmt(new Date())}</div></div>`;
     }
     area.insertBefore(div, typing);
     scroll();
@@ -462,4 +563,149 @@ async function loadEquippedBackground() {
 
 document.addEventListener('click', function(e) {
     if (e.target.id === 'deleteConfirmModal') closeDeleteModal();
+    if (e.target.id === 'wrappedModal') closeWrapped();
 });
+
+// ── Resumen semanal (Wrapped) ────────────────────────────────
+const WRAPPED_SLIDES = ['ws1','ws2','ws3','wsfreq','ws4','ws5'];
+let wrappedIdx = 0;
+let wrappedDataLoaded = false;
+
+function buildWrappedNav() {
+    const nav = document.getElementById('wrappedNav');
+    if (!nav || nav.children.length) return;
+    WRAPPED_SLIDES.forEach((_, i) => {
+        const d = document.createElement('div');
+        d.className = 'wdot' + (i === 0 ? ' active' : '');
+        nav.appendChild(d);
+    });
+}
+function renderWrappedSlide() {
+    WRAPPED_SLIDES.forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('show', i === wrappedIdx);
+    });
+    const nav = document.getElementById('wrappedNav');
+    if (nav) [...nav.children].forEach((d, i) => d.classList.toggle('active', i === wrappedIdx));
+}
+function nextWrappedSlide() { wrappedIdx = Math.min(wrappedIdx + 1, WRAPPED_SLIDES.length - 1); renderWrappedSlide(); }
+function prevWrappedSlide() { wrappedIdx = Math.max(wrappedIdx - 1, 0); renderWrappedSlide(); }
+
+async function loadWrappedData() {
+    const userId = getUserId();
+    let data = {
+        studyHours: '--', studyCompare: 'Aún no hay suficientes datos.',
+        topSubject: 'Sin datos', topPct: '', weakSubject: 'Sin datos', questionsCount: '0',
+        freqTopic: 'Sin datos aún', freqDetail: 'Pregúntale más cosas a tu asistente esta semana.',
+        streak: '0 días', xp: '+0 XP', coins: '+0 monedas',
+        suggestionTitle: 'Sigue chateando esta semana',
+        suggestionText: 'Cuantas más dudas resuelvas, más preciso será tu resumen la próxima semana.'
+    };
+    try {
+        if (userId) {
+            const res = await fetch(`${API_BASE}/api/wrapped?userId=${userId}`, {
+                headers: getAuthHeaders(), credentials: 'include'
+            });
+            if (res.ok) {
+                const json = await res.json();
+                if (json.success && json.data) data = { ...data, ...json.data };
+            }
+        }
+    } catch(e) { console.error('[Wrapped] usando datos de respaldo:', e); }
+
+    document.getElementById('wStudyTime').textContent       = data.studyHours;
+    document.getElementById('wStudyCompare').textContent    = data.studyCompare;
+    document.getElementById('wTopSubject').textContent      = data.topSubject;
+    document.getElementById('wTopPct').textContent          = data.topPct;
+    document.getElementById('wWeakSubject').textContent     = data.weakSubject;
+    document.getElementById('wQuestionsCount').textContent  = data.questionsCount;
+    document.getElementById('wFreqTopic').textContent       = data.freqTopic;
+    document.getElementById('wFreqDetail').textContent      = data.freqDetail;
+    document.getElementById('wStreak').textContent          = data.streak;
+    document.getElementById('wXp').textContent              = data.xp;
+    document.getElementById('wCoins').textContent           = data.coins;
+    document.getElementById('wSuggestionTitle').textContent = data.suggestionTitle;
+    document.getElementById('wSuggestionText').textContent  = data.suggestionText;
+    wrappedDataLoaded = true;
+}
+
+function openWrapped() {
+    buildWrappedNav();
+    wrappedIdx = 0;
+    renderWrappedSlide();
+    document.getElementById('wrappedModal').classList.add('show');
+    if (!wrappedDataLoaded) loadWrappedData();
+}
+function closeWrapped() {
+    document.getElementById('wrappedModal').classList.remove('show');
+}
+
+async function shareWrappedCard(e) {
+    e.stopPropagation();
+    const status = document.getElementById('wrappedShareStatus');
+    if (typeof html2canvas === 'undefined') {
+        status.textContent = 'No se pudo cargar el generador de imagen.';
+        return;
+    }
+    status.textContent = 'Generando imagen...';
+    const target = document.getElementById('ws5');
+    try {
+        const canvas = await html2canvas(target, { backgroundColor: null, scale: 2 });
+        canvas.toBlob(async (blob) => {
+            const file = new File([blob], 'mi-resumen-profesoria.png', { type: 'image/png' });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                try {
+                    await navigator.share({ files: [file], title: 'Mi resumen semanal' });
+                    status.textContent = '¡Compartido!';
+                } catch(err) { status.textContent = 'Cancelado.'; }
+            } else {
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = 'mi-resumen-profesoria.png';
+                link.click();
+                status.textContent = 'Imagen descargada.';
+            }
+        }, 'image/png');
+    } catch(err) {
+        status.textContent = 'No se pudo generar la imagen.';
+        console.error('[Wrapped] Error al compartir:', err);
+    }
+}
+
+// ── PDF Upload ───────────────────────────────────────────────────────────────
+
+function handlePdfUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+        addBotMsg('⚠️ El PDF es demasiado grande. Máximo 10 MB.');
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result.split(',')[1];
+        attachedPdf = { name: file.name, base64: base64 };
+        document.getElementById('pdfChip').querySelector('.pdf-chip-name').textContent = file.name;
+        document.getElementById('pdfChip').style.display = 'flex';
+        document.getElementById('pdfBtn').style.display = 'none';
+        document.getElementById('userInput').placeholder = '¿Qué querés saber sobre el PDF? (opcional)';
+        document.getElementById('userInput').focus();
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+}
+
+function removePdf() {
+    attachedPdf = null;
+    const chip = document.getElementById('pdfChip');
+    if (chip) chip.style.display = 'none';
+    const btn = document.getElementById('pdfBtn');
+    if (btn) btn.style.display = 'flex';
+    const fi = document.getElementById('pdfFileInput');
+    if (fi) fi.value = '';
+    const inp = document.getElementById('userInput');
+    if (inp) inp.placeholder = 'Escríbeme tu pregunta...';
+}

@@ -55,11 +55,26 @@
           </svg>
           Nuevo chat
         </button>
-        </div>
+        <button class="wrapped-trigger-btn" onclick="openWrapped()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+          Tu resumen semanal
+        </button>
+      </div>
+
+      <!-- Buscador de chats -->
+      <div class="chat-search-box">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="chatSearchInput" placeholder="Buscar en tus chats..." oninput="handleChatSearch(this.value)">
+        <button class="chat-search-clear" id="chatSearchClear" onclick="clearChatSearch()" style="display:none" title="Limpiar búsqueda">&#215;</button>
+      </div>
 
       <!-- Chats recientes -->
       <div class="recents">
-        <div class="section-label">Chats recientes</div>
+        <div class="section-label" id="recentsLabel">Chats recientes</div>
       </div>
 
       <div class="chat-profile-area">
@@ -134,6 +149,20 @@
       <!-- Input -->
       <div class="input-area">
         <div class="input-box">
+          <input type="file" id="pdfFileInput" accept="application/pdf" style="display:none" onchange="handlePdfUpload(event)">
+
+          <!-- Chip PDF dentro del input-box -->
+          <div class="pdf-chip" id="pdfChip" style="display:none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span class="pdf-chip-name"></span>
+            <button class="pdf-chip-remove" onclick="removePdf()" title="Quitar PDF">&#215;</button>
+          </div>
+
+          <!-- Botón adjuntar PDF -->
+          <button class="pdf-btn" id="pdfBtn" onclick="document.getElementById('pdfFileInput').click()" title="Adjuntar PDF">
+            <svg width="16" height="16" viewBox="0 0 512 512" fill="currentColor"><path d="M364.6 45.9c-42.4-42.4-111.1-42.4-153.5 0L61.5 195.5c-53.1 53.1-53.1 139.1 0 192.2s139.1 53.1 192.2 0l149.6-149.6c8.6-8.6 22.6-8.6 31.2 0s8.6 22.6 0 31.2L284.9 419c-70.3 70.3-184.2 70.3-254.5 0s-70.3-184.2 0-254.5L180 14.9C239.6-44.7 336.1-44.7 395.7 14.9s59.6 156.1 0 215.7L246.1 380.2c-39.5 39.5-103.5 39.5-143 0s-39.5-103.5 0-143L253.4 87c8.6-8.6 22.6-8.6 31.2 0s8.6 22.6 0 31.2L134.3 268.4c-22.3 22.3-22.3 58.4 0 80.6s58.4 22.3 80.6 0L364.6 199.4c42.4-42.4 42.4-111.1 0-153.5z"/></svg>
+          </button>
+
           <textarea id="userInput" rows="1" placeholder="Escríbeme tu pregunta..." onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
 
           <button class="send-btn" id="sendBtn" onclick="send()">
@@ -142,12 +171,70 @@
             </svg>
           </button>
         </div>
-        <div class="input-hint">Enter para enviar &middot; Shift+Enter nueva l&iacute;nea</div>
+        <div class="input-hint">Enter para enviar &middot; Shift+Enter nueva l&iacute;nea &middot; 📎 adjuntar PDF</div>
       </div>
     </div>
 
     <div class="chat-sidebar-overlay" id="chatSidebarOverlay" onclick="toggleChatSidebar()"></div>
   </main>
+
+  <!-- Modal: Resumen semanal (Wrapped) -->
+  <div class="modal wrapped-modal" id="wrappedModal">
+    <button class="wrapped-close" onclick="closeWrapped()">&times;</button>
+    <div class="wrapped-phone" id="wrappedPhone">
+      <div class="wrapped-slide ws1 show" id="ws1">
+        <div class="wrapped-eyebrow">Tu semana en Mi ProfesorIA</div>
+        <div class="wrapped-emoji">&#10022;</div>
+        <div class="wrapped-line">Esta semana</div>
+        <div class="wrapped-sub">Vamos a repasar como te fue estudiando.</div>
+      </div>
+      <div class="wrapped-slide ws2" id="ws2">
+        <div class="wrapped-eyebrow">Tiempo de estudio</div>
+        <div class="wrapped-num" id="wStudyTime">--</div>
+        <div class="wrapped-line">de estudio esta semana</div>
+        <div class="wrapped-sub" id="wStudyCompare"></div>
+      </div>
+      <div class="wrapped-slide ws3" id="ws3">
+        <div class="wrapped-eyebrow">Tus materias</div>
+        <div class="wrapped-line">Tu tema mas fuerte</div>
+        <div class="wrapped-num wrapped-num-sm" id="wTopSubject">--</div>
+        <div class="wrapped-tag-row"><span class="wrapped-tag wrapped-tag-cyan" id="wTopPct"></span></div>
+        <div class="wrapped-stat-card">
+          <div class="wrapped-stat-row"><span>Para reforzar</span><span class="wrapped-stat-val" id="wWeakSubject">--</span></div>
+          <div class="wrapped-stat-row"><span>Preguntas respondidas</span><span class="wrapped-stat-val" id="wQuestionsCount">--</span></div>
+        </div>
+      </div>
+      <div class="wrapped-slide wsfreq" id="wsfreq">
+        <div class="wrapped-eyebrow">Tu pregunta mas frecuente</div>
+        <div class="wrapped-emoji">&#128172;</div>
+        <div class="wrapped-line" id="wFreqTopic">--</div>
+        <div class="wrapped-sub" id="wFreqDetail"></div>
+      </div>
+      <div class="wrapped-slide ws4" id="ws4">
+        <div class="wrapped-eyebrow">Gamificacion</div>
+        <div class="wrapped-emoji">&#128293;</div>
+        <div class="wrapped-num" id="wStreak">--</div>
+        <div class="wrapped-line">de racha seguida</div>
+        <div class="wrapped-tag-row">
+          <span class="wrapped-tag wrapped-tag-purple" id="wXp"></span>
+          <span class="wrapped-tag wrapped-tag-orange" id="wCoins"></span>
+        </div>
+      </div>
+      <div class="wrapped-slide ws5" id="ws5">
+        <div class="wrapped-eyebrow">Para la proxima semana</div>
+        <div class="wrapped-line" id="wSuggestionTitle">Sugerencia de tu asistente</div>
+        <div class="wrapped-sub" id="wSuggestionText"></div>
+        <button class="wrapped-share-btn" onclick="shareWrappedCard(event)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          Compartir mi resumen
+        </button>
+        <div class="wrapped-share-status" id="wrappedShareStatus"></div>
+      </div>
+      <div class="wrapped-tapzone left" onclick="prevWrappedSlide()"></div>
+      <div class="wrapped-tapzone right" onclick="nextWrappedSlide()"></div>
+      <div class="wrapped-nav" id="wrappedNav"></div>
+    </div>
+  </div>
 
   <!-- Modal: Confirmar eliminar chat -->
   <div class="modal" id="deleteConfirmModal">
@@ -163,6 +250,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="../js/components.js"></script>
   <script src="../js/chat.js"></script>
   <script src="../js/backgrounds-fx.js"></script>
