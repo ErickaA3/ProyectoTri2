@@ -7,7 +7,9 @@ import com.google.gson.JsonParser;
 import com.project.dao.implementation.DuelDAOImpl;
 import com.project.dao.interfaces.IDuelDAO;
 import com.project.util.GamificationService;
+import com.project.util.JwtUtil;
 
+import io.jsonwebtoken.JwtException;
 import jakarta.websocket.*;
 import jakarta.websocket.server.PathParam;
 import jakarta.websocket.server.ServerEndpoint;
@@ -73,8 +75,34 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
 
     // ── HANDLERS ────────────────────────────────────────────────
 
+    /**
+     * Identidad desde el JWT que manda el cliente en JOIN/RECONNECT (el navegador no
+     * puede mandar el header Authorization en un WebSocket). El "userId" del mensaje
+     * ya no se usa: antes cualquiera podía jugar como otro mandando su id.
+     */
+    private String authenticate(JsonObject msg) {
+        if (!msg.has("token") || msg.get("token").isJsonNull()) return null;
+        try {
+            return JwtUtil.validarToken(msg.get("token").getAsString()).getSubject();
+        } catch (JwtException | IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /** Fija el usuario de esta conexión. Una conexión no puede cambiar de usuario. */
+    private boolean bindUser(JsonObject msg) throws IOException {
+        String tokenUser = authenticate(msg);
+        if (tokenUser == null || (userId != null && !userId.equals(tokenUser))) {
+            sendError("Sesión no válida. Volvé a iniciar sesión.");
+            session.close();
+            return false;
+        }
+        this.userId = tokenUser;
+        return true;
+    }
+
     private void handleJoin(JsonObject msg) throws Exception {
-        this.userId = msg.get("userId").getAsString();
+        if (!bindUser(msg)) return;
 
         JsonObject duelInfo = duelDAO.getDuel(duelId, userId);
         if (duelInfo == null) { sendError("No pertenecés a este duelo."); session.close(); return; }
@@ -204,7 +232,7 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
     }
 
     private void handleReconnect(JsonObject msg) throws Exception {
-        this.userId = msg.get("userId").getAsString();
+        if (!bindUser(msg)) return;
 
         DuelRoom room = DuelRoomManager.INSTANCE.get(duelId);
         if (room == null) { sendError("El duelo ya no está activo."); return; }
