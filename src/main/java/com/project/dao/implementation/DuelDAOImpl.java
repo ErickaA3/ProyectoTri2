@@ -806,4 +806,19 @@ public class DuelDAOImpl implements IDuelDAO {
             return ps.executeUpdate() > 0;
         }
     }
+
+    @Override
+    public boolean forfeitDuel(String duelId, String winnerId) throws Exception {
+        String sql = """
+            UPDATE duels SET status = 'finished', winner_id = ?::uuid,
+                   finished_at = COALESCE(finished_at, NOW())
+            WHERE id = ?::uuid AND status <> 'declined'
+            """;
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, winnerId);
+            ps.setString(2, duelId);
+            return ps.executeUpdate() > 0;
+        }
+    }
 }

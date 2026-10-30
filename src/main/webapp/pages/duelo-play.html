@@ -278,6 +278,12 @@
     let startTime     = Date.now();
     let players       = {};
 
+    // Nombres de usuario y opciones los escribe otra persona: nunca como HTML crudo.
+    function escHtml(s) {
+        return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
     function setText(id, value) {
         const el = document.getElementById(id);
         if (el) el.textContent = value;
@@ -384,7 +390,9 @@
             case 'SCORE_UPDATE':   onScoreUpdate(msg); break;
             case 'GAME_OVER':      onGameOver(msg); break;
             case 'TIMEOUT':        onTimeout(msg); break;
-            case 'OPPONENT_LEFT':  showWaiting(`Tu oponente se desconectó. Esperando (${msg.graceSecs}s)...`); break;
+            // Aviso sin bloquear: mientras el rival vuelve, uno sigue respondiendo su pregunta.
+            case 'OPPONENT_LEFT':  setRivalNote(`Se desconectó · tiene ${msg.graceSecs}s para volver`); break;
+            case 'OPPONENT_BACK':  setRivalNote(''); break;
             case 'STATE_SYNC':     onStateSync(msg); break;
             case 'INFO':           console.info('[WS]', msg.message); break;
             case 'ERROR':          console.error('[WS] ERROR del servidor:', msg.message); showFatal(msg.message); break;
@@ -424,7 +432,7 @@
         setHtml('optionsList', opts.map((opt, i) =>
             `<button class="option-btn" onclick="selectOption(${i}, this)">
                 <span class="option-letter">${String.fromCharCode(65 + i)}</span>
-                <span class="option-text">${opt}</span>
+                <span class="option-text">${escHtml(opt)}</span>
             </button>`).join(''));
 
         document.querySelectorAll('.q-dot').forEach((d, i) => d.classList.toggle('current', i === currentQ));
@@ -492,7 +500,10 @@
         score    = msg.myScore || 0;
     }
 
+    let rivalName = '', rivalPoints = 0, rivalNote = '';
+
     function updateRivalPanel(username, rivalScore) {
+        rivalName = username; rivalPoints = rivalScore;
         let panel = document.getElementById('rivalPanel');
         if (!panel) {
             panel = document.createElement('div');
@@ -500,8 +511,14 @@
             document.body.appendChild(panel);
         }
         panel.innerHTML = `
-            <div class="rival-name"><i class="fas fa-user" style="font-size:.7rem;margin-right:4px;"></i>${username}</div>
-            <div class="rival-score">${rivalScore} <span>puntos</span></div>`;
+            <div class="rival-name"><i class="fas fa-user" style="font-size:.7rem;margin-right:4px;"></i>${escHtml(username)}</div>
+            <div class="rival-score">${rivalScore} <span>puntos</span></div>
+            ${rivalNote ? `<div class="rival-note" style="font-size:.7rem;opacity:.8;">${escHtml(rivalNote)}</div>` : ''}`;
+    }
+
+    function setRivalNote(note) {
+        rivalNote = note;
+        if (rivalName) updateRivalPanel(rivalName, rivalPoints);
     }
 
     // ── Countdown circular dramático ──────────────────────────────
@@ -561,14 +578,13 @@
         if (selectedIdx !== null) return;
         selectedIdx = -1;
         document.querySelectorAll('.option-btn').forEach(btn => btn.style.pointerEvents = 'none');
-        send({ type: 'ANSWER', questionIndex: currentQ, answerIdx: -1, timeSecs: timePerQ });
+        send({ type: 'ANSWER', questionIndex: currentQ, answerIdx: -1 });
     }
 
     function selectOption(idx, el) {
         if (selectedIdx !== null) return;
         selectedIdx = idx;
         clearInterval(countdownInterval);
-        const timeSecs = Math.round((Date.now() - questionStart) / 1000);
 
         document.querySelectorAll('.option-btn').forEach((btn, i) => {
             btn.style.pointerEvents = 'none';
@@ -583,7 +599,8 @@
         const btn = document.getElementById('btnNext');
         if (btn) btn.disabled = false;
 
-        send({ type: 'ANSWER', questionIndex: currentQ, answerIdx: idx, timeSecs });
+        // El tiempo lo mide el servidor desde que mandó la pregunta.
+        send({ type: 'ANSWER', questionIndex: currentQ, answerIdx: idx });
     }
 
     function nextQuestion() {

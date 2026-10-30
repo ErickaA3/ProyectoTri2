@@ -110,6 +110,14 @@ public class DuelServlet extends HttpServlet {
                     if (duelId == null) { sendError(res, 400, "Falta parámetro id."); return; }
                     JsonObject questions = duelDAO.getDuelQuestions(duelId, userId);
                     if (questions == null) { sendError(res, 404, "Duelo no encontrado."); return; }
+                    // Sin respuestas: si no, un jugador podía pedirlas a mitad del duelo.
+                    // /submit califica en el servidor contra study_content.
+                    for (var q : questions.getAsJsonArray("questions")) {
+                        JsonObject qo = q.getAsJsonObject();
+                        qo.remove("correct");
+                        qo.remove("correctAnswer");
+                        qo.remove("explanation");
+                    }
                     questions.addProperty("success", true);
                     res.getWriter().write(gson.toJson(questions));
                 }

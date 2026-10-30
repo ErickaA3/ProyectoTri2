@@ -291,7 +291,7 @@ function renderFriends() {
                 </div>
             </div>
             <div class="friend-info">
-                <h4 class="friend-name">${f.username || 'Usuario'}</h4>
+                <h4 class="friend-name">${escHtml(f.username || 'Usuario')}</h4>
                 <p class="friend-username">Nivel ${f.level || 1}</p>
                 <div class="friend-stats">
                     <span class="stat-item win"><i class="fas fa-star"></i> ${(f.xp || 0).toLocaleString()} XP</span>
@@ -319,8 +319,8 @@ function renderInvitations() {
                 <i class="fas fa-user" style="font-size:1.2rem;color:rgba(255,255,255,0.4)"></i>
             </div>
             <div class="invitation-info">
-                <h4 class="invitation-name">${inv.username || 'Usuario'}</h4>
-                <p class="invitation-username">${inv.email || ''}</p>
+                <h4 class="invitation-name">${escHtml(inv.username || 'Usuario')}</h4>
+                <p class="invitation-username">${escHtml(inv.email || '')}</p>
                 <p class="invitation-time"><i class="fas fa-clock"></i> ${timeAgo(inv.createdAt)}</p>
             </div>
             <div class="invitation-actions">
@@ -341,7 +341,7 @@ function renderChallenges() {
 
     list.innerHTML = activeDuels.map(d => {
         const isCh = d.isChallenger;
-        const oppName = isCh ? d.opponentName : d.challengerName;
+        const oppName = escHtml(isCh ? d.opponentName : d.challengerName);
         const oppLevel = isCh ? d.opponentLevel : d.challengerLevel;
         const canPlay = !d.hasPlayed;
 
@@ -368,7 +368,7 @@ function renderChallenges() {
                         <div>
                             <h4 style="margin:0;font-size:0.95rem;">${oppName}</h4>
                             <p style="margin:0;font-size:0.75rem;color:var(--text-secondary)">Nivel ${oppLevel} · ${d.questionCount} preguntas</p>
-                            <p style="margin:2px 0 0;font-size:0.75rem;color:var(--accent-purple,#8b5cf6)"><i class="fas fa-book"></i> ${d.topic}</p>
+                            <p style="margin:2px 0 0;font-size:0.75rem;color:var(--accent-purple,#8b5cf6)"><i class="fas fa-book"></i> ${escHtml(d.topic)}</p>
                         </div>
                     </div>
                     <span style="padding:6px 14px;border-radius:20px;font-size:0.78rem;font-weight:600;
@@ -400,17 +400,18 @@ function renderNotifications() {
 
     list.innerHTML = notifications.map(n => {
         let icon, color, title, detail;
+        const rival = escHtml(n.isChallenger ? n.opponentName : n.challengerName);
         if (n.result === 'win') {
             icon = 'fa-trophy'; color = 'var(--accent-yellow,#fbbf24)';
-            title = `¡Victoria vs ${n.isChallenger ? n.opponentName : n.challengerName}!`;
+            title = `¡Victoria vs ${rival}!`;
             detail = `${n.challengerScore} - ${n.opponentScore}`;
         } else if (n.result === 'loss') {
             icon = 'fa-heart-broken'; color = 'var(--accent-red,#ef4444)';
-            title = `Derrota vs ${n.isChallenger ? n.opponentName : n.challengerName}`;
+            title = `Derrota vs ${rival}`;
             detail = `${n.challengerScore} - ${n.opponentScore}`;
         } else {
             icon = 'fa-handshake'; color = 'var(--accent-cyan,#2dd4bf)';
-            title = `Empate vs ${n.isChallenger ? n.opponentName : n.challengerName}`;
+            title = `Empate vs ${rival}`;
             detail = `${n.challengerScore} - ${n.opponentScore}`;
         }
 
@@ -422,7 +423,7 @@ function renderNotifications() {
                 <div style="flex:1;">
                     <div style="font-size:0.92rem;font-weight:600;color:${color};">${title}</div>
                     <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:2px;">
-                        ${n.topic || 'Duelo'} · ${detail} · ${timeAgo(n.finishedAt)}
+                        ${escHtml(n.topic || 'Duelo')} · ${detail} · ${timeAgo(n.finishedAt)}
                     </div>
                 </div>
                 <div style="font-size:0.78rem;padding:4px 10px;border-radius:8px;
@@ -508,7 +509,7 @@ function closeAddFriendModal() {
 function openCreateDuelModal() {
     const select = document.getElementById('opponentSelect');
     select.innerHTML = '<option value="">Elige un amigo...</option>' +
-        friends.map(f => `<option value="${f.id}">${f.username || f.email}</option>`).join('');
+        friends.map(f => `<option value="${f.id}">${escHtml(f.username || f.email)}</option>`).join('');
     document.getElementById('createDuelModal').classList.add('show');
 }
 function closeCreateDuelModal() {

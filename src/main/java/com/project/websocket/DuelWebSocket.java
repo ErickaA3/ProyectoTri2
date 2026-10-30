@@ -46,10 +46,10 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             JsonObject msg = JsonParser.parseString(raw).getAsJsonObject();
             String type = msg.get("type").getAsString();
             switch (type) {
-                case "JOIN"      -> handleJoin(msg);
-                case "ANSWER"    -> handleAnswer(msg);
-                case "RECONNECT" -> handleReconnect(msg);
-                default          -> sendError("Tipo de mensaje desconocido: " + type);
+                // RECONNECT es un JOIN más: handleJoin ya distingue sala nueva de partida en curso.
+                case "JOIN", "RECONNECT" -> handleJoin(msg);
+                case "ANSWER"            -> handleAnswer(msg);
+                default                  -> sendError("Tipo de mensaje desconocido: " + type);
             }
         } catch (Exception e) {
             LOG.log(Level.WARNING, "[WS] Error procesando mensaje: " + raw, e);
@@ -63,9 +63,8 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
         SESSION_LOCKS.remove(session);
         if (userId == null || duelId == null) return;
         DuelRoom room = DuelRoomManager.INSTANCE.get(duelId);
-        if (room != null && room.getState() != DuelRoom.State.FINISHED) {
-            room.playerDisconnected(userId);
-        }
+        // Se pasa la sesión que se cerró: si el jugador ya entró con otra, no se lo saca.
+        if (room != null) room.playerDisconnected(userId, session);
     }
 
     @OnError
@@ -114,22 +113,10 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
 
         DuelRoom room = DuelRoomManager.INSTANCE.getOrCreate(duelId);
 
-        // JOIN repetido a una sala ya en curso → tratar como reconexión,
-        // NUNCA reinicializar preguntas ni timePerQuestion a mitad de partida.
+        // JOIN repetido a una sala ya en curso (recargó la página o se le cayó la red)
+        // → reconexión. NUNCA reinicializar preguntas ni timePerQuestion a mitad de partida.
         if (room.getState() != DuelRoom.State.WAITING) {
-            room.join(userId, session, this);
-
-            JsonObject stateSync = new JsonObject();
-            stateSync.addProperty("type",            "STATE_SYNC");
-            stateSync.addProperty("currentQuestion", room.getCurrentQuestion(userId));
-            stateSync.addProperty("totalQuestions",  room.getTotalQuestions());
-            stateSync.addProperty("myScore",         room.getScore(userId));
-            send(stateSync);
-
-            int idx = room.getCurrentQuestion(userId);
-            int tpq = room.getTimePerQuestion();
-            sendQuestionTo(session, room, room.getQuestions(), idx, tpq);
-            room.scheduleQuestionTimer(userId, idx, tpq);
+            resumePlayer(room);
             return;
         }
 
@@ -144,98 +131,32 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
 
         if (!bothReady) { send(buildWaiting("Esperando a tu oponente...")); return; }
 
-        int totalQ   = questionsData.get("questionCount").getAsInt();
+        JsonArray questions = questionsData.getAsJsonArray("questions");
+        // La IA a veces genera menos preguntas de las pedidas: se juega con las que hay.
+        int totalQ   = Math.min(questionsData.get("questionCount").getAsInt(), questions.size());
         int timePerQ = questionsData.has("timePerQuestion")
                        ? questionsData.get("timePerQuestion").getAsInt() : 30;
+        if (totalQ == 0) { broadcastToRoom(room, buildError("Este duelo no tiene preguntas.")); return; }
 
-        room.startGame(totalQ, timePerQ);
-        room.setTimePerQuestion(timePerQ);
-
-        JsonArray questions = questionsData.getAsJsonArray("questions");
         room.setQuestions(questions);
+        if (!room.tryStartGame(totalQ, timePerQ)) {
+            // El otro JOIN la arrancó primero.
+            resumePlayer(room);
+            return;
+        }
 
         broadcastToRoom(room, buildReady(duelInfo, totalQ, timePerQ));
-
-        sendQuestionTo(session, room, questions, 0, timePerQ);
-        String rival = room.getRival(userId);
-        if (rival != null) {
-            Session rivalSession = room.getSession(rival);
-            if (rivalSession != null && rivalSession.isOpen()) {
-                sendQuestionTo(rivalSession, room, questions, 0, timePerQ);
-            }
-        }
-
-        room.scheduleQuestionTimer(userId, 0, timePerQ);
-        if (rival != null) room.scheduleQuestionTimer(rival, 0, timePerQ);
+        askQuestion(room, room.getChallengerId(), 0);
+        askQuestion(room, room.getOpponentId(), 0);
     }
 
-    private void handleAnswer(JsonObject msg) throws Exception {
-        if (userId == null) { sendError("Enviá JOIN primero."); return; }
-
-        DuelRoom room = DuelRoomManager.INSTANCE.get(duelId);
-        if (room == null || room.getState() != DuelRoom.State.PLAYING) {
-            sendError("El duelo no está en curso."); return;
-        }
-
-        int questionIndex = msg.get("questionIndex").getAsInt();
-        int answerIdx     = msg.has("answerIdx") ? msg.get("answerIdx").getAsInt() : -1;
-        int timeSecs      = msg.has("timeSecs")  ? msg.get("timeSecs").getAsInt()  : 0;
-
-        boolean correct  = room.isCorrectAnswer(questionIndex, answerIdx);
-        int correctIdx   = room.getCorrectIdx(questionIndex);
-
-        // Atómico: si ya se procesó esta pregunta (por ejemplo, el timeout
-        // del servidor ganó la carrera), esto retorna false y no hacemos nada más.
-        boolean applied = room.tryRegisterAnswer(userId, questionIndex, correct, timeSecs);
-        if (!applied) return;
-
-        JsonObject feedback = new JsonObject();
-        feedback.addProperty("type",          "ANSWER_RESULT");
-        feedback.addProperty("questionIndex", questionIndex);
-        feedback.addProperty("correct",       correct);
-        feedback.addProperty("correctIdx",    correctIdx);
-        feedback.addProperty("yourAnswerIdx", answerIdx);
-        send(feedback);
-
-        String rival = room.getRival(userId);
-        if (rival != null) {
-            Session rivalSession = room.getSession(rival);
-            if (rivalSession != null && rivalSession.isOpen()) {
-                JsonObject scoreUpdate = new JsonObject();
-                scoreUpdate.addProperty("type",   "SCORE_UPDATE");
-                scoreUpdate.addProperty("userId", userId);
-                scoreUpdate.addProperty("score",  room.getScore(userId));
-                sendTo(rivalSession, scoreUpdate);
-            }
-        }
-
-        if (room.isFinished(userId)) {
-            try {
-                duelDAO.submitDuelResult(duelId, userId,
-                        room.getScore(userId), room.getTotalQuestions(),
-                        room.getTime(userId), "[]");
-            } catch (Exception e) {
-                LOG.warning("[WS] Error guardando score de " + userId + ": " + e.getMessage());
-            }
-
-            send(buildWaiting("¡Terminaste! Esperando a tu oponente..."));
-
-            if (room.bothFinished()) {
-                finishDuel(room);
-            }
-        } else {
-            int nextIndex = room.getCurrentQuestion(userId);
-            int tpq = room.getTimePerQuestion();
-            sendQuestionTo(session, room, room.getQuestions(), nextIndex, tpq);
-            room.scheduleQuestionTimer(userId, nextIndex, tpq);
-        }
-    }
-
-    private void handleReconnect(JsonObject msg) throws Exception {
-        if (!bindUser(msg)) return;
-
-        DuelRoom room = DuelRoomManager.INSTANCE.get(duelId);
-        if (room == null) { sendError("El duelo ya no está activo."); return; }
+    /**
+     * Vuelve a meter al jugador en un duelo en curso. Si la pregunta actual todavía
+     * corre, se la reenvía con el tiempo que le queda (recargar no da tiempo extra).
+     * Si el tiempo se le acabó mientras estaba desconectado, recibe la siguiente.
+     */
+    private void resumePlayer(DuelRoom room) {
+        if (room.isClosed()) { sendError("Este duelo ya terminó."); return; }
         if (!room.isPlayer(userId)) { sendError("No pertenecés a este duelo."); return; }
 
         room.join(userId, session, this);
@@ -249,19 +170,104 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
 
         String rival = room.getRival(userId);
         if (rival != null) {
-            Session rivalSession = room.getSession(rival);
-            if (rivalSession != null && rivalSession.isOpen()) {
-                sendTo(rivalSession, buildInfo("Tu oponente reconectó."));
-            }
+            JsonObject back = new JsonObject();
+            back.addProperty("type", "OPPONENT_BACK");
+            sendTo(room.getSession(rival), back);
+        }
+
+        if (room.isFinished(userId)) {
+            send(buildWaiting("¡Terminaste! Esperando a tu oponente..."));
+            return;
+        }
+
+        int idx       = room.getCurrentQuestion(userId);
+        int remaining = room.remainingSecs(userId);
+        if (remaining > 0) {
+            sendQuestionTo(session, room, room.getQuestions(), idx, remaining);
+        } else {
+            askQuestion(room, userId, idx);
         }
     }
 
-    // ── FINISH ───────────────────────────────────────────────────
+    private void handleAnswer(JsonObject msg) throws Exception {
+        if (userId == null) { sendError("Enviá JOIN primero."); return; }
+
+        DuelRoom room = DuelRoomManager.INSTANCE.get(duelId);
+        if (room == null || room.getState() != DuelRoom.State.PLAYING) {
+            sendError("El duelo no está en curso."); return;
+        }
+
+        int questionIndex = msg.get("questionIndex").getAsInt();
+        int answerIdx     = msg.has("answerIdx") ? msg.get("answerIdx").getAsInt() : -1;
+
+        // Atómico: si ya se procesó esta pregunta (por ejemplo, el timeout
+        // del servidor ganó la carrera), esto retorna false y no hacemos nada más.
+        // El tiempo lo mide el servidor; el "timeSecs" que manda el cliente se ignora.
+        boolean applied = room.tryRegisterAnswer(userId, questionIndex, answerIdx, false);
+        if (!applied) return;
+
+        JsonObject feedback = new JsonObject();
+        feedback.addProperty("type",          "ANSWER_RESULT");
+        feedback.addProperty("questionIndex", questionIndex);
+        feedback.addProperty("correct",       room.isCorrectAnswer(questionIndex, answerIdx));
+        feedback.addProperty("correctIdx",    room.getCorrectIdx(questionIndex));
+        feedback.addProperty("yourAnswerIdx", answerIdx);
+        send(feedback);
+
+        String rival = room.getRival(userId);
+        if (rival != null) {
+            JsonObject scoreUpdate = new JsonObject();
+            scoreUpdate.addProperty("type",   "SCORE_UPDATE");
+            scoreUpdate.addProperty("userId", userId);
+            scoreUpdate.addProperty("score",  room.getScore(userId));
+            sendTo(room.getSession(rival), scoreUpdate);
+        }
+
+        advance(room, userId);
+    }
+
+    // ── AVANCE Y CIERRE ──────────────────────────────────────────
+
+    /** Manda la pregunta y arranca su tiempo. Si el jugador no está conectado, espera a que vuelva. */
+    private void askQuestion(DuelRoom room, String uid, int index) {
+        Session target = room.getSession(uid);
+        if (target == null || !target.isOpen()) return;
+        int tpq = room.getTimePerQuestion();
+        sendQuestionTo(target, room, room.getQuestions(), index, tpq);
+        room.startQuestion(uid, index, tpq);
+    }
+
+    /** Después de cada respuesta o tiempo agotado: siguiente pregunta, o guardar y esperar al rival. */
+    private void advance(DuelRoom room, String uid) {
+        if (!room.isFinished(uid)) {
+            askQuestion(room, uid, room.getCurrentQuestion(uid));
+            return;
+        }
+
+        saveResult(room, uid);
+        sendTo(room.getSession(uid), buildWaiting("¡Terminaste! Esperando a tu oponente..."));
+
+        if (room.bothSaved()) finishDuel(room);
+    }
+
+    /** Guarda el resultado de un jugador una sola vez, con sus respuestas pregunta por pregunta. */
+    private void saveResult(DuelRoom room, String uid) {
+        if (!room.markSubmitted(uid)) return;
+        try {
+            duelDAO.submitDuelResult(duelId, uid,
+                    room.getScore(uid), room.getTotalQuestions(),
+                    room.getTime(uid), room.getAnswersJson(uid));
+        } catch (Exception e) {
+            LOG.warning("[WS] Error guardando score de " + uid + ": " + e.getMessage());
+        } finally {
+            room.markSaved(uid);
+        }
+    }
 
     private void finishDuel(DuelRoom room) {
+        // Los dos pueden terminar casi a la vez: solo el primero cierra el duelo.
+        if (!room.tryClose()) return;
         try {
-            room.setState(DuelRoom.State.FINISHED);
-
             String cId    = room.getChallengerId();
             String oId    = room.getOpponentId();
             int    cScore = room.getScore(cId);
@@ -292,11 +298,8 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             JsonObject cReward = GamificationService.processActivity(cId, cActivity, cPct, null, cTime, total);
             JsonObject oReward = GamificationService.processActivity(oId, oActivity, oPct, null, oTime, total);
 
-            Session cSession = room.getSession(cId);
-            if (cSession != null && cSession.isOpen()) sendTo(cSession, buildGameOver(winnerId, room, cReward));
-
-            Session oSession = room.getSession(oId);
-            if (oSession != null && oSession.isOpen()) sendTo(oSession, buildGameOver(winnerId, room, oReward));
+            sendTo(room.getSession(cId), buildGameOver(winnerId, room, cReward));
+            sendTo(room.getSession(oId), buildGameOver(winnerId, room, oReward));
 
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "[WS] Error al finalizar duelo " + duelId, e);
@@ -313,38 +316,20 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
         DuelRoom room = DuelRoomManager.INSTANCE.get(duelId);
         if (room == null || room.getState() != DuelRoom.State.PLAYING) return;
 
-        Session userSession = room.getSession(userId);
-        if (userSession == null || !userSession.isOpen()) return;
-
+        // Se registra aunque el jugador esté desconectado: si no, al volver quedaría
+        // trabado en esta pregunta sin tiempo corriendo.
         // Atómico: si la respuesta real del cliente ya se procesó para esta
         // pregunta (ganó la carrera), esto retorna false y no hacemos nada.
-        boolean applied = room.tryRegisterAnswer(userId, questionIndex, false, 0);
+        boolean applied = room.tryRegisterAnswer(userId, questionIndex, -1, true);
         if (!applied) return;
 
         JsonObject timeout = new JsonObject();
         timeout.addProperty("type",          "TIMEOUT");
         timeout.addProperty("questionIndex", questionIndex);
-        sendTo(userSession, timeout);
+        sendTo(room.getSession(userId), timeout);
 
         try {
-            if (room.isFinished(userId)) {
-                try {
-                    duelDAO.submitDuelResult(duelId, userId,
-                            room.getScore(userId), room.getTotalQuestions(),
-                            room.getTime(userId), "[]");
-                } catch (Exception e) {
-                    LOG.warning("[WS] Error guardando score timeout: " + e.getMessage());
-                }
-
-                sendTo(userSession, buildWaiting("¡Terminaste! Esperando a tu oponente..."));
-
-                if (room.bothFinished()) finishDuel(room);
-            } else {
-                int nextIndex = room.getCurrentQuestion(userId);
-                int tpq = room.getTimePerQuestion();
-                sendQuestionTo(userSession, room, room.getQuestions(), nextIndex, tpq);
-                room.scheduleQuestionTimer(userId, nextIndex, tpq);
-            }
+            advance(room, userId);
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "[WS] Error en timeout de " + userId, e);
         }
@@ -354,40 +339,36 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
     public void onOpponentLeft(String duelId, String rivalUserId, int graceSecs) {
         DuelRoom room = DuelRoomManager.INSTANCE.get(duelId);
         if (room == null) return;
-        Session rivalSession = room.getSession(rivalUserId);
-        if (rivalSession != null && rivalSession.isOpen()) sendTo(rivalSession, buildOpponentLeft(graceSecs));
+        sendTo(room.getSession(rivalUserId), buildOpponentLeft(graceSecs));
     }
 
+    /**
+     * El jugador no volvió a tiempo. DuelRoom ya cerró la sala (tryClose), así que
+     * nadie más da premios ni manda GAME_OVER por este duelo.
+     */
     @Override
     public void onAbandon(String duelId, String abandonedUserId) {
         DuelRoom room = DuelRoomManager.INSTANCE.get(duelId);
         if (room == null) return;
         String winner = room.getRival(abandonedUserId);
         try {
-            int aScore = room.getScore(abandonedUserId);
-            int rScore = winner != null ? room.getScore(winner) : 0;
-            int total  = room.getTotalQuestions();
-
-            duelDAO.submitDuelResult(duelId, abandonedUserId, aScore, total,
-                    room.getTime(abandonedUserId), "[]");
+            saveResult(room, abandonedUserId);
             if (winner != null) {
-                duelDAO.submitDuelResult(duelId, winner, rScore, total,
-                        room.getTime(winner), "[]");
-                duelDAO.finishDuelWithWinner(duelId, winner);
+                saveResult(room, winner);
+                // submitDuelResult elige ganador por puntaje; en un abandono gana el que se quedó.
+                duelDAO.forfeitDuel(duelId, winner);
 
-                GamificationService.processActivity(winner, "duelo_ganado",
+                int total  = room.getTotalQuestions();
+                int rScore = room.getScore(winner);
+                int aScore = room.getScore(abandonedUserId);
+                JsonObject reward = GamificationService.processActivity(winner, "duelo_ganado",
                         total > 0 ? (rScore * 100.0 / total) : 0, null, room.getTime(winner), total);
                 GamificationService.processActivity(abandonedUserId, "duelo_perdido",
                         total > 0 ? (aScore * 100.0 / total) : 0, null, room.getTime(abandonedUserId), total);
 
-                Session winnerSession = room.getSession(winner);
-                if (winnerSession != null && winnerSession.isOpen()) {
-                    JsonObject msg = new JsonObject();
-                    msg.addProperty("type",   "GAME_OVER");
-                    msg.addProperty("winner", winner);
-                    msg.addProperty("reason", "opponent_abandoned");
-                    sendTo(winnerSession, msg);
-                }
+                JsonObject msg = buildGameOver(winner, room, reward);
+                msg.addProperty("reason", "opponent_abandoned");
+                sendTo(room.getSession(winner), msg);
             }
         } catch (Exception e) {
             LOG.log(Level.SEVERE, "[WS] Error procesando abandono en " + duelId, e);
@@ -466,13 +447,6 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
         JsonObject o = new JsonObject();
         o.addProperty("type", "OPPONENT_LEFT");
         o.addProperty("graceSecs", graceSecs);
-        return o;
-    }
-
-    private JsonObject buildInfo(String message) {
-        JsonObject o = new JsonObject();
-        o.addProperty("type", "INFO");
-        o.addProperty("message", message);
         return o;
     }
 

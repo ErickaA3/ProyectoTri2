@@ -24,4 +24,10 @@ public enum DuelRoomManager {
     public int activeRooms() {
         return rooms.size();
     }
+
+    /** Apaga los timers de todas las salas. Lo llama AppShutdownListener al redesplegar. */
+    public void shutdownAll() {
+        rooms.values().forEach(DuelRoom::shutdown);
+        rooms.clear();
+    }
 }

@@ -25,6 +25,13 @@ public interface IDuelDAO {
 
     boolean finishDuelWithWinner(String duelId, String winnerId) throws Exception;
 
+    /**
+     * Cierra un duelo por abandono: gana el que se quedó, aunque el puntaje diga
+     * otra cosa. A diferencia de finishDuelWithWinner, pisa el ganador que haya
+     * calculado submitDuelResult. Solo lo usa DuelWebSocket.
+     */
+    boolean forfeitDuel(String duelId, String winnerId) throws Exception;
+
     /** Lista de amigos aceptados con sus stats (nivel, username, etc). */
     JsonArray getFriends(String userId) throws Exception;
 
