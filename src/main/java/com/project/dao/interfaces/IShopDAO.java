@@ -75,7 +75,8 @@ public interface IShopDAO {
     int getUserCoins(String userId);
 
     /**
-     * Equipa un ítem que el usuario ya posee.
+     * Equipa un ítem que el usuario ya posee. Los ítems gratis (cost 0) se agregan
+     * al inventario al equiparlos; los de pago devuelven false si no se compraron.
      * Solo aplica a "avatar" y "background" — los consumibles se aplican automáticamente.
      *
      * @return true si se equipó correctamente.

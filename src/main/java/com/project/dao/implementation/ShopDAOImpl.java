@@ -4,8 +4,11 @@ import com.project.dao.interfaces.IShopDAO;
 import com.project.database.DatabaseConnection;
 import com.project.model.shop.Product;
 import com.project.model.shop.Purchase;
+import com.project.util.GamificationService;
 
 import java.sql.*;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,6 +23,12 @@ import java.util.List;
  *   professor_config → user_id, avatar_item_id, background_item_id
  */
 public class ShopDAOImpl implements IShopDAO {
+
+    private static final String SHIELD_ACTIVE_MESSAGE =
+        "Ya tienes un protector de racha activo. Vence 24 horas después de comprarlo.";
+    private static final String SHIELD_PENDING_MESSAGE =
+        "Tu protector anterior está cuidando tu racha de ayer. Estudia hoy para usarlo "
+        + "y después puedes comprar otro.";
 
     // ──────────────────────────────────────────────────────────────
     //  CATÁLOGO
@@ -188,7 +197,7 @@ public class ShopDAOImpl implements IShopDAO {
         result.setItemType(item.getType());
         result.setCostPaid(item.getCost());
 
-        // 2. ¿Ya lo tiene? (streak_shield sí se puede recomprar para renovarlo)
+        // 2. ¿Ya lo tiene? (streak_shield se puede recomprar cuando se gastó el anterior)
         boolean isStreakShield = "streak_shield".equals(item.getType());
         if (!isStreakShield && userOwnsItem(userId, itemId)) {
             result.setSuccess(false);
@@ -197,14 +206,19 @@ public class ShopDAOImpl implements IShopDAO {
         }
 
         // 3. Transacción: verificar monedas + descontar + insertar en inventario
-        String checkCoinsSQL     = "SELECT coins FROM user_stats WHERE user_id = ?::uuid";
+        // FOR UPDATE: dos compras simultáneas del mismo usuario se atienden de a una,
+        // así la segunda ya ve el protector que activó la primera.
+        String checkCoinsSQL     = "SELECT coins, has_streak_shield, streak_shield_until, streak_last_activity " +
+                                   "FROM user_stats WHERE user_id = ?::uuid FOR UPDATE";
         String deductCoinsSQL    = "UPDATE user_stats SET coins = coins - ? " +
                                    "WHERE user_id = ?::uuid AND coins >= ?";
         String insertInvSQL      = "INSERT INTO user_inventory (user_id, item_id, purchased_at, is_equipped) " +
                                    "VALUES (?::uuid, ?, NOW(), false) " +
                                    "ON CONFLICT (user_id, item_id) DO NOTHING";
-        String activateShieldSQL = "UPDATE user_stats SET has_streak_shield = true " +
-                                   "WHERE user_id = ?::uuid";
+        String activateShieldSQL = "UPDATE user_stats SET has_streak_shield = true, " +
+                                   "streak_shield_until = NOW() + ? * INTERVAL '1 second' " +
+                                   "WHERE user_id = ?::uuid " +
+                                   "RETURNING (EXTRACT(EPOCH FROM streak_shield_until) * 1000)::bigint AS until_ms";
 
         Connection conn = null;
         try {
@@ -223,6 +237,26 @@ public class ShopDAOImpl implements IShopDAO {
                         return result;
                     }
                     currentCoins = rs.getInt("coins");
+                    if (isStreakShield) {
+                        boolean hasShield     = rs.getBoolean("has_streak_shield");
+                        Timestamp untilTs     = rs.getTimestamp("streak_shield_until");
+                        Instant shieldUntil   = untilTs != null ? untilTs.toInstant() : null;
+                        Date lastTs           = rs.getDate("streak_last_activity");
+                        LocalDate lastActivity = lastTs != null ? lastTs.toLocalDate() : null;
+
+                        String blocked = null;
+                        if (GamificationService.isShieldActive(hasShield, shieldUntil)) {
+                            blocked = SHIELD_ACTIVE_MESSAGE;
+                        } else if (GamificationService.isShieldStillUseful(hasShield, shieldUntil, lastActivity)) {
+                            blocked = SHIELD_PENDING_MESSAGE;
+                        }
+                        if (blocked != null) {
+                            conn.rollback();
+                            result.setSuccess(false);
+                            result.setMessage(blocked);
+                            return result;
+                        }
+                    }
                 }
             }
 
@@ -259,8 +293,11 @@ public class ShopDAOImpl implements IShopDAO {
             // 3e. Si es streak_shield, activarlo en user_stats
             if (isStreakShield) {
                 try (PreparedStatement ps = conn.prepareStatement(activateShieldSQL)) {
-                    ps.setString(1, userId);
-                    ps.executeUpdate();
+                    ps.setLong(1, GamificationService.SHIELD_DURATION.getSeconds());
+                    ps.setString(2, userId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) result.setStreakShieldUntil(rs.getLong("until_ms"));
+                    }
                 }
             }
 
@@ -310,14 +347,17 @@ public class ShopDAOImpl implements IShopDAO {
             conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
 
-            // 1. Auto-insertar en inventario si no lo tiene
-            ps = conn.prepareStatement(
-                "INSERT INTO user_inventory (user_id, item_id, purchased_at, is_equipped) " +
-                "VALUES (?::uuid, ?, NOW(), false) ON CONFLICT (user_id, item_id) DO NOTHING");
-            ps.setString(1, userId);
-            ps.setInt(2, itemId);
-            ps.executeUpdate();
-            ps.close();
+            // 1. Los ítems gratis (cost 0, ej. el fondo por defecto) se agregan
+            //    al inventario al equiparlos. Los de pago solo se equipan si se compraron.
+            if (item.getCost() == 0) {
+                ps = conn.prepareStatement(
+                    "INSERT INTO user_inventory (user_id, item_id, purchased_at, is_equipped) " +
+                    "VALUES (?::uuid, ?, NOW(), false) ON CONFLICT (user_id, item_id) DO NOTHING");
+                ps.setString(1, userId);
+                ps.setInt(2, itemId);
+                ps.executeUpdate();
+                ps.close();
+            }
 
             // 2. Desequipar todos del mismo tipo
             ps = conn.prepareStatement(
@@ -329,15 +369,21 @@ public class ShopDAOImpl implements IShopDAO {
             ps.executeUpdate();
             ps.close();
 
-            // 3. Equipar el nuevo
+            // 3. Equipar el nuevo. Si no actualiza ninguna fila, el usuario no lo
+            //    tiene: se deshace el paso 2 y queda equipado lo que tenía antes.
             ps = conn.prepareStatement(
                 "UPDATE user_inventory SET is_equipped = true " +
                 "WHERE user_id = ?::uuid AND item_id = ?");
             ps.setString(1, userId);
             ps.setInt(2, itemId);
-            ps.executeUpdate();
+            int equipped = ps.executeUpdate();
             ps.close();
             ps = null;
+
+            if (equipped == 0) {
+                conn.rollback();
+                return false;
+            }
 
             conn.commit();
             return true;

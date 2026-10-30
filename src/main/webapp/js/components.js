@@ -11,6 +11,14 @@ function getUserData() {
     catch { return null; }
 }
 
+// ── Vencimiento del protector de racha (epoch ms que manda el servidor) ──
+// null si no hay protector activo o ya venció.
+function getShieldExpiresAt() {
+    const stats = getUserData()?.stats;
+    const until = stats?.hasStreakShield ? stats.streakShieldUntil : null;
+    return (until && until > Date.now()) ? until : null;
+}
+
 // ── Headers con JWT para llamadas a /api/* ──
 function getAuthHeaders(extra) {
     const token = localStorage.getItem('token');
@@ -46,8 +54,8 @@ function getNavbarHTML(base) {
         </div>
         <div class="navbar-stats">
 
-            <!-- Escudo protector (separado de la racha) — solo si tiene shield Y hay countdown activo -->
-            ${(hasShield && localStorage.getItem('shieldActivatedAt')) ? `
+            <!-- Escudo protector (separado de la racha) — solo si tiene shield sin vencer -->
+            ${(hasShield && getShieldExpiresAt()) ? `
             <div class="shield-pill" id="shieldPill">
                 <div class="shield-icon-wrap">
                     <i class="fas fa-shield-alt"></i>
@@ -593,7 +601,7 @@ function refreshNavbarStats() {
 
     // Sincronizar pill del escudo protector (separado)
     const hasShield = user.stats?.hasStreakShield ?? false;
-    const hasTimer  = !!localStorage.getItem('shieldActivatedAt');
+    const hasTimer  = !!getShieldExpiresAt();
     const shieldPill = document.getElementById('shieldPill');
     if (hasShield && hasTimer && !shieldPill) {
         const stats = document.querySelector('.navbar-stats');
@@ -695,6 +703,7 @@ function autoRefreshStats() {
             if (data.streakCurrent !== undefined)  stored.stats.streakCurrent = data.streakCurrent;
             if (data.streakLongest !== undefined)  stored.stats.streakRecord  = data.streakLongest;
             if (data.hasStreakShield !== undefined) stored.stats.hasStreakShield = data.hasStreakShield;
+            if (data.streakShieldUntil !== undefined) stored.stats.streakShieldUntil = data.streakShieldUntil;
             localStorage.setItem('user', JSON.stringify(stored));
             refreshNavbarStats();
             refreshSidebarInfo();
@@ -741,14 +750,17 @@ function initPageTransitions() {
 
 // ══════════════════════════════════════════════════
 // ══════════════════════════════════════════════════
-// SHIELD PILL — countdown 24h desde activación
+// SHIELD PILL — countdown hasta streakShieldUntil (lo fija el servidor al comprar)
 // ══════════════════════════════════════════════════
 function initShieldCountdown() {
+    // Clave vieja: antes el vencimiento se calculaba en el navegador.
+    localStorage.removeItem('shieldActivatedAt');
+
     const pill = document.getElementById('shieldPill');
     if (!pill) return;
 
-    // Solo iniciar si hay un timestamp de activación (lo pone tienda.js al comprar)
-    if (!localStorage.getItem('shieldActivatedAt')) {
+    const expiresAt = getShieldExpiresAt();
+    if (!expiresAt) {
         pill.remove();
         return;
     }
@@ -758,16 +770,13 @@ function initShieldCountdown() {
         const shieldPill = document.getElementById('shieldPill');
         if (!el || !shieldPill) return;
 
-        const activatedAt = parseInt(localStorage.getItem('shieldActivatedAt') || '0');
-        const expiresAt = activatedAt + 24 * 60 * 60 * 1000; // 24 horas
         const diff = expiresAt - Date.now();
 
         if (diff <= 0) {
-            // Expiró — quitar escudo visual y marcar en localStorage
+            // Venció — quitar escudo visual
             shieldPill.style.opacity = '0';
             shieldPill.style.pointerEvents = 'none';
             setTimeout(() => shieldPill.remove(), 400);
-            localStorage.removeItem('shieldActivatedAt');
             // Actualizar user data
             try {
                 const user = JSON.parse(localStorage.getItem('user') || '{}');

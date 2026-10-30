@@ -25,6 +25,7 @@ public class Purchase {
     private int     remainingCoins;
     private boolean success;
     private String  message;
+    private Long    streakShieldUntil;     // epoch ms, solo al comprar el protector
 
     // ────────────────────── constructores ──────────────────────
 
@@ -71,4 +72,7 @@ public class Purchase {
 
     public String        getMessage()                       { return message; }
     public void          setMessage(String message)         { this.message = message; }
+
+    public Long          getStreakShieldUntil()             { return streakShieldUntil; }
+    public void          setStreakShieldUntil(Long until)   { this.streakShieldUntil = until; }
 }

@@ -1,5 +1,6 @@
 package com.project.model.users;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -16,6 +17,7 @@ public class Statistics {
     private int       streakRecord;
     private LocalDate streakLastActivity;
     private boolean   hasStreakShield;
+    private Instant   streakShieldUntil;   // vence 24 h después de comprar el protector
 
     // ── Constructores ──────────────────────────────────────────────────────────
 
@@ -56,4 +58,7 @@ public class Statistics {
 
     public boolean isHasStreakShield()                 { return hasStreakShield; }
     public void setHasStreakShield(boolean b)         { this.hasStreakShield = b; }
+
+    public Instant getStreakShieldUntil()              { return streakShieldUntil; }
+    public void setStreakShieldUntil(Instant until)   { this.streakShieldUntil = until; }
 }

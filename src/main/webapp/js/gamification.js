@@ -117,6 +117,7 @@ function updateLocalStats(data) {
 
         // Streak shield: el servidor devuelve hasStreakShield y shieldUsed tras procesar la actividad
         if (data.hasStreakShield !== undefined) user.stats.hasStreakShield = data.hasStreakShield;
+        if (data.streakShieldUntil !== undefined) user.stats.streakShieldUntil = data.streakShieldUntil;
         if (data.shieldUsed) {
             user.stats.hasStreakShield = false;
             // Notificar para que el tooltip del navbar refleje el cambio inmediatamente

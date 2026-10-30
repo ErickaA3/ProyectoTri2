@@ -217,12 +217,15 @@ async function buyProduct(productName, price, btn) {
             sessionStorage.setItem('userCoins', result.remainingCoins);
             showPurchaseModal(productName, price, result.remainingCoins);
 
-            // Activar countdown del escudo si es Streak Protector
-            if (productName === 'Streak Protector') {
-                localStorage.setItem('shieldActivatedAt', Date.now().toString());
+            // Activar countdown del escudo si es Streak Protector (vence cuando dice el servidor)
+            if (productName === 'Streak Protector' && result.streakShieldUntil) {
                 try {
                     const user = JSON.parse(localStorage.getItem('user') || '{}');
-                    if (user.stats) { user.stats.hasStreakShield = true; localStorage.setItem('user', JSON.stringify(user)); }
+                    if (user.stats) {
+                        user.stats.hasStreakShield   = true;
+                        user.stats.streakShieldUntil = result.streakShieldUntil;
+                        localStorage.setItem('user', JSON.stringify(user));
+                    }
                 } catch(_) {}
 
                 // Crear el pill en el navbar inmediatamente

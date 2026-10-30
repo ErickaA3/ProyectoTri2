@@ -63,7 +63,8 @@ public class ProfileServlet extends HttpServlet {
                 int rachaReal = GamificationService.effectiveStreak(
                         stats.getStreakCurrent(),
                         stats.getStreakLastActivity(),
-                        stats.isHasStreakShield()
+                        stats.isHasStreakShield(),
+                        stats.getStreakShieldUntil()
                 );
                 stats.setStreakCurrent(rachaReal);
             }

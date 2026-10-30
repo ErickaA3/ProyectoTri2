@@ -20,7 +20,8 @@ public class GamificationDAOImpl implements IGamificationDAO {
     public JsonObject getStats(String userId) throws Exception {
         String sql = """
             SELECT xp, level, coins, streak_current, streak_record,
-                   streak_last_activity::text, has_streak_shield
+                   streak_last_activity::text, has_streak_shield,
+                   (EXTRACT(EPOCH FROM streak_shield_until) * 1000)::bigint AS shield_until_ms
             FROM user_stats
             WHERE user_id = ?::uuid
             """;
@@ -40,6 +41,8 @@ public class GamificationDAOImpl implements IGamificationDAO {
                 stats.addProperty("streakRecord",      rs.getInt("streak_record"));
                 stats.addProperty("streakLastActivity", rs.getString("streak_last_activity"));
                 stats.addProperty("hasStreakShield",    rs.getBoolean("has_streak_shield"));
+                long shieldUntilMs = rs.getLong("shield_until_ms");
+                if (!rs.wasNull()) stats.addProperty("streakShieldUntil", shieldUntilMs);
                 return stats;
             }
             return null;

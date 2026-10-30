@@ -17,7 +17,8 @@ public interface IGamificationDAO {
     /**
      * Obtiene los stats actuales de un usuario.
      * @return JsonObject con xp, level, coins, streakCurrent, streakRecord,
-     *         streakLastActivity, hasStreakShield. Null si no existe.
+     *         streakLastActivity, hasStreakShield y streakShieldUntil (epoch ms,
+     *         solo si hay fecha de vencimiento). Null si no existe.
      */
     JsonObject getStats(String userId) throws Exception;
 

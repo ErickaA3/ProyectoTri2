@@ -1,5 +1,7 @@
 package com.project.util;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
@@ -68,6 +70,9 @@ public class GamificationService {
 
     private static final int MAX_LEVEL = 10;
 
+    // El protector de racha vence 24 h después de comprarlo (user_stats.streak_shield_until).
+    public static final Duration SHIELD_DURATION = Duration.ofHours(24);
+
     // ═════════════════════════════════════════════════════════════════════════
     // MÉTODO PRINCIPAL
     // ═════════════════════════════════════════════════════════════════════════
@@ -90,6 +95,7 @@ public class GamificationService {
         int    streakRecord    = stats.has("streakRecord") && !stats.get("streakRecord").isJsonNull() ? stats.get("streakRecord").getAsInt() : 0;
         String lastActivityStr = stats.has("streakLastActivity") && !stats.get("streakLastActivity").isJsonNull() ? stats.get("streakLastActivity").getAsString() : null;
         boolean hasShield      = stats.has("hasStreakShield") && !stats.get("hasStreakShield").isJsonNull() && stats.get("hasStreakShield").getAsBoolean();
+        Instant shieldUntil    = readShieldUntil(stats);
 
         // 2. Racha
         LocalDate today        = LocalDate.now(APP_ZONE);
@@ -98,7 +104,9 @@ public class GamificationService {
                                  ? LocalDate.parse(lastActivityStr)
                                  : today.minusDays(2);
 
-        StreakResult streak = calculateStreak(streakCurrent, lastActivity, today, hasShield);
+        // El protector solo cuenta si estuvo activo durante el día que faltó.
+        boolean shieldCoversGap = hasShield && shieldCoversDay(shieldUntil, lastActivity.plusDays(1));
+        StreakResult streak = calculateStreak(streakCurrent, lastActivity, today, shieldCoversGap);
 
         // 2.5. Guardar resultado + detectar si ya fue recompensado antes
         //      saveActivityResult devuelve null cuando ya existe el registro (mismo user + content)
@@ -235,7 +243,10 @@ public class GamificationService {
         r.addProperty("newStreak",        streak.newStreak);
         r.addProperty("streakRecord",     newStreakRecord);
         r.addProperty("shieldUsed",       streak.shieldUsed);
-        r.addProperty("hasStreakShield",  streak.shieldUsed ? false : hasShield);
+        r.addProperty("hasStreakShield",  !streak.shieldUsed && isShieldActive(hasShield, shieldUntil));
+        if (!streak.shieldUsed && shieldUntil != null) {
+            r.addProperty("streakShieldUntil", shieldUntil.toEpochMilli());
+        }
         r.addProperty("leveledUp",        leveledUp);
         r.addProperty("oldLevel",         currentLevel);
 
@@ -314,7 +325,7 @@ public class GamificationService {
     }
 
     private static StreakResult calculateStreak(int currentStreak, LocalDate lastActivity,
-                                                LocalDate today, boolean hasShield) {
+                                                LocalDate today, boolean shieldCoversGap) {
         long days = java.time.temporal.ChronoUnit.DAYS.between(lastActivity, today);
 
         // Actividad repetida hoy — no cambiar nada
@@ -328,7 +339,7 @@ public class GamificationService {
         // perdonaba CUALQUIER cantidad de días saltados (10, 30, lo que sea).
         // Ahora el escudo solo aplica cuando days == 2 (un único día saltado
         // entre la última actividad y hoy).
-        if (hasShield && days == 2) {
+        if (shieldCoversGap && days == 2) {
             // La racha se mantiene (no sube — el día faltante queda perdonado).
             // shieldUsed = true → el DAO consumirá el shield (hasStreakShield → false).
             return new StreakResult(currentStreak, true);
@@ -344,14 +355,15 @@ public class GamificationService {
      * se refresque (evita que la racha quede "congelada"/inflada en pantalla).
      *
      * Devuelve 0 si la racha ya se rompió:
-     *   - más de 1 día de ausencia sin escudo, o
-     *   - más de 2 días de ausencia con escudo activo sin usar.
+     *   - más de 1 día de ausencia sin un escudo que cubra el día que faltó, o
+     *   - más de 2 días de ausencia.
      *
      * Reusable: la llaman tanto getPlayerStats() (endpoint /api/gamification/stats)
      * como ProfileServlet (endpoint /api/profile), que son los dos caminos que
      * hoy muestran la racha al usuario.
      */
-    public static int effectiveStreak(int streakActual, LocalDate ultimaActividad, boolean tieneEscudo) {
+    public static int effectiveStreak(int streakActual, LocalDate ultimaActividad,
+                                      boolean tieneEscudo, Instant escudoHasta) {
         if (ultimaActividad == null) {
             return streakActual;
         }
@@ -359,10 +371,48 @@ public class GamificationService {
         if (days <= 1) {
             return streakActual;
         }
-        if (days == 2 && tieneEscudo) {
+        if (days == 2 && tieneEscudo && shieldCoversDay(escudoHasta, ultimaActividad.plusDays(1))) {
             return streakActual;
         }
         return 0;
+    }
+
+    /**
+     * El protector cubre un día sin actividad si estuvo activo en algún momento
+     * de ese día (hora de Costa Rica). Como dura 24 h, cubre el día en que se
+     * compró o el siguiente, nunca más de uno (calculateStreak exige days == 2).
+     */
+    public static boolean shieldCoversDay(Instant shieldUntil, LocalDate missedDay) {
+        if (shieldUntil == null || missedDay == null) return false;
+        Instant dayStart     = missedDay.atStartOfDay(APP_ZONE).toInstant();
+        Instant dayEnd       = missedDay.plusDays(1).atStartOfDay(APP_ZONE).toInstant();
+        Instant shieldBought = shieldUntil.minus(SHIELD_DURATION);
+        return shieldUntil.isAfter(dayStart) && shieldBought.isBefore(dayEnd);
+    }
+
+    /** Protector comprado, sin usar y sin vencer. Es lo que ve el usuario en el navbar. */
+    public static boolean isShieldActive(boolean hasShield, Instant shieldUntil) {
+        return hasShield && shieldUntil != null && shieldUntil.isAfter(Instant.now());
+    }
+
+    /**
+     * ¿El protector todavía sirve? Además de estar activo, cuenta el que ya venció
+     * pero cubrió el día de ayer y espera a que el usuario vuelva a estudiar hoy
+     * para salvarle la racha. Mientras sirva, la tienda no vende otro: el nuevo
+     * pisaría streak_shield_until y la racha de ayer se perdería.
+     */
+    public static boolean isShieldStillUseful(boolean hasShield, Instant shieldUntil, LocalDate lastActivity) {
+        if (isShieldActive(hasShield, shieldUntil)) return true;
+        if (!hasShield || lastActivity == null) return false;
+        LocalDate today = LocalDate.now(APP_ZONE);
+        return java.time.temporal.ChronoUnit.DAYS.between(lastActivity, today) == 2
+            && shieldCoversDay(shieldUntil, lastActivity.plusDays(1));
+    }
+
+    private static Instant readShieldUntil(JsonObject stats) {
+        return stats.has("streakShieldUntil") && !stats.get("streakShieldUntil").isJsonNull()
+            ? Instant.ofEpochMilli(stats.get("streakShieldUntil").getAsLong())
+            : null;
     }
 
     private static int calculateLevel(int totalXp) {
@@ -466,8 +516,10 @@ public class GamificationService {
                                  ? LocalDate.parse(lastActivityStr)
                                  : null;
 
-        int sc = effectiveStreak(streakCurrentRaw, lastActivity, hasShield);
+        Instant shieldUntil = readShieldUntil(stats);
+        int sc = effectiveStreak(streakCurrentRaw, lastActivity, hasShield, shieldUntil);
         stats.addProperty("streakCurrent", sc);
+        stats.addProperty("hasStreakShield", isShieldActive(hasShield, shieldUntil));
         stats.addProperty("streakMultiplier", getStreakMultiplier(sc));
         return stats;
     }

@@ -77,7 +77,9 @@ public class UserContextService {
     // ── Stats ─────────────────────────────────────────────────────────────
 
     private static void appendStats(Connection conn, UUID userId, StringBuilder ctx) {
-        String sql = "SELECT xp, level, coins, streak_current, streak_record, has_streak_shield FROM user_stats WHERE user_id = ?";
+        String sql = "SELECT xp, level, coins, streak_current, streak_record, "
+                   + "(has_streak_shield AND COALESCE(streak_shield_until > NOW(), false)) AS has_streak_shield "
+                   + "FROM user_stats WHERE user_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ResultSet rs = ps.executeQuery();

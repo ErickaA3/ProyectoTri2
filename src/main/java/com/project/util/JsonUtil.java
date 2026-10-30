@@ -45,7 +45,7 @@ public class JsonUtil {
             sb.append("\"coins\":").append(stats.getCoins()).append(",");
             sb.append("\"streakCurrent\":").append(stats.getStreakCurrent()).append(",");
             sb.append("\"streakRecord\":").append(stats.getStreakRecord()).append(",");
-            sb.append("\"hasStreakShield\":").append(stats.isHasStreakShield());
+            appendShield(sb, stats);
             sb.append("}");
         }
 
@@ -82,7 +82,7 @@ public class JsonUtil {
             sb.append("\"coins\":").append(stats.getCoins()).append(",");
             sb.append("\"streakCurrent\":").append(stats.getStreakCurrent()).append(",");
             sb.append("\"streakRecord\":").append(stats.getStreakRecord()).append(",");
-            sb.append("\"hasStreakShield\":").append(stats.isHasStreakShield());
+            appendShield(sb, stats);
             sb.append("},");
         } else {
             sb.append("\"stats\":null,");
@@ -125,6 +125,14 @@ public class JsonUtil {
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    // hasStreakShield = comprado, sin usar y sin vencer. streakShieldUntil (epoch ms)
+    // alimenta la cuenta regresiva del navbar.
+    private static void appendShield(StringBuilder sb, com.project.model.users.Statistics stats) {
+        boolean active = GamificationService.isShieldActive(stats.isHasStreakShield(), stats.getStreakShieldUntil());
+        sb.append("\"hasStreakShield\":").append(active);
+        if (active) sb.append(",\"streakShieldUntil\":").append(stats.getStreakShieldUntil().toEpochMilli());
+    }
 
     private static String escape(String s) {
         if (s == null) return "";

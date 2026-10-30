@@ -193,7 +193,7 @@ public class UserDAOImpl implements IUserDAO {
         String sql = """
                 SELECT user_id, xp, level, coins,
                        streak_current, streak_record,
-                       streak_last_activity, has_streak_shield
+                       streak_last_activity, has_streak_shield, streak_shield_until
                 FROM user_stats WHERE user_id = ?::uuid
                 """;
         try (Connection c = conn();
@@ -212,6 +212,8 @@ public class UserDAOImpl implements IUserDAO {
             s.setHasStreakShield(rs.getBoolean("has_streak_shield"));
             Date lsa = rs.getDate("streak_last_activity");
             if (lsa != null) s.setStreakLastActivity(lsa.toLocalDate());
+            Timestamp shieldUntil = rs.getTimestamp("streak_shield_until");
+            if (shieldUntil != null) s.setStreakShieldUntil(shieldUntil.toInstant());
             return Optional.of(s);
         }
     }
