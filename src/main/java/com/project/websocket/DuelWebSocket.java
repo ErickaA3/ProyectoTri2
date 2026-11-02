@@ -197,7 +197,7 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
 
         // Atómico: si ya se procesó esta pregunta (por ejemplo, el timeout
         // del servidor ganó la carrera), esto retorna false y no hacemos nada más.
-        boolean applied = room.tryRegisterAnswer(userId, questionIndex, correct, timeSecs);
+        boolean applied = room.tryRegisterAnswer(userId, questionIndex, answerIdx, correct, timeSecs);
         if (!applied) return;
 
         JsonObject feedback = new JsonObject();
@@ -224,7 +224,7 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             try {
                 duelDAO.submitDuelResult(duelId, userId,
                         room.getScore(userId), room.getTotalQuestions(),
-                        room.getTime(userId), "[]");
+                        room.getTime(userId), room.getAnswersJson(userId));
             } catch (Exception e) {
                 LOG.warning("[WS] Error guardando score de " + userId + ": " + e.getMessage());
             }
@@ -329,7 +329,7 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
 
         // Atómico: si la respuesta real del cliente ya se procesó para esta
         // pregunta (ganó la carrera), esto retorna false y no hacemos nada.
-        boolean applied = room.tryRegisterAnswer(userId, questionIndex, false, 0);
+        boolean applied = room.tryRegisterAnswer(userId, questionIndex, -1, false, 0);
         if (!applied) return;
 
         JsonObject timeout = new JsonObject();
@@ -342,7 +342,7 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
                 try {
                     duelDAO.submitDuelResult(duelId, userId,
                             room.getScore(userId), room.getTotalQuestions(),
-                            room.getTime(userId), "[]");
+                            room.getTime(userId), room.getAnswersJson(userId));
                 } catch (Exception e) {
                     LOG.warning("[WS] Error guardando score timeout: " + e.getMessage());
                 }
@@ -380,10 +380,10 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             int total  = room.getTotalQuestions();
 
             duelDAO.submitDuelResult(duelId, abandonedUserId, aScore, total,
-                    room.getTime(abandonedUserId), "[]");
+                    room.getTime(abandonedUserId), room.getAnswersJson(abandonedUserId));
             if (winner != null) {
                 duelDAO.submitDuelResult(duelId, winner, rScore, total,
-                        room.getTime(winner), "[]");
+                        room.getTime(winner), room.getAnswersJson(winner));
                 duelDAO.finishDuelWithWinner(duelId, winner);
 
                 GamificationService.processActivity(winner, "duelo_ganado",

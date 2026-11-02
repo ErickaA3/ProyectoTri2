@@ -51,7 +51,7 @@ public class LeaderboardDAO {
                 COALESCE(us.streak_current, 0)                      AS streak
             FROM users u
             LEFT JOIN user_stats us ON us.user_id = u.id
-            LEFT JOIN duels d
+            LEFT JOIN v_duels d
                 ON (d.challenger_id = u.id OR d.opponent_id = u.id)
                 AND d.status = 'finished'
                 """ + dateFilter + """
@@ -125,7 +125,7 @@ public class LeaderboardDAO {
             FROM users u
             INNER JOIN friend_ids fi ON fi.friend_id = u.id
             LEFT JOIN user_stats us ON us.user_id = u.id
-            LEFT JOIN duels d
+            LEFT JOIN v_duels d
                 ON (d.challenger_id = u.id OR d.opponent_id = u.id)
                 AND d.status = 'finished'
                 """ + dateFilter + """

@@ -30,6 +30,8 @@ public class DuelRoom {
     private final ConcurrentHashMap<String, Integer> scores = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> times  = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> finished = new ConcurrentHashMap<>();
+    // Respuestas de cada jugador: [{ "position": 0, "option": 2 }, ...]
+    private final ConcurrentHashMap<String, com.google.gson.JsonArray> answerLog = new ConcurrentHashMap<>();
 
     private final ConcurrentHashMap<String, ScheduledFuture<?>> questionTimers = new ConcurrentHashMap<>();
 
@@ -104,7 +106,8 @@ public class DuelRoom {
      * @return true si esta llamada fue la que efectivamente avanzó la partida,
      *         false si ya se había procesado esta pregunta (llamada duplicada/tardía).
      */
-    public synchronized boolean tryRegisterAnswer(String userId, int questionIndex, boolean correct, int timeSecs) {
+    public synchronized boolean tryRegisterAnswer(String userId, int questionIndex, int answerIdx,
+                                                  boolean correct, int timeSecs) {
         int current = currentQuestion.getOrDefault(userId, 0);
         if (questionIndex != current) {
             // Pregunta obsoleta — ya se procesó (carrera timeout vs respuesta real).
@@ -112,6 +115,12 @@ public class DuelRoom {
         }
 
         cancelQuestionTimer(userId);
+        // Se guarda qué opción eligió (null = se acabó el tiempo) para persistir
+        // las respuestas del duelo como intento al terminar.
+        com.google.gson.JsonObject answer = new com.google.gson.JsonObject();
+        answer.addProperty("position", questionIndex);
+        if (answerIdx >= 0) answer.addProperty("option", answerIdx);
+        answerLog.computeIfAbsent(userId, k -> new com.google.gson.JsonArray()).add(answer);
         if (correct) scores.merge(userId, 1, Integer::sum);
         times.merge(userId, timeSecs, Integer::sum);
 
@@ -188,6 +197,11 @@ public class DuelRoom {
     public String getOpponentId()               { return opponentId; }
     public int    getScore(String uid)           { return scores.getOrDefault(uid, 0); }
     public int    getTime(String uid)            { return times.getOrDefault(uid, 0);  }
+    /** Respuestas del jugador en el formato que espera IDuelDAO.submitDuelResult. */
+    public synchronized String getAnswersJson(String uid) {
+        com.google.gson.JsonArray log = answerLog.get(uid);
+        return log != null ? log.toString() : "[]";
+    }
     public int    getCurrentQuestion(String uid) { return currentQuestion.getOrDefault(uid, 0); }
     public Session getSession(String uid)        { return sessions.get(uid); }
 

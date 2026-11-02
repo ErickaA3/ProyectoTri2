@@ -3,6 +3,7 @@ package com.project.dao.implementation;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -180,28 +181,51 @@ public class DuelDAOImpl implements IDuelDAO {
 
     // ═══════════════════════════════════════════════════════════════
     //  DUELOS
+    //
+    //  Desde la V6 cada jugador es una fila de duel_participants y juega un
+    //  intento (attempts + attempt_answers) sobre el quiz del duelo. Las
+    //  lecturas usan la vista v_duels, que arma challenger/opponent con su
+    //  puntaje (respuestas correctas) y su tiempo a partir de esos intentos.
     // ═══════════════════════════════════════════════════════════════
+
+    private final GamificationDAOImpl attemptsDAO = new GamificationDAOImpl();
 
     @Override
     public String createDuel(String challengerId, String opponentId, String contentId,
                              String topic, int questionCount, int timePerQuestion) throws Exception {
-        String sql = """
-            INSERT INTO duels (challenger_id, opponent_id, content_id, topic, question_count, time_per_question, status)
-            VALUES (?::uuid, ?::uuid, ?::uuid, ?, ?, ?, 'waiting_opponent')
-            RETURNING id
-            """;
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, challengerId);
-            ps.setString(2, opponentId);
-            ps.setString(3, contentId);
-            ps.setString(4, topic);
-            ps.setInt(5, questionCount);
-            ps.setInt(6, timePerQuestion);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) return rs.getString("id");
-            throw new Exception("No se pudo crear el duelo.");
+        // questionCount ya no se guarda: es la cantidad de preguntas del quiz.
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                String duelId;
+                try (PreparedStatement ps = conn.prepareStatement("""
+                        INSERT INTO duels (content_id, topic, time_per_question, status)
+                        VALUES (?::uuid, ?, ?, 'waiting_opponent')
+                        RETURNING id
+                        """)) {
+                    ps.setString(1, contentId);
+                    ps.setString(2, topic);
+                    ps.setInt(3, timePerQuestion);
+                    ResultSet rs = ps.executeQuery();
+                    if (!rs.next()) throw new Exception("No se pudo crear el duelo.");
+                    duelId = rs.getString("id");
+                }
+                try (PreparedStatement ps = conn.prepareStatement("""
+                        INSERT INTO duel_participants (duel_id, user_id, role)
+                        VALUES (?::uuid, ?::uuid, 'challenger'), (?::uuid, ?::uuid, 'opponent')
+                        """)) {
+                    ps.setString(1, duelId); ps.setString(2, challengerId);
+                    ps.setString(3, duelId); ps.setString(4, opponentId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+                return duelId;
+            } catch (Exception e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
         }
     }
 
@@ -209,9 +233,9 @@ public class DuelDAOImpl implements IDuelDAO {
     public JsonObject getDuel(String duelId, String userId) throws Exception {
         String sql = """
             SELECT d.*,
-                   c.username AS challenger_name, c_s.level AS challenger_level,
-                   o.username AS opponent_name, o_s.level AS opponent_level
-            FROM duels d
+                   c.username::text AS challenger_name, c_s.level AS challenger_level,
+                   o.username::text AS opponent_name, o_s.level AS opponent_level
+            FROM v_duels d
             JOIN users c ON c.id = d.challenger_id
             JOIN users o ON o.id = d.opponent_id
             LEFT JOIN user_stats c_s ON c_s.user_id = d.challenger_id
@@ -237,8 +261,8 @@ public class DuelDAOImpl implements IDuelDAO {
             d.addProperty("topic",           rs.getString("topic"));
             d.addProperty("questionCount",   rs.getInt("question_count"));
             d.addProperty("status",          rs.getString("status"));
-            d.addProperty("challengerScore", rs.getBigDecimal("challenger_score") != null ? rs.getBigDecimal("challenger_score").intValue() : -1);
-            d.addProperty("opponentScore",   rs.getBigDecimal("opponent_score") != null ? rs.getBigDecimal("opponent_score").intValue() : -1);
+            d.addProperty("challengerScore", scoreOrMinusOne(rs, "challenger_score"));
+            d.addProperty("opponentScore",   scoreOrMinusOne(rs, "opponent_score"));
             d.addProperty("challengerTime",  rs.getInt("challenger_time"));
             d.addProperty("opponentTime",    rs.getInt("opponent_time"));
             d.addProperty("winnerId",        rs.getString("winner_id"));
@@ -249,15 +273,21 @@ public class DuelDAOImpl implements IDuelDAO {
         }
     }
 
+    /** -1 = ese jugador todavía no jugó (así lo espera el front). */
+    private static int scoreOrMinusOne(ResultSet rs, String column) throws SQLException {
+        int v = rs.getInt(column);
+        return rs.wasNull() ? -1 : v;
+    }
+
     @Override
     public JsonArray getActiveDuels(String userId) throws Exception {
         String sql = """
             SELECT d.id, d.topic, d.question_count, d.status, d.created_at::text,
                    d.challenger_id, d.opponent_id,
                    d.challenger_score, d.opponent_score,
-                   c.username AS challenger_name, c_s.level AS challenger_level,
-                   o.username AS opponent_name, o_s.level AS opponent_level
-            FROM duels d
+                   c.username::text AS challenger_name, c_s.level AS challenger_level,
+                   o.username::text AS opponent_name, o_s.level AS opponent_level
+            FROM v_duels d
             JOIN users c ON c.id = d.challenger_id
             JOIN users o ON o.id = d.opponent_id
             LEFT JOIN user_stats c_s ON c_s.user_id = d.challenger_id
@@ -288,9 +318,7 @@ public class DuelDAOImpl implements IDuelDAO {
                 d.addProperty("isChallenger",    userId.equals(rs.getString("challenger_id")));
 
                 boolean isChallenger = userId.equals(rs.getString("challenger_id"));
-                boolean hasPlayed = isChallenger
-                    ? rs.getBigDecimal("challenger_score") != null
-                    : rs.getBigDecimal("opponent_score") != null;
+                boolean hasPlayed = scoreOrMinusOne(rs, isChallenger ? "challenger_score" : "opponent_score") >= 0;
                 d.addProperty("hasPlayed", hasPlayed);
 
                 duels.add(d);
@@ -306,9 +334,9 @@ public class DuelDAOImpl implements IDuelDAO {
                    d.challenger_score, d.opponent_score,
                    d.challenger_time, d.opponent_time,
                    d.winner_id, d.finished_at::text, d.created_at::text,
-                   c.username AS challenger_name, o.username AS opponent_name,
+                   c.username::text AS challenger_name, o.username::text AS opponent_name,
                    d.challenger_id, d.opponent_id
-            FROM duels d
+            FROM v_duels d
             JOIN users c ON c.id = d.challenger_id
             JOIN users o ON o.id = d.opponent_id
             WHERE (d.challenger_id = ?::uuid OR d.opponent_id = ?::uuid)
@@ -350,12 +378,13 @@ public class DuelDAOImpl implements IDuelDAO {
         String sql = """
             UPDATE duels SET status = 'declined'
             WHERE id = ?::uuid
-              AND (challenger_id = ?::uuid OR opponent_id = ?::uuid)
+              AND EXISTS (SELECT 1 FROM duel_participants p
+                          WHERE p.duel_id = duels.id AND p.user_id = ?::uuid)
               AND status IN ('waiting_opponent', 'in_progress')
             """;
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, duelId); ps.setString(2, userId); ps.setString(3, userId);
+            ps.setString(1, duelId); ps.setString(2, userId);
             return ps.executeUpdate() > 0;
         }
     }
@@ -382,347 +411,173 @@ public class DuelDAOImpl implements IDuelDAO {
         }
     }
 
+    /**
+     * Registra la partida de un jugador (modo en tiempo real, desde DuelWebSocket).
+     * @param answersJson [{ "position": 0, "option": 2 }, ...] tal como las
+     *                    registró DuelRoom (option null = se acabó el tiempo).
+     * score y maxScore se ignoran: el servidor califica contra las opciones guardadas.
+     */
     @Override
     public JsonObject submitDuelResult(String duelId, String userId, int score,
                                        int maxScore, int timeSecs, String answersJson) throws Exception {
-        Connection conn = DatabaseConnection.getConnection();
-        try {
-            conn.setAutoCommit(false);
-
-            String getDuel = """
-                SELECT challenger_id, opponent_id, status, question_count,
-                       challenger_score, opponent_score
-                FROM duels WHERE id = ?::uuid
-                FOR UPDATE
-                """;
-            String challengerId, opponentId, status;
-            int questionCount;
-            boolean challengerPlayed, opponentPlayed;
-
-            try (PreparedStatement ps = conn.prepareStatement(getDuel)) {
-                ps.setString(1, duelId);
-                ResultSet rs = ps.executeQuery();
-                if (!rs.next()) { conn.rollback(); throw new Exception("Duelo no encontrado."); }
-                challengerId    = rs.getString("challenger_id");
-                opponentId      = rs.getString("opponent_id");
-                status          = rs.getString("status");
-                questionCount   = rs.getInt("question_count");
-                challengerPlayed = rs.getBigDecimal("challenger_score") != null;
-                opponentPlayed   = rs.getBigDecimal("opponent_score") != null;
-            }
-
-            if ("finished".equals(status) || "declined".equals(status)) {
-                conn.rollback();
-                throw new Exception("Este duelo ya terminó.");
-            }
-
-            boolean isChallenger = userId.equals(challengerId);
-
-            if ((isChallenger && challengerPlayed) || (!isChallenger && opponentPlayed)) {
-                conn.rollback();
-                throw new Exception("Ya jugaste este duelo.");
-            }
-
-            if (!userId.equals(challengerId) && !userId.equals(opponentId)) {
-                conn.rollback();
-                throw new Exception("No eres participante de este duelo.");
-            }
-
-            JsonArray answers = JsonParser.parseString(answersJson).getAsJsonArray();
-            String insertAnswer = """
-                INSERT INTO duel_answers (duel_id, user_id, question_index, answer_given, is_correct, time_ms)
-                VALUES (?::uuid, ?::uuid, ?, ?, ?, ?)
-                """;
-            try (PreparedStatement ps = conn.prepareStatement(insertAnswer)) {
-                for (int i = 0; i < answers.size(); i++) {
-                    JsonObject a = answers.get(i).getAsJsonObject();
-                    ps.setString(1, duelId);
-                    ps.setString(2, userId);
-                    ps.setInt(3, a.get("questionIndex").getAsInt());
-                    ps.setString(4, a.has("answerGiven") ? a.get("answerGiven").getAsString() : null);
-                    ps.setBoolean(5, a.get("isCorrect").getAsBoolean());
-                    ps.setInt(6, a.has("timeMs") ? a.get("timeMs").getAsInt() : 0);
-                    ps.addBatch();
-                }
-                ps.executeBatch();
-            }
-
-            String updateScore = isChallenger
-                ? "UPDATE duels SET challenger_score = ?, challenger_time = ? WHERE id = ?::uuid"
-                : "UPDATE duels SET opponent_score = ?, opponent_time = ? WHERE id = ?::uuid";
-
-            try (PreparedStatement ps = conn.prepareStatement(updateScore)) {
-                ps.setInt(1, score);
-                ps.setInt(2, timeSecs);
-                ps.setString(3, duelId);
-                ps.executeUpdate();
-            }
-
-            boolean otherPlayed = isChallenger ? opponentPlayed : challengerPlayed;
-            JsonObject result = new JsonObject();
-            result.addProperty("success", true);
-            result.addProperty("score", score);
-            result.addProperty("maxScore", maxScore);
-            result.addProperty("timeSecs", timeSecs);
-
-            if (otherPlayed) {
-                String getOther = isChallenger
-                    ? "SELECT opponent_score, opponent_time FROM duels WHERE id = ?::uuid"
-                    : "SELECT challenger_score, challenger_time FROM duels WHERE id = ?::uuid";
-
-                int otherScore, otherTime;
-                try (PreparedStatement ps = conn.prepareStatement(getOther)) {
-                    ps.setString(1, duelId);
-                    ResultSet rs = ps.executeQuery();
-                    rs.next();
-                    otherScore = rs.getInt(1);
-                    otherTime  = rs.getInt(2);
-                }
-
-                String winnerId = null;
-                String resultType;
-                if (score > otherScore) {
-                    winnerId = userId;
-                    resultType = "win";
-                } else if (score < otherScore) {
-                    winnerId = isChallenger ? opponentId : challengerId;
-                    resultType = "loss";
-                } else {
-                    if (timeSecs < otherTime) {
-                        winnerId = userId;
-                        resultType = "win";
-                    } else if (timeSecs > otherTime) {
-                        winnerId = isChallenger ? opponentId : challengerId;
-                        resultType = "loss";
-                    } else {
-                        resultType = "draw"; // winnerId queda null → empate total
-                    }
-                }
-
-                // FIX: se usa el helper para evitar null::uuid en PostgreSQL
-                finishDuelStatement(conn, duelId, winnerId);
-
-                result.addProperty("duelFinished", true);
-                result.addProperty("result", resultType);
-                result.addProperty("winnerId", winnerId != null ? winnerId : "");
-                result.addProperty("otherScore", otherScore);
-                result.addProperty("otherTime", otherTime);
-            } else {
-                String updateStatus = "UPDATE duels SET status = 'in_progress' WHERE id = ?::uuid";
-                try (PreparedStatement ps = conn.prepareStatement(updateStatus)) {
-                    ps.setString(1, duelId);
-                    ps.executeUpdate();
-                }
-
-                result.addProperty("duelFinished", false);
-                result.addProperty("waitingForOpponent", true);
-            }
-
-            conn.commit();
-            return result;
-
-        } catch (Exception e) {
-            conn.rollback();
-            throw e;
-        } finally {
-            conn.setAutoCommit(true);
-            conn.close();
-        }
+        JsonArray answers = (answersJson == null || answersJson.isBlank())
+                ? new JsonArray() : JsonParser.parseString(answersJson).getAsJsonArray();
+        return recordPlay(duelId, userId, answers, Math.max(0, timeSecs));
     }
 
     /**
-     * [SEGURIDAD] Versión "graded" de submitDuelResult — recalcula todo
-     * en el servidor contra las preguntas reales, sin confiar en el cliente.
+     * [SEGURIDAD] Versión HTTP: recalcula todo en el servidor contra las
+     * preguntas reales, sin confiar en el cliente.
+     * @param rawAnswers [{ "questionIndex": 0, "answerGiven": 2, "timeMs": 1200 }, ...]
      */
     @Override
     public JsonObject submitDuelResultGraded(String duelId, String userId,
                                              JsonArray rawAnswers, int timeSecsRaw) throws Exception {
-        Connection conn = DatabaseConnection.getConnection();
-        try {
+        int questionCount, timePerQuestion;
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement(
+                     "SELECT question_count, time_per_question FROM v_duels WHERE id = ?::uuid")) {
+            ps.setString(1, duelId);
+            ResultSet rs = ps.executeQuery();
+            if (!rs.next()) throw new Exception("Duelo no encontrado.");
+            questionCount   = rs.getInt(1);
+            timePerQuestion = rs.getInt(2);
+        }
+
+        // Al formato de saveGradedAnswers; las preguntas que no existen se ignoran.
+        JsonArray answers = new JsonArray();
+        for (int i = 0; i < rawAnswers.size(); i++) {
+            if (!rawAnswers.get(i).isJsonObject()) continue;
+            JsonObject a = rawAnswers.get(i).getAsJsonObject();
+            int qIndex = a.has("questionIndex") ? safeInt(a.get("questionIndex"), -1) : -1;
+            if (qIndex < 0 || qIndex >= questionCount) continue;
+            int given = a.has("answerGiven") ? safeInt(a.get("answerGiven"), -1) : -1;
+            JsonObject converted = new JsonObject();
+            converted.addProperty("position", qIndex);
+            if (given >= 0) converted.addProperty("option", given);
+            answers.add(converted);
+        }
+
+        int maxTime  = Math.max(1, questionCount) * Math.max(5, timePerQuestion);
+        int timeSecs = Math.max(0, Math.min(timeSecsRaw, maxTime));
+        return recordPlay(duelId, userId, answers, timeSecs);
+    }
+
+    /**
+     * Guarda la partida de un jugador como intento sobre el quiz del duelo y,
+     * si el rival ya había jugado, cierra el duelo con el ganador (más
+     * respuestas correctas; si empatan, menos tiempo; si también, empate).
+     */
+    private JsonObject recordPlay(String duelId, String userId, JsonArray answers, int timeSecs) throws Exception {
+        try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
-
-            String getDuel = """
-                SELECT d.challenger_id, d.opponent_id, d.status, d.question_count,
-                       d.challenger_score, d.opponent_score, d.time_per_question,
-                       sc.body::text AS content_json
-                FROM duels d
-                JOIN generated_content sc ON sc.id = d.content_id
-                WHERE d.id = ?::uuid
-                FOR UPDATE
-                """;
-
-            String challengerId, opponentId, status, contentJson;
-            int questionCount, timePerQuestion;
-            boolean challengerPlayed, opponentPlayed;
-
-            try (PreparedStatement ps = conn.prepareStatement(getDuel)) {
-                ps.setString(1, duelId);
-                ResultSet rs = ps.executeQuery();
-                if (!rs.next()) { conn.rollback(); throw new Exception("Duelo no encontrado."); }
-                challengerId     = rs.getString("challenger_id");
-                opponentId       = rs.getString("opponent_id");
-                status           = rs.getString("status");
-                questionCount    = rs.getInt("question_count");
-                timePerQuestion  = rs.getInt("time_per_question");
-                contentJson      = rs.getString("content_json");
-                challengerPlayed = rs.getBigDecimal("challenger_score") != null;
-                opponentPlayed   = rs.getBigDecimal("opponent_score") != null;
-            }
-
-            if ("finished".equals(status) || "declined".equals(status)) {
-                conn.rollback();
-                throw new Exception("Este duelo ya terminó.");
-            }
-
-            if (!userId.equals(challengerId) && !userId.equals(opponentId)) {
-                conn.rollback();
-                throw new Exception("No eres participante de este duelo.");
-            }
-
-            boolean isChallenger = userId.equals(challengerId);
-
-            if ((isChallenger && challengerPlayed) || (!isChallenger && opponentPlayed)) {
-                conn.rollback();
-                throw new Exception("Ya jugaste este duelo.");
-            }
-
-            JsonObject content = JsonParser.parseString(contentJson).getAsJsonObject();
-            JsonArray questions = content.has("questions")
-                ? content.getAsJsonArray("questions") : new JsonArray();
-
-            int score = 0;
-            JsonArray gradedAnswers = new JsonArray();
-            for (int i = 0; i < rawAnswers.size(); i++) {
-                JsonObject a;
-                try {
-                    a = rawAnswers.get(i).getAsJsonObject();
-                } catch (Exception e) {
-                    continue;
-                }
-
-                int qIndex = a.has("questionIndex") ? safeInt(a.get("questionIndex"), -1) : -1;
-                int answerGiven = a.has("answerGiven") ? safeInt(a.get("answerGiven"), -1) : -1;
-
-                boolean correct = false;
-                if (qIndex >= 0 && qIndex < questions.size()) {
-                    JsonObject q = questions.get(qIndex).getAsJsonObject();
-                    int correctIdx = q.has("correct")       ? q.get("correct").getAsInt()
-                                    : q.has("correctAnswer") ? q.get("correctAnswer").getAsInt()
-                                    : -1;
-                    correct = (correctIdx == answerGiven);
-                }
-                if (correct) score++;
-
-                JsonObject graded = new JsonObject();
-                graded.addProperty("questionIndex", qIndex);
-                graded.addProperty("answerGiven",   String.valueOf(answerGiven));
-                graded.addProperty("isCorrect",     correct);
-                graded.addProperty("timeMs",        a.has("timeMs") ? safeInt(a.get("timeMs"), 0) : 0);
-                gradedAnswers.add(graded);
-            }
-
-            int maxScore = questionCount > 0 ? questionCount : questions.size();
-            int maxTime  = Math.max(1, questionCount) * Math.max(5, timePerQuestion);
-            int timeSecs = Math.max(0, Math.min(timeSecsRaw, maxTime));
-
-            String insertAnswer = """
-                INSERT INTO duel_answers (duel_id, user_id, question_index, answer_given, is_correct, time_ms)
-                VALUES (?::uuid, ?::uuid, ?, ?, ?, ?)
-                """;
-            try (PreparedStatement ps = conn.prepareStatement(insertAnswer)) {
-                for (int i = 0; i < gradedAnswers.size(); i++) {
-                    JsonObject a = gradedAnswers.get(i).getAsJsonObject();
-                    ps.setString(1, duelId);
-                    ps.setString(2, userId);
-                    ps.setInt(3, a.get("questionIndex").getAsInt());
-                    ps.setString(4, a.get("answerGiven").getAsString());
-                    ps.setBoolean(5, a.get("isCorrect").getAsBoolean());
-                    ps.setInt(6, a.get("timeMs").getAsInt());
-                    ps.addBatch();
-                }
-                if (gradedAnswers.size() > 0) ps.executeBatch();
-            }
-
-            String updateScore = isChallenger
-                ? "UPDATE duels SET challenger_score = ?, challenger_time = ? WHERE id = ?::uuid"
-                : "UPDATE duels SET opponent_score = ?, opponent_time = ? WHERE id = ?::uuid";
-            try (PreparedStatement ps = conn.prepareStatement(updateScore)) {
-                ps.setInt(1, score);
-                ps.setInt(2, timeSecs);
-                ps.setString(3, duelId);
-                ps.executeUpdate();
-            }
-
-            boolean otherPlayed = isChallenger ? opponentPlayed : challengerPlayed;
-            JsonObject result = new JsonObject();
-            result.addProperty("success",  true);
-            result.addProperty("score",    score);
-            result.addProperty("maxScore", maxScore);
-            result.addProperty("timeSecs", timeSecs);
-
-            if (otherPlayed) {
-                String getOther = isChallenger
-                    ? "SELECT opponent_score, opponent_time FROM duels WHERE id = ?::uuid"
-                    : "SELECT challenger_score, challenger_time FROM duels WHERE id = ?::uuid";
-
-                int otherScore, otherTime;
-                try (PreparedStatement ps = conn.prepareStatement(getOther)) {
+            try {
+                // 1. Bloquear el duelo: las dos partidas no se pueden cerrar a la vez.
+                String status, contentId;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT status, content_id::text FROM duels WHERE id = ?::uuid FOR UPDATE")) {
                     ps.setString(1, duelId);
                     ResultSet rs = ps.executeQuery();
-                    rs.next();
-                    otherScore = rs.getInt(1);
-                    otherTime  = rs.getInt(2);
+                    if (!rs.next()) throw new Exception("Duelo no encontrado.");
+                    status    = rs.getString(1);
+                    contentId = rs.getString(2);
                 }
+                if ("finished".equals(status) || "declined".equals(status)) {
+                    throw new Exception("Este duelo ya terminó.");
+                }
+                if (contentId == null) throw new Exception("El quiz de este duelo ya no existe.");
 
-                String winnerId = null;
-                String resultType;
-                if (score > otherScore) {
-                    winnerId = userId;
-                    resultType = "win";
-                } else if (score < otherScore) {
-                    winnerId = isChallenger ? opponentId : challengerId;
-                    resultType = "loss";
-                } else {
-                    if (timeSecs < otherTime) {
-                        winnerId = userId;
-                        resultType = "win";
-                    } else if (timeSecs > otherTime) {
-                        winnerId = isChallenger ? opponentId : challengerId;
-                        resultType = "loss";
-                    } else {
-                        winnerId = null;
-                        resultType = "draw";
+                // 2. Jugadores y si ya jugaron.
+                String rivalId = null;
+                boolean iPlayed = false, rivalPlayed = false, isPlayer = false;
+                try (PreparedStatement ps = conn.prepareStatement("""
+                        SELECT user_id::text,
+                               (attempt_id IS NOT NULL OR legacy_score IS NOT NULL) AS played
+                        FROM duel_participants WHERE duel_id = ?::uuid
+                        """)) {
+                    ps.setString(1, duelId);
+                    ResultSet rs = ps.executeQuery();
+                    while (rs.next()) {
+                        if (userId.equals(rs.getString(1))) { isPlayer = true; iPlayed = rs.getBoolean(2); }
+                        else { rivalId = rs.getString(1); rivalPlayed = rs.getBoolean(2); }
                     }
                 }
+                if (!isPlayer) throw new Exception("No eres participante de este duelo.");
+                if (iPlayed)   throw new Exception("Ya jugaste este duelo.");
 
-                // FIX: se usa el helper para evitar null::uuid en PostgreSQL
-                finishDuelStatement(conn, duelId, winnerId);
-
-                result.addProperty("duelFinished", true);
-                result.addProperty("result",       resultType);
-                result.addProperty("winnerId",     winnerId != null ? winnerId : "");
-                result.addProperty("otherScore",   otherScore);
-                result.addProperty("otherTime",    otherTime);
-            } else {
-                String updateStatus = "UPDATE duels SET status = 'in_progress' WHERE id = ?::uuid";
-                try (PreparedStatement ps = conn.prepareStatement(updateStatus)) {
-                    ps.setString(1, duelId);
+                // 3. Intento + respuestas calificadas contra item_options.
+                String attemptId = attemptsDAO.createAttempt(conn, userId, contentId, "completed", timeSecs);
+                if (!answers.isEmpty()) {
+                    attemptsDAO.saveGradedAnswers(conn, attemptId, contentId, answers, false);
+                }
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE duel_participants SET attempt_id = ?::uuid WHERE duel_id = ?::uuid AND user_id = ?::uuid")) {
+                    ps.setString(1, attemptId);
+                    ps.setString(2, duelId);
+                    ps.setString(3, userId);
                     ps.executeUpdate();
                 }
 
-                result.addProperty("duelFinished", false);
-                result.addProperty("waitingForOpponent", true);
+                // 4. Puntajes ya calculados por la vista.
+                int myScore, myTime, otherScore, otherTime, maxScore;
+                try (PreparedStatement ps = conn.prepareStatement("""
+                        SELECT challenger_id::text, challenger_score, challenger_time,
+                               opponent_score, opponent_time, question_count
+                        FROM v_duels WHERE id = ?::uuid
+                        """)) {
+                    ps.setString(1, duelId);
+                    ResultSet rs = ps.executeQuery();
+                    rs.next();
+                    boolean isChallenger = userId.equals(rs.getString(1));
+                    myScore    = rs.getInt(isChallenger ? 2 : 4);
+                    myTime     = rs.getInt(isChallenger ? 3 : 5);
+                    otherScore = rs.getInt(isChallenger ? 4 : 2);
+                    otherTime  = rs.getInt(isChallenger ? 5 : 3);
+                    maxScore   = rs.getInt(6);
+                }
+
+                JsonObject result = new JsonObject();
+                result.addProperty("success",   true);
+                result.addProperty("score",     myScore);
+                result.addProperty("maxScore",  maxScore);
+                result.addProperty("timeSecs",  myTime);
+                result.addProperty("attemptId", attemptId);
+
+                if (rivalPlayed) {
+                    String winnerId;
+                    String resultType;
+                    if (myScore > otherScore || (myScore == otherScore && myTime < otherTime)) {
+                        winnerId = userId;  resultType = "win";
+                    } else if (myScore < otherScore || myTime > otherTime) {
+                        winnerId = rivalId; resultType = "loss";
+                    } else {
+                        winnerId = null;    resultType = "draw";
+                    }
+                    finishDuelStatement(conn, duelId, winnerId);
+
+                    result.addProperty("duelFinished", true);
+                    result.addProperty("result",       resultType);
+                    result.addProperty("winnerId",     winnerId != null ? winnerId : "");
+                    result.addProperty("otherScore",   otherScore);
+                    result.addProperty("otherTime",    otherTime);
+                } else {
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "UPDATE duels SET status = 'in_progress' WHERE id = ?::uuid")) {
+                        ps.setString(1, duelId);
+                        ps.executeUpdate();
+                    }
+                    result.addProperty("duelFinished", false);
+                    result.addProperty("waitingForOpponent", true);
+                }
+
+                conn.commit();
+                return result;
+            } catch (Exception e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
             }
-
-            conn.commit();
-            return result;
-
-        } catch (Exception e) {
-            conn.rollback();
-            throw e;
-        } finally {
-            conn.setAutoCommit(true);
-            conn.close();
         }
     }
 
@@ -738,36 +593,10 @@ public class DuelDAOImpl implements IDuelDAO {
 
     @Override
     public JsonObject getDuelQuestions(String duelId, String userId) throws Exception {
-        String checkPlayed = """
-            SELECT challenger_id, opponent_id, challenger_score, opponent_score, status
-            FROM duels WHERE id = ?::uuid
-              AND (challenger_id = ?::uuid OR opponent_id = ?::uuid)
-            """;
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement ps = conn.prepareStatement(checkPlayed)) {
-            ps.setString(1, duelId); ps.setString(2, userId); ps.setString(3, userId);
-            ResultSet rs = ps.executeQuery();
-            if (!rs.next()) return null;
-
-            String status = rs.getString("status");
-            if ("finished".equals(status) || "declined".equals(status)) {
-                throw new Exception("Este duelo ya terminó.");
-            }
-
-            boolean isChallenger = userId.equals(rs.getString("challenger_id"));
-            boolean alreadyPlayed = isChallenger
-                ? rs.getBigDecimal("challenger_score") != null
-                : rs.getBigDecimal("opponent_score") != null;
-
-            if (alreadyPlayed) {
-                throw new Exception("Ya jugaste este duelo.");
-            }
-        }
-
         String sql = """
-            SELECT sc.body::text AS content, sc.title, d.question_count, d.topic, d.time_per_question
-            FROM duels d
+            SELECT d.status, d.challenger_id::text AS challenger_id, d.challenger_score, d.opponent_score,
+                   sc.body::text AS content, sc.title, d.question_count, d.topic, d.time_per_question
+            FROM v_duels d
             JOIN generated_content sc ON sc.id = d.content_id
             WHERE d.id = ?::uuid
               AND (d.challenger_id = ?::uuid OR d.opponent_id = ?::uuid)
@@ -779,16 +608,23 @@ public class DuelDAOImpl implements IDuelDAO {
             ResultSet rs = ps.executeQuery();
             if (!rs.next()) return null;
 
+            String status = rs.getString("status");
+            if ("finished".equals(status) || "declined".equals(status)) {
+                throw new Exception("Este duelo ya terminó.");
+            }
+            boolean isChallenger = userId.equals(rs.getString("challenger_id"));
+            if (scoreOrMinusOne(rs, isChallenger ? "challenger_score" : "opponent_score") >= 0) {
+                throw new Exception("Ya jugaste este duelo.");
+            }
+
             JsonObject result = new JsonObject();
             result.addProperty("title", rs.getString("title"));
             result.addProperty("topic", rs.getString("topic"));
             result.addProperty("questionCount", rs.getInt("question_count"));
             result.addProperty("timePerQuestion", rs.getInt("time_per_question"));
 
-            String contentJson = rs.getString("content");
-            JsonObject content = JsonParser.parseString(contentJson).getAsJsonObject();
+            JsonObject content = JsonParser.parseString(rs.getString("content")).getAsJsonObject();
             result.add("questions", content.has("questions") ? content.getAsJsonArray("questions") : new JsonArray());
-
             return result;
         }
     }
