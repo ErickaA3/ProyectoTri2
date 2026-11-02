@@ -106,17 +106,26 @@ Si en el futuro alguna vista se vuelve lenta (por ejemplo `v_user_balances` con 
 - **Que `user_missions.period_start` sea lunes para misiones semanales.** Lo calcula el backend al asignar.
 - **Que solo un usuario con rol `teacher` cree aulas.** Es una regla de permisos del backend.
 
+## Migraciones (Flyway)
+
+Las migraciones viven en [`src/main/resources/db/migration/`](../src/main/resources/db/migration/). Flyway las aplica en orden al arrancar la app y anota cada una en la tabla `flyway_schema_history`, así nunca corre dos veces la misma.
+
+- **Solo corren si la variable de entorno `DB_MIGRATE=true`.** Se define en Railway. Localmente queda apagado, para que nadie aplique a la base compartida una migración de su rama a medio hacer.
+- **Nunca se edita una migración ya aplicada.** Si hay que corregir algo, se escribe una migración nueva (`V4__...`).
+- **Nombres:** `V<número>__<descripcion_con_guiones_bajos>.sql` (dos guiones bajos).
+- **Producción ya tenía V1 y V2 aplicadas a mano.** La primera vez que arranque con `DB_MIGRATE=true`, Flyway la marca como "al día hasta la V2" (baseline) y solo ejecuta de la V3 en adelante. En una base vacía corre todas desde la V1.
+
 ## Plan de migración
 
 Hoy hay 6 usuarios y 44 contenidos: es el momento más barato para hacerlo.
 
-1. **`V1__baseline.sql`:** el esquema actual de Supabase, tal cual, para que Flyway arranque desde el estado real.
-2. **`V2__arreglos_urgentes.sql`:** se puede aplicar ya, sin cambiar el modelo:
+1. **`V1__baseline.sql`** (hecho): el esquema de Supabase como estaba antes de la V2, para poder levantar una base idéntica desde cero.
+2. **`V2__arreglos_urgentes.sql`** (aplicada en Supabase el 2026-11-02):
    - alinear `objectives.type` con los tipos que usa `GamificationService`;
    - `duels.content_id ... ON DELETE SET NULL`;
    - `UNIQUE (user_id)` en `clientes`;
-   - `NOT NULL DEFAULT` en `user_stats`.
-   - El desfase de zona horaria se corrige en Java: dejar de usar `CURRENT_DATE` y pasar la fecha de Costa Rica como parámetro.
+   - `NOT NULL` y rangos válidos en `user_stats`, amistades sin duplicados e índices.
+   - En Java: misiones y objetivos usan la fecha de Costa Rica en vez de `CURRENT_DATE`.
 3. **`V3__modelo_nuevo.sql`:** crea las tablas nuevas y copia los datos:
    - Cada usuario recibe una materia "Sin clasificar" con un tema "General".
    - Cada `study_content` pasa a `generated_content` en ese tema. Las preguntas del JSON se separan en `content_items` e `item_options`, y `source_text` pasa a un `documents` con sus `document_chunks`.

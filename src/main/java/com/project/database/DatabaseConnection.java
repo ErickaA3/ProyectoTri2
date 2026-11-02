@@ -73,6 +73,11 @@ public class DatabaseConnection {
         return ds;
     }
 
+    /** El pool completo, para herramientas que lo necesitan (p. ej. Flyway). */
+    public static javax.sql.DataSource dataSource() {
+        return getDataSource();
+    }
+
     public static Connection getConnection() {
     try {
         Connection conn = getDataSource().getConnection();

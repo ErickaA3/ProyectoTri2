@@ -4,7 +4,7 @@
 --
 --  Este archivo describe la base de datos a la que se quiere llegar.
 --  NO es una migración: no se corre contra producción. Las migraciones
---  (Flyway, database/migrations/V*.sql) se escriben a partir de este diseño.
+--  (Flyway, src/main/resources/db/migration/V*.sql) se escriben a partir de este diseño.
 --  Las decisiones están explicadas en database/DISENO.md.
 --
 --  Convenciones

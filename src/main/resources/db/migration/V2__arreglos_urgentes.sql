@@ -2,8 +2,8 @@
 --  V2 · Arreglos urgentes (no cambia el modelo)
 --  Aplicada a mano en Supabase (SQL Editor) el 2026-11-02, después de copiar
 --  las tablas al esquema "respaldo". Ver database/DISENO.md.
+--  Sin begin/commit: Flyway ya corre cada migración dentro de una transacción.
 -- =============================================================================
-begin;
 
 -- 1. Objetivos semanales: alinear los tipos con los que avanza GamificationService.
 --    Desde que objectives se lee de la tabla, ningún tipo coincidía y los
@@ -96,4 +96,3 @@ create index idx_activity_results_user_content on activity_results (user_id, con
 -- 8. La fecha de las misiones la pone el backend (hora de Costa Rica), no la BD (UTC).
 alter table user_daily_missions alter column date drop default;
 
-commit;
