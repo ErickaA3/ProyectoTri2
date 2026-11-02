@@ -113,7 +113,7 @@ Las migraciones viven en [`src/main/resources/db/migration/`](../src/main/resour
 - **Solo corren si la variable de entorno `DB_MIGRATE=true`.** Se define en Railway. Localmente queda apagado, para que nadie aplique a la base compartida una migración de su rama a medio hacer.
 - **Nunca se edita una migración ya aplicada.** Si hay que corregir algo, se escribe una migración nueva (`V4__...`).
 - **Nombres:** `V<número>__<descripcion_con_guiones_bajos>.sql` (dos guiones bajos).
-- **Mientras dure la reestructuración, las migraciones se aplican a mano** en el SQL Editor de Supabase. `BASELINE_VERSION` en `DatabaseMigrationListener` es la última aplicada así (hoy, la V3). La primera vez que la app arranque con `DB_MIGRATE=true`, Flyway marca producción como "al día" hasta esa versión y solo ejecuta las siguientes. En una base vacía corre todas desde la V1. Cada migración aplicada a mano sube ese número en el mismo commit.
+- **Mientras dure la reestructuración, las migraciones se aplican a mano** en el SQL Editor de Supabase. `BASELINE_VERSION` en `DatabaseMigrationListener` es la última aplicada así (hoy, la V4). La primera vez que la app arranque con `DB_MIGRATE=true`, Flyway marca producción como "al día" hasta esa versión y solo ejecuta las siguientes. En una base vacía corre todas desde la V1. Cada migración aplicada a mano sube ese número en el mismo commit.
 
 ## Plan de migración
 
@@ -126,18 +126,20 @@ Hoy hay 6 usuarios y 44 contenidos: es el momento más barato para hacerlo.
    - `UNIQUE (user_id)` en `clientes`;
    - `NOT NULL` y rangos válidos en `user_stats`, amistades sin duplicados e índices.
    - En Java: misiones y objetivos usan la fecha de Costa Rica en vez de `CURRENT_DATE`.
-3. **`V3__modelo_nuevo.sql`:** crea las tablas nuevas y copia los datos:
-   - Cada usuario recibe una materia "Sin clasificar" con un tema "General".
-   - Cada `study_content` pasa a `generated_content` en ese tema. Las preguntas del JSON se separan en `content_items` e `item_options`, y `source_text` pasa a un `documents` con sus `document_chunks`.
-   - `is_favorite = true` pasa a `favorites`.
-   - Cada `activity_results` pasa a un `attempts` completado con `xp_awarded = 0`, sin respuestas: hoy no se guardan.
-   - El XP y las monedas actuales de `user_stats` pasan a un `balance_adjustments` por usuario con motivo "Saldo migrado". Así nadie pierde lo que tenía.
-   - **Decisión pendiente, la racha:** hoy solo se guarda el número, no los días. Hay dos opciones: reiniciarla (son 6 usuarios), o crear para cada usuario un contenido "Migración" con intentos completados en los días anteriores hasta igualar `streak_current`.
-   - Duelos, amistades, inventario, misiones y chat se convierten a sus tablas nuevas.
-   - Los embeddings se regeneran sobre los fragmentos.
-4. **Cambiar los DAO** a las tablas nuevas. Recién entonces se borran las tablas viejas, en una `V4`.
+La reestructuración va **por fases**: cada fase es una migración más el código que la usa, y la app funciona al terminar cada una. Las tablas viejas quedan sin uso y se borran todas juntas al final.
 
-Los pasos 3 y 4 se hacen juntos en una rama: el código actual no funciona con el modelo nuevo.
+3. **Fase 1 · `V3__usuarios_perfiles_roles.sql`** (aplicada): `roles`, `languages`, `countries`, `user_roles`, `user_profiles` (reemplaza a `clientes`) y `assistant_settings` (reemplaza a `professor_config`). `username` y `email` pasan a `citext`; los usernames repetidos en mayúsculas reciben sufijo.
+4. **Fase 2 · `V4__materias_temas_contenido.sql`:** `content_types`, `subjects`, `topics`, `documents`, `document_chunks`, `generated_content` (reemplaza a `study_content`), `content_sources` y `favorites`.
+   - Cada usuario con contenido recibe una materia "Sin clasificar" con un tema "General".
+   - `source_text` pasa a un documento por sesión, dividido en fragmentos de 2000 caracteres. El backend calcula sus embeddings al arrancar.
+   - El chat (RAG) busca en los fragmentos del material original, no en lo generado.
+   - Transitorio: las preguntas siguen en `generated_content.body` hasta la fase 3, y el quiz de un duelo es tipo `duel_quiz` sin tema hasta la fase 4.
+   - Contrato de la API para el front: [`docs/api-materias.md`](../docs/api-materias.md).
+5. **Fase 3:** `content_items`, `item_options`, `attempts`, `attempt_answers`; el servidor califica. Cada `activity_results` pasa a un intento completado.
+6. **Fase 4:** duelos con `duel_participants`.
+7. **Fase 5:** gamificación y tienda. Decisión tomada: **la racha se reinicia**. XP y monedas actuales pasan a `balance_adjustments` con motivo "Saldo migrado".
+8. **Fase 6:** chat con `chat_sessions` y alcance.
+9. **Limpieza:** se borran `study_content`, `clientes`, `professor_config` y el resto de tablas viejas.
 
 ## Supabase
 - **RLS:** mantener RLS activo y sin políticas en todas las tablas nuevas. El backend se conecta con un usuario que salta RLS; con la clave pública de Supabase no se puede leer nada. Esa es la configuración correcta mientras todo pase por el backend Java.
