@@ -233,107 +233,38 @@ public class WrappedDAOImpl implements IWrappedDAO {
     private void fillGamification(String userId, LocalDate weekStart, LocalDate lastWeekStart,
                                    JsonObject result) throws SQLException {
 
-        // Racha actual (ya es un valor "en vivo", no hace falta calcular delta semanal)
-        int currentXp = 0;
-        String streakSql = "SELECT streak_current, xp FROM user_stats WHERE user_id = ?::uuid";
+        // Racha actual (ya es un valor "en vivo", calculado por v_user_stats)
+        String streakSql = "SELECT streak_current FROM v_user_stats WHERE user_id = ?::uuid";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(streakSql)) {
             stmt.setString(1, userId);
             ResultSet rs = stmt.executeQuery();
-            int streak = 0;
-            if (rs.next()) {
-                streak = rs.getInt("streak_current");
-                currentXp = rs.getInt("xp");
-            }
+            int streak = rs.next() ? rs.getInt("streak_current") : 0;
             result.addProperty("streak", streak + (streak == 1 ? " día" : " días"));
         }
 
-        // Aseguramos que exista un snapshot semanal de HOY antes de comparar.
-        // Así no dependemos de ningún cron job: el snapshot se crea solo,
-        // la primera vez que alguien pide su resumen esa semana.
-        ensureWeeklySnapshot(userId, weekStart, currentXp);
-
-        // XP ganado esta semana: diferencia entre snapshots semanales en leaderboard_history.
-        // Si todavía no hay snapshot de la semana anterior (recién empezó a usar la app),
-        // se avisa en vez de inventar un número.
-        String xpSql = """
-            SELECT period_start, xp_snapshot FROM leaderboard_history
-            WHERE user_id = ?::uuid AND period_type = 'weekly'
-              AND period_start IN (?::date, ?::date)
-            ORDER BY period_start DESC
+        // XP y monedas ganadas esta semana: suma de lo pagado por cada evento
+        // (intentos, duelos y misiones) desde el lunes. Antes se restaban dos
+        // fotos del XP guardadas en leaderboard_history; ya no hace falta. El
+        // saldo migrado (balance_adjustments) no es algo "ganado" esta semana.
+        String sql = """
+            SELECT COALESCE(SUM(xp), 0)                         AS xp_earned,
+                   COALESCE(SUM(GREATEST(coins, 0)), 0)         AS coins_earned,
+                   COUNT(*)                                     AS events
+            FROM v_xp_events
+            WHERE user_id = ?::uuid AND source <> 'adjustment'
+              AND occurred_at >= ?::date
             """;
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(xpSql)) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, userId);
             stmt.setString(2, weekStart.toString());
-            stmt.setString(3, lastWeekStart.toString());
-
             ResultSet rs = stmt.executeQuery();
-            Integer thisWeekXp = null, lastWeekXp = null;
-            while (rs.next()) {
-                LocalDate periodStart = rs.getDate("period_start").toLocalDate();
-                int snapshot = rs.getInt("xp_snapshot");
-                if (periodStart.equals(weekStart))     thisWeekXp = snapshot;
-                if (periodStart.equals(lastWeekStart)) lastWeekXp = snapshot;
-            }
-            if (thisWeekXp != null && lastWeekXp != null) {
-                result.addProperty("xp", "+" + (thisWeekXp - lastWeekXp) + " XP");
-            } else if (thisWeekXp != null) {
-                result.addProperty("xp", "+" + thisWeekXp + " XP");
-            } else {
-                result.addProperty("xp", "Aún sin datos de esta semana");
-            }
-        }
-
-        // Monedas ganadas esta semana: misiones diarias + objetivos semanales completados
-        String coinsSql = """
-            SELECT
-              COALESCE((SELECT SUM(m.coin_reward) FROM user_daily_missions udm
-                        JOIN missions m ON m.id = udm.mission_id
-                        WHERE udm.user_id = ?::uuid AND udm.completed = true
-                          AND udm.date >= ?::date), 0)
-              +
-              COALESCE((SELECT SUM(coin_reward) FROM user_weekly_objectives
-                        WHERE user_id = ?::uuid AND completed = true
-                          AND week_start = ?::date), 0)
-              AS coins_earned
-            """;
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(coinsSql)) {
-            stmt.setString(1, userId);
-            stmt.setString(2, weekStart.toString());
-            stmt.setString(3, userId);
-            stmt.setString(4, weekStart.toString());
-
-            ResultSet rs = stmt.executeQuery();
-            int coins = rs.next() ? rs.getInt("coins_earned") : 0;
-            result.addProperty("coins", "+" + coins + " monedas");
-        }
-    }
-
-    // ─── Crea el snapshot semanal de XP si todavía no existe ───────────────
-    private void ensureWeeklySnapshot(String userId, LocalDate weekStart, int currentXp) throws SQLException {
-        String checkSql = """
-            SELECT 1 FROM leaderboard_history
-            WHERE user_id = ?::uuid AND period_type = 'weekly' AND period_start = ?::date
-            """;
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(checkSql)) {
-            stmt.setString(1, userId);
-            stmt.setString(2, weekStart.toString());
-            if (stmt.executeQuery().next()) return; // ya existe, no hacemos nada
-        }
-
-        String insertSql = """
-            INSERT INTO leaderboard_history (user_id, period_type, period_start, xp_snapshot)
-            VALUES (?::uuid, 'weekly', ?::date, ?)
-            """;
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(insertSql)) {
-            stmt.setString(1, userId);
-            stmt.setString(2, weekStart.toString());
-            stmt.setInt(3, currentXp);
-            stmt.executeUpdate();
+            rs.next();
+            result.addProperty("xp", rs.getInt("events") > 0
+                    ? "+" + rs.getInt("xp_earned") + " XP"
+                    : "Aún sin datos de esta semana");
+            result.addProperty("coins", "+" + rs.getInt("coins_earned") + " monedas");
         }
     }
 

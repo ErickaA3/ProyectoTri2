@@ -38,7 +38,7 @@ public class LeaderboardDAO {
 
         /*
          * ── Query ──────────────────────────────────────────────────
-         * Une users + user_stats + duelos terminados.
+         * Une users + v_user_stats + duelos terminados.
          * Cuenta las victorias de cada usuario en el período elegido.
          * Ordena por score compuesto descendente.
          */
@@ -50,7 +50,7 @@ public class LeaderboardDAO {
                 COALESCE(us.xp, 0)                                  AS xp,
                 COALESCE(us.streak_current, 0)                      AS streak
             FROM users u
-            LEFT JOIN user_stats us ON us.user_id = u.id
+            LEFT JOIN v_user_stats us ON us.user_id = u.id
             LEFT JOIN v_duels d
                 ON (d.challenger_id = u.id OR d.opponent_id = u.id)
                 AND d.status = 'finished'
@@ -124,7 +124,7 @@ public class LeaderboardDAO {
                 COALESCE(us.streak_current, 0)                      AS streak
             FROM users u
             INNER JOIN friend_ids fi ON fi.friend_id = u.id
-            LEFT JOIN user_stats us ON us.user_id = u.id
+            LEFT JOIN v_user_stats us ON us.user_id = u.id
             LEFT JOIN v_duels d
                 ON (d.challenger_id = u.id OR d.opponent_id = u.id)
                 AND d.status = 'finished'

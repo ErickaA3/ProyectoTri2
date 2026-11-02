@@ -125,7 +125,7 @@ public class DuelDAOImpl implements IDuelDAO {
                 WHEN f.sender_id = ?::uuid THEN f.receiver_id
                 ELSE f.sender_id
             END
-            LEFT JOIN user_stats s ON s.user_id = u.id
+            LEFT JOIN v_user_stats s ON s.user_id = u.id
             WHERE (f.sender_id = ?::uuid OR f.receiver_id = ?::uuid)
               AND f.status = 'accepted'
             ORDER BY u.username
@@ -238,8 +238,8 @@ public class DuelDAOImpl implements IDuelDAO {
             FROM v_duels d
             JOIN users c ON c.id = d.challenger_id
             JOIN users o ON o.id = d.opponent_id
-            LEFT JOIN user_stats c_s ON c_s.user_id = d.challenger_id
-            LEFT JOIN user_stats o_s ON o_s.user_id = d.opponent_id
+            LEFT JOIN v_user_stats c_s ON c_s.user_id = d.challenger_id
+            LEFT JOIN v_user_stats o_s ON o_s.user_id = d.opponent_id
             WHERE d.id = ?::uuid
               AND (d.challenger_id = ?::uuid OR d.opponent_id = ?::uuid)
             """;
@@ -290,8 +290,8 @@ public class DuelDAOImpl implements IDuelDAO {
             FROM v_duels d
             JOIN users c ON c.id = d.challenger_id
             JOIN users o ON o.id = d.opponent_id
-            LEFT JOIN user_stats c_s ON c_s.user_id = d.challenger_id
-            LEFT JOIN user_stats o_s ON o_s.user_id = d.opponent_id
+            LEFT JOIN v_user_stats c_s ON c_s.user_id = d.challenger_id
+            LEFT JOIN v_user_stats o_s ON o_s.user_id = d.opponent_id
             WHERE (d.challenger_id = ?::uuid OR d.opponent_id = ?::uuid)
               AND d.status IN ('waiting_opponent', 'in_progress')
             ORDER BY d.created_at DESC

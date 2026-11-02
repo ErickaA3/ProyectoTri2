@@ -81,7 +81,7 @@ public class UserContextService {
     // ── Stats ─────────────────────────────────────────────────────────────
 
     private static void appendStats(Connection conn, UUID userId, StringBuilder ctx) {
-        String sql = "SELECT xp, level, coins, streak_current, streak_record, has_streak_shield FROM user_stats WHERE user_id = ?";
+        String sql = "SELECT xp, level, coins, streak_current, streak_record, has_streak_shield FROM v_user_stats WHERE user_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ResultSet rs = ps.executeQuery();
@@ -341,9 +341,10 @@ public class UserContextService {
 
     private static void appendDailyMissions(Connection conn, UUID userId, StringBuilder ctx) {
         String sql = """
-            SELECT m.description, udm.progress, m.required_count, udm.completed, m.xp_reward
-            FROM user_daily_missions udm JOIN missions m ON m.id = udm.mission_id
-            WHERE udm.user_id = ? AND udm.date = ?
+            SELECT description, progress, required_count,
+                   (completed_at IS NOT NULL) AS completed, xp_reward
+            FROM v_user_mission_progress
+            WHERE user_id = ? AND period = 'daily' AND period_start = ?
             """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
@@ -365,9 +366,11 @@ public class UserContextService {
 
     private static void appendWeeklyObjectives(Connection conn, UUID userId, StringBuilder ctx) {
         String sql = """
-            SELECT objective_description, progress, required_count, completed
-            FROM user_weekly_objectives WHERE user_id = ?
-            ORDER BY week_start DESC LIMIT 5
+            SELECT description AS objective_description, progress, required_count,
+                   (completed_at IS NOT NULL) AS completed
+            FROM v_user_mission_progress
+            WHERE user_id = ? AND period = 'weekly'
+            ORDER BY period_start DESC LIMIT 5
             """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
@@ -386,7 +389,7 @@ public class UserContextService {
     // ── Inventario ────────────────────────────────────────────────────────
 
     private static void appendInventory(Connection conn, UUID userId, StringBuilder ctx) {
-        String sql = "SELECT si.name, si.type, ui.is_equipped FROM user_inventory ui JOIN store_items si ON si.id = ui.item_id WHERE ui.user_id = ?";
+        String sql = "SELECT si.name, si.type, (ue.item_id IS NOT NULL) AS is_equipped FROM user_items ui JOIN store_items si ON si.id = ui.item_id LEFT JOIN user_equipped ue ON ue.user_id = ui.user_id AND ue.item_id = ui.item_id WHERE ui.user_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ResultSet rs = ps.executeQuery();

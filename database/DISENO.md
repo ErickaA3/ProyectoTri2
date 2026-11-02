@@ -113,7 +113,7 @@ Las migraciones viven en [`src/main/resources/db/migration/`](../src/main/resour
 - **Solo corren si la variable de entorno `DB_MIGRATE=true`.** Se define en Railway. Localmente queda apagado, para que nadie aplique a la base compartida una migración de su rama a medio hacer.
 - **Nunca se edita una migración ya aplicada.** Si hay que corregir algo, se escribe una migración nueva (`V4__...`).
 - **Nombres:** `V<número>__<descripcion_con_guiones_bajos>.sql` (dos guiones bajos).
-- **Mientras dure la reestructuración, las migraciones se aplican a mano** en el SQL Editor de Supabase. `BASELINE_VERSION` en `DatabaseMigrationListener` es la última aplicada así (hoy, la V6). La primera vez que la app arranque con `DB_MIGRATE=true`, Flyway marca producción como "al día" hasta esa versión y solo ejecuta las siguientes. En una base vacía corre todas desde la V1. Cada migración aplicada a mano sube ese número en el mismo commit.
+- **Mientras dure la reestructuración, las migraciones se aplican a mano** en el SQL Editor de Supabase. `BASELINE_VERSION` en `DatabaseMigrationListener` es la última aplicada así (hoy, la V7). La primera vez que la app arranque con `DB_MIGRATE=true`, Flyway marca producción como "al día" hasta esa versión y solo ejecuta las siguientes. En una base vacía corre todas desde la V1. Cada migración aplicada a mano sube ese número en el mismo commit.
 
 ## Plan de migración
 
@@ -140,7 +140,11 @@ La reestructuración va **por fases**: cada fase es una migración más el códi
    - Se guardan todos los intentos con sus respuestas; se sigue pagando solo el primero (eso cambia en la fase 5).
    - Cada `activity_results` pasa a un intento completado sin respuestas, con su porcentaje en `legacy_score_pct`.
 6. **Fase 4 · `V6__duelos_participantes.sql`:** `duel_participants` (cada jugador juega un intento sobre el quiz del duelo, así que sus respuestas se guardan) y la vista `v_duels` (puntaje = respuestas correctas, tiempo = duración del intento). `duels.winner_id` se mantiene como resultado oficial. Los duelos anteriores conservan su puntaje en `legacy_score` / `legacy_time_secs`.
-7. **Fase 5:** gamificación y tienda. Decisión tomada: **la racha se reinicia**. XP y monedas actuales pasan a `balance_adjustments` con motivo "Saldo migrado".
+7. **Fase 5 · `V7__gamificacion_tienda.sql`:** XP, monedas, nivel, racha y progreso de misiones dejan de guardarse; se calculan (`v_xp_events`, `v_user_balances`, `v_user_streaks`, `v_user_mission_progress` y `v_user_stats`, que tiene las mismas columnas que la vieja `user_stats`).
+   - Cada evento guarda lo que pagó: `attempts`, `duel_participants` y `user_missions`. El saldo anterior quedó en `balance_adjustments` ("Saldo migrado").
+   - `levels` reemplaza los umbrales fijos en Java. `missions` tiene diarias y semanales (`period`) y apunta a `activity_types`.
+   - Tienda: `item_types`, `purchases`, `user_items`, `user_consumables` (protectores) y `user_equipped`. La base impide equipar lo que no se tiene.
+   - **La racha se reinició** (decisión del equipo). Generar contenido ya no da XP.
 8. **Fase 6:** chat con `chat_sessions` y alcance.
 9. **Limpieza:** se borran `study_content`, `clientes`, `professor_config` y el resto de tablas viejas.
 

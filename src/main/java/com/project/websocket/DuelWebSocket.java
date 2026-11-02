@@ -300,8 +300,8 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
             double cPct = total > 0 ? (cScore * 100.0 / total) : 0;
             double oPct = total > 0 ? (oScore * 100.0 / total) : 0;
 
-            JsonObject cReward = GamificationService.processActivity(cId, cActivity, cPct, null, cTime, total);
-            JsonObject oReward = GamificationService.processActivity(oId, oActivity, oPct, null, oTime, total);
+            JsonObject cReward = GamificationService.processDuelOutcome(duelId, cId, cActivity, cPct);
+            JsonObject oReward = GamificationService.processDuelOutcome(duelId, oId, oActivity, oPct);
 
             Session cSession = room.getSession(cId);
             if (cSession != null && cSession.isOpen()) sendTo(cSession, buildGameOver(winnerId, room, cReward));
@@ -386,10 +386,10 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
                         room.getTime(winner), room.getAnswersJson(winner));
                 duelDAO.finishDuelWithWinner(duelId, winner);
 
-                GamificationService.processActivity(winner, "duelo_ganado",
-                        total > 0 ? (rScore * 100.0 / total) : 0, null, room.getTime(winner), total);
-                GamificationService.processActivity(abandonedUserId, "duelo_perdido",
-                        total > 0 ? (aScore * 100.0 / total) : 0, null, room.getTime(abandonedUserId), total);
+                GamificationService.processDuelOutcome(duelId, winner, "duelo_ganado",
+                        total > 0 ? (rScore * 100.0 / total) : 0);
+                GamificationService.processDuelOutcome(duelId, abandonedUserId, "duelo_perdido",
+                        total > 0 ? (aScore * 100.0 / total) : 0);
 
                 Session winnerSession = room.getSession(winner);
                 if (winnerSession != null && winnerSession.isOpen()) {

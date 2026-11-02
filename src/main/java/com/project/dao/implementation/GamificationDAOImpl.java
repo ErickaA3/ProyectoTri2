@@ -2,8 +2,10 @@ package com.project.dao.implementation;
 
 import java.sql.*;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -15,77 +17,63 @@ import com.project.database.DatabaseConnection;
 
 /**
  * Implementación del DAO de gamificación.
- * Habla con user_stats, attempts, attempt_answers, user_daily_missions,
- * user_weekly_objectives en Supabase.
  *
- * Salvo getStats(String), todos los métodos trabajan sobre la Connection que
- * reciben (la transacción de GamificationService.processActivity) y no la cierran.
+ * Lee los stats de v_user_stats y el progreso de v_user_mission_progress
+ * (todo calculado); escribe intentos, respuestas, lo pagado por cada evento,
+ * el uso de protectores y las misiones completadas.
  */
 public class GamificationDAOImpl implements IGamificationDAO {
 
     private static final String STATS_SQL = """
         SELECT xp, level, coins, streak_current, streak_record,
                streak_last_activity::text, has_streak_shield
-        FROM user_stats
+        FROM v_user_stats
         WHERE user_id = ?::uuid
         """;
 
-    // ─── GET STATS ──────────────────────────────────────────────────────────
+    // ─── STATS ──────────────────────────────────────────────────────────────
+    @Override
+    public void lockUser(Connection conn, String userId) throws Exception {
+        try (PreparedStatement stmt = conn.prepareStatement(
+                "SELECT 1 FROM users WHERE id = ?::uuid FOR UPDATE")) {
+            stmt.setString(1, userId);
+            if (!stmt.executeQuery().next()) throw new Exception("Usuario no encontrado: " + userId);
+        }
+    }
+
     @Override
     public JsonObject getStats(String userId) throws Exception {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            return getStats(conn, userId);
+        }
+    }
+
+    @Override
+    public JsonObject getStats(Connection conn, String userId) throws Exception {
+        try (PreparedStatement stmt = conn.prepareStatement(STATS_SQL)) {
+            stmt.setString(1, userId);
+            ResultSet rs = stmt.executeQuery();
+            if (!rs.next()) return null;
+            JsonObject stats = new JsonObject();
+            stats.addProperty("xp",                 rs.getInt("xp"));
+            stats.addProperty("level",              rs.getInt("level"));
+            stats.addProperty("coins",              rs.getInt("coins"));
+            stats.addProperty("streakCurrent",      rs.getInt("streak_current"));
+            stats.addProperty("streakRecord",       rs.getInt("streak_record"));
+            stats.addProperty("streakLastActivity", rs.getString("streak_last_activity"));
+            stats.addProperty("hasStreakShield",    rs.getBoolean("has_streak_shield"));
+            return stats;
+        }
+    }
+
+    @Override
+    public int[] getLevelThresholds() throws Exception {
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(STATS_SQL)) {
-            stmt.setString(1, userId);
-            return mapStats(stmt.executeQuery());
-        }
-    }
-
-    @Override
-    public JsonObject getStatsForUpdate(Connection conn, String userId) throws Exception {
-        try (PreparedStatement stmt = conn.prepareStatement(STATS_SQL + " FOR UPDATE")) {
-            stmt.setString(1, userId);
-            return mapStats(stmt.executeQuery());
-        }
-    }
-
-    private JsonObject mapStats(ResultSet rs) throws SQLException {
-        if (!rs.next()) return null;
-        JsonObject stats = new JsonObject();
-        stats.addProperty("xp",                 rs.getInt("xp"));
-        stats.addProperty("level",              rs.getInt("level"));
-        stats.addProperty("coins",              rs.getInt("coins"));
-        stats.addProperty("streakCurrent",      rs.getInt("streak_current"));
-        stats.addProperty("streakRecord",       rs.getInt("streak_record"));
-        stats.addProperty("streakLastActivity", rs.getString("streak_last_activity"));
-        stats.addProperty("hasStreakShield",    rs.getBoolean("has_streak_shield"));
-        return stats;
-    }
-
-    // ─── UPDATE STATS ───────────────────────────────────────────────────────
-    @Override
-    public boolean updateStats(Connection conn, String userId, int xp, int level, int coins,
-                               int streak, int streakRecord, String lastActivity,
-                               boolean shield) throws Exception {
-        String sql = """
-            UPDATE user_stats
-            SET xp = ?, level = ?, coins = ?,
-                streak_current = ?, streak_record = ?,
-                streak_last_activity = ?::date,
-                has_streak_shield = ?
-            WHERE user_id = ?::uuid
-            """;
-
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, xp);
-            stmt.setInt(2, level);
-            stmt.setInt(3, coins);
-            stmt.setInt(4, streak);
-            stmt.setInt(5, streakRecord);
-            stmt.setString(6, lastActivity);
-            stmt.setBoolean(7, shield);
-            stmt.setString(8, userId);
-
-            return stmt.executeUpdate() > 0;
+             PreparedStatement stmt = conn.prepareStatement("SELECT min_xp FROM levels ORDER BY level")) {
+            ResultSet rs = stmt.executeQuery();
+            List<Integer> list = new ArrayList<>();
+            while (rs.next()) list.add(rs.getInt(1));
+            return list.stream().mapToInt(Integer::intValue).toArray();
         }
     }
 
@@ -184,7 +172,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
                 insert.setString(1, attemptId);
                 insert.setString(2, itemId);
                 insert.setString(3, optionId);
-                if (rating != null) insert.setInt(4, rating); else insert.setNull(4, java.sql.Types.SMALLINT);
+                if (rating != null) insert.setInt(4, rating); else insert.setNull(4, Types.SMALLINT);
                 insert.addBatch();
             }
             insert.executeBatch();
@@ -204,139 +192,106 @@ public class GamificationDAOImpl implements IGamificationDAO {
         }
     }
 
-    // ─── ADVANCE DAILY MISSIONS ─────────────────────────────────────────────
     @Override
-    public int advanceDailyMissions(Connection conn, String userId, String missionType,
-                                    LocalDate today) throws Exception {
-        // Incrementa progress en misiones del día que coincidan con el tipo
-        // y que aún no estén completadas.
-        // [BUG] Antes usaba CURRENT_DATE (zona horaria del servidor de BD,
-        // típicamente UTC) en vez de recibir la fecha ya calculada en la
-        // zona horaria de la app — podía no coincidir con la fecha con la
-        // que ensureDailyMissions() había insertado la misión de "hoy".
-        String sql = """
-            UPDATE user_daily_missions udm
-            SET progress = progress + 1
-            FROM missions m
-            WHERE udm.mission_id = m.id
-              AND udm.user_id = ?::uuid
-              AND udm.date = ?
-              AND udm.completed = false
-              AND m.type = ?
-            """;
-
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, userId);
-            stmt.setDate(2, java.sql.Date.valueOf(today));
-            stmt.setString(3, missionType);
-
-            return stmt.executeUpdate();
+    public void setDuelRewards(Connection conn, String duelId, String userId, int xp, int coins) throws Exception {
+        try (PreparedStatement stmt = conn.prepareStatement("""
+                UPDATE duel_participants SET xp_awarded = ?, coins_awarded = ?
+                WHERE duel_id = ?::uuid AND user_id = ?::uuid
+                """)) {
+            stmt.setInt(1, xp);
+            stmt.setInt(2, coins);
+            stmt.setString(3, duelId);
+            stmt.setString(4, userId);
+            stmt.executeUpdate();
         }
     }
 
-    // ─── ADVANCE WEEKLY OBJECTIVES ──────────────────────────────────────────
+    // ─── RACHA ──────────────────────────────────────────────────────────────
     @Override
-    public int advanceWeeklyObjectives(Connection conn, String userId, String objectiveType,
-                                       LocalDate weekStart) throws Exception {
-        String sql = """
-            UPDATE user_weekly_objectives
-            SET progress = progress + 1
-            WHERE user_id = ?::uuid
-              AND week_start = ?
-              AND completed = false
-              AND type = ?
-            """;
-
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, userId);
-            stmt.setDate(2, java.sql.Date.valueOf(weekStart));
-            stmt.setString(3, objectiveType);
-
-            return stmt.executeUpdate();
-        }
-    }
-
-    // ─── CHECK COMPLETED MISSIONS ───────────────────────────────────────────
-    @Override
-    public JsonObject checkCompletedMissions(Connection conn, String userId,
-                                             LocalDate today) throws Exception {
-        // Marca como completadas las misiones que alcanzaron su required_count
-        // y devuelve sus rewards
-        String sql = """
-            UPDATE user_daily_missions udm
-            SET completed = true
-            FROM missions m
-            WHERE udm.mission_id = m.id
-              AND udm.user_id = ?::uuid
-              AND udm.date = ?
-              AND udm.completed = false
-              AND udm.progress >= m.required_count
-            RETURNING m.description, m.xp_reward, m.coin_reward
-            """;
-
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, userId);
-            stmt.setDate(2, java.sql.Date.valueOf(today));
+    public boolean useStreakShieldIfNeeded(Connection conn, String userId, LocalDate today) throws Exception {
+        LocalDate yesterday = today.minusDays(1);
+        try (PreparedStatement stmt = conn.prepareStatement("""
+                SELECT EXISTS (SELECT 1 FROM v_user_active_days WHERE user_id = ?::uuid AND day = ?) AS yesterday,
+                       EXISTS (SELECT 1 FROM v_user_active_days WHERE user_id = ?::uuid AND day = ?) AS before
+                """)) {
+            stmt.setString(1, userId); stmt.setObject(2, yesterday);
+            stmt.setString(3, userId); stmt.setObject(4, today.minusDays(2));
             ResultSet rs = stmt.executeQuery();
-
-            JsonObject result = new JsonObject();
-            JsonArray completed = new JsonArray();
-            int totalXp = 0, totalCoins = 0;
-
-            while (rs.next()) {
-                JsonObject mission = new JsonObject();
-                mission.addProperty("description", rs.getString("description"));
-                mission.addProperty("xpReward",    rs.getInt("xp_reward"));
-                mission.addProperty("coinReward",  rs.getInt("coin_reward"));
-                completed.add(mission);
-                totalXp    += rs.getInt("xp_reward");
-                totalCoins += rs.getInt("coin_reward");
-            }
-
-            result.add("completedMissions", completed);
-            result.addProperty("missionXp",    totalXp);
-            result.addProperty("missionCoins", totalCoins);
-            return result;
+            rs.next();
+            if (rs.getBoolean("yesterday") || !rs.getBoolean("before")) return false;
+        }
+        // Se gasta la unidad disponible más antigua.
+        try (PreparedStatement stmt = conn.prepareStatement("""
+                UPDATE user_consumables SET used_for_date = ?
+                WHERE purchase_id = (
+                    SELECT c.purchase_id FROM user_consumables c
+                    JOIN purchases p ON p.id = c.purchase_id
+                    WHERE p.user_id = ?::uuid AND c.used_for_date IS NULL
+                    ORDER BY p.purchased_at LIMIT 1)
+                """)) {
+            stmt.setObject(1, yesterday);
+            stmt.setString(2, userId);
+            return stmt.executeUpdate() > 0;
         }
     }
 
-    // ─── CHECK COMPLETED OBJECTIVES ─────────────────────────────────────────
+    // ─── MISIONES ───────────────────────────────────────────────────────────
     @Override
-    public JsonObject checkCompletedObjectives(Connection conn, String userId,
-                                               LocalDate weekStart) throws Exception {
-        String sql = """
-            UPDATE user_weekly_objectives
-            SET completed = true
-            WHERE user_id = ?::uuid
-              AND week_start = ?
-              AND completed = false
-              AND progress >= required_count
-            RETURNING objective_description, xp_reward, coin_reward
-            """;
+    public void ensureMissions(Connection conn, String userId, LocalDate today, LocalDate weekStart) throws Exception {
+        try (PreparedStatement stmt = conn.prepareStatement("""
+                INSERT INTO user_missions (user_id, mission_id, period_start)
+                SELECT ?::uuid, id, CASE period WHEN 'daily' THEN ?::date ELSE ?::date END
+                FROM missions WHERE is_active
+                ON CONFLICT DO NOTHING
+                """)) {
+            stmt.setString(1, userId);
+            stmt.setObject(2, today);
+            stmt.setObject(3, weekStart);
+            stmt.executeUpdate();
+        }
+    }
 
+    @Override
+    public JsonObject completeReachedMissions(Connection conn, String userId,
+                                              LocalDate today, LocalDate weekStart) throws Exception {
+        JsonObject result = new JsonObject();
+        JsonArray daily = new JsonArray(), weekly = new JsonArray();
+        int dailyXp = 0, dailyCoins = 0, weeklyXp = 0, weeklyCoins = 0;
+
+        String sql = """
+            UPDATE user_missions um
+            SET completed_at = now(), xp_awarded = p.xp_reward, coins_awarded = p.coin_reward
+            FROM v_user_mission_progress p
+            WHERE p.user_id = um.user_id AND p.mission_id = um.mission_id AND p.period_start = um.period_start
+              AND um.user_id = ?::uuid AND um.completed_at IS NULL
+              AND p.progress >= p.required_count
+              AND ((p.period = 'daily' AND p.period_start = ?) OR (p.period = 'weekly' AND p.period_start = ?))
+            RETURNING p.period, p.description, p.xp_reward, p.coin_reward
+            """;
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, userId);
-            stmt.setDate(2, java.sql.Date.valueOf(weekStart));
+            stmt.setObject(2, today);
+            stmt.setObject(3, weekStart);
             ResultSet rs = stmt.executeQuery();
-
-            JsonObject result = new JsonObject();
-            JsonArray completed = new JsonArray();
-            int totalXp = 0, totalCoins = 0;
-
             while (rs.next()) {
-                JsonObject obj = new JsonObject();
-                obj.addProperty("description", rs.getString("objective_description"));
-                obj.addProperty("xpReward",    rs.getInt("xp_reward"));
-                obj.addProperty("coinReward",  rs.getInt("coin_reward"));
-                completed.add(obj);
-                totalXp    += rs.getInt("xp_reward");
-                totalCoins += rs.getInt("coin_reward");
+                JsonObject m = new JsonObject();
+                m.addProperty("description", rs.getString("description"));
+                m.addProperty("xpReward",    rs.getInt("xp_reward"));
+                m.addProperty("coinReward",  rs.getInt("coin_reward"));
+                if ("daily".equals(rs.getString("period"))) {
+                    daily.add(m);  dailyXp += rs.getInt("xp_reward");  dailyCoins += rs.getInt("coin_reward");
+                } else {
+                    weekly.add(m); weeklyXp += rs.getInt("xp_reward"); weeklyCoins += rs.getInt("coin_reward");
+                }
             }
-
-            result.add("completedObjectives", completed);
-            result.addProperty("objectiveXp",    totalXp);
-            result.addProperty("objectiveCoins", totalCoins);
-            return result;
         }
+
+        result.add("completedMissions", daily);
+        result.addProperty("missionXp",    dailyXp);
+        result.addProperty("missionCoins", dailyCoins);
+        result.add("completedObjectives", weekly);
+        result.addProperty("objectiveXp",    weeklyXp);
+        result.addProperty("objectiveCoins", weeklyCoins);
+        return result;
     }
 }

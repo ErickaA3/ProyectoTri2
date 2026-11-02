@@ -214,9 +214,7 @@ public class DuelServlet extends HttpServlet {
                         };
 
                         double pct = maxScore > 0 ? (score * 100.0 / maxScore) : 0;
-                        JsonObject reward = GamificationService.processActivity(
-                            userId, activityType, pct, null, timeSecs, maxScore
-                        );
+                        JsonObject reward = GamificationService.processDuelOutcome(duelId, userId, activityType, pct);
                         result.add("reward", reward);
 
                         // FIX: getDuel puede retornar null en casos extremos.
@@ -238,9 +236,7 @@ public class DuelServlet extends HttpServlet {
                             int otherScore = result.has("otherScore") ? result.get("otherScore").getAsInt() : 0;
                             double otherPct = maxScore > 0 ? (otherScore * 100.0 / maxScore) : 0;
                             int otherTime = result.has("otherTime") ? result.get("otherTime").getAsInt() : 0;
-                            GamificationService.processActivity(
-                                otherUserId, otherActivityType, otherPct, null, otherTime, maxScore
-                            );
+                            GamificationService.processDuelOutcome(duelId, otherUserId, otherActivityType, otherPct);
                         }
                     }
 

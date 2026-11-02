@@ -16,7 +16,6 @@ public interface IUserDAO {
     Optional<User> findById(UUID id) throws SQLException;
     Optional<User> findByUsername(String username) throws SQLException;
     Optional<Statistics> getStatsByUserId(UUID userId) throws SQLException;
-    void updateStats(Statistics stats) throws SQLException;
     boolean emailExists(String email) throws SQLException;
     boolean usernameExists(String username) throws SQLException;
 

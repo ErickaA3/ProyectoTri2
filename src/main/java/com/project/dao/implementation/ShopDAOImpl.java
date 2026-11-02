@@ -11,13 +11,14 @@ import java.util.List;
 
 /**
  * Implementación real del IShopDAO.
- * Todo el SQL de la tienda vive aquí.
  *
- * Tablas que usa:
- *   store_items      → id, name, type, cost, image_url
- *   user_inventory   → user_id, item_id, purchased_at, is_equipped
- *   user_stats       → user_id, coins, has_streak_shield
- *   professor_config → user_id, avatar_item_id, background_item_id
+ * Tablas que usa (V7):
+ *   store_items      → catálogo (type → item_types)
+ *   purchases        → cada gasto de monedas
+ *   user_items       → ítems permanentes del usuario
+ *   user_consumables → cada protector de racha (used_for_date = el día que cubrió)
+ *   user_equipped    → un ítem equipado por tipo (la base exige que sea del usuario)
+ *   v_user_balances  → monedas = lo ganado − lo gastado (no hay columna "coins")
  */
 public class ShopDAOImpl implements IShopDAO {
 
@@ -28,44 +29,30 @@ public class ShopDAOImpl implements IShopDAO {
     @Override
     public List<Product> getAllItems() {
         List<Product> items = new ArrayList<>();
-        String sql = "SELECT id, name, type, cost, image_url " +
-                     "FROM store_items " +
-                     "ORDER BY type, cost";
-
+        String sql = "SELECT id, name, type, cost, image_url FROM store_items "
+                   + "WHERE is_active ORDER BY type, cost NULLS LAST, id";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-
-            while (rs.next()) {
-                items.add(mapProduct(rs));
-            }
-
+            while (rs.next()) items.add(mapProduct(rs));
         } catch (SQLException e) {
             System.err.println("[ShopDAO] Error en getAllItems: " + e.getMessage());
         }
-
         return items;
     }
 
     @Override
     public Product getItemById(int itemId) {
-        String sql = "SELECT id, name, type, cost, image_url " +
-                     "FROM store_items WHERE id = ?";
-
+        String sql = "SELECT id, name, type, cost, image_url FROM store_items WHERE id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setInt(1, itemId);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapProduct(rs);
-                }
+                if (rs.next()) return mapProduct(rs);
             }
-
         } catch (SQLException e) {
             System.err.println("[ShopDAO] Error en getItemById: " + e.getMessage());
         }
-
         return null;
     }
 
@@ -73,220 +60,191 @@ public class ShopDAOImpl implements IShopDAO {
     //  INVENTARIO
     // ──────────────────────────────────────────────────────────────
 
+    /** Ítems permanentes del usuario, más el protector si tiene alguno sin usar. */
     @Override
     public List<Integer> getUserInventory(String userId) {
-        List<Integer> ownedItemIds = new ArrayList<>();
-        String sql = "SELECT item_id FROM user_inventory WHERE user_id = ?::uuid";
-
+        List<Integer> ids = new ArrayList<>();
+        String sql = """
+            SELECT item_id FROM user_items WHERE user_id = ?::uuid
+            UNION
+            SELECT p.item_id FROM user_consumables c
+            JOIN purchases p ON p.id = c.purchase_id
+            WHERE p.user_id = ?::uuid AND c.used_for_date IS NULL
+            """;
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setString(1, userId);
+            ps.setString(2, userId);
             try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    ownedItemIds.add(rs.getInt("item_id"));
-                }
+                while (rs.next()) ids.add(rs.getInt(1));
             }
-
         } catch (SQLException e) {
             System.err.println("[ShopDAO] Error en getUserInventory: " + e.getMessage());
         }
-
-        return ownedItemIds;
+        return ids;
     }
 
     @Override
     public boolean userOwnsItem(String userId, int itemId) {
-        String sql = "SELECT 1 FROM user_inventory WHERE user_id = ?::uuid AND item_id = ?";
-
+        String sql = "SELECT 1 FROM user_items WHERE user_id = ?::uuid AND item_id = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setString(1, userId);
             ps.setInt(2, itemId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
-
         } catch (SQLException e) {
             System.err.println("[ShopDAO] Error en userOwnsItem: " + e.getMessage());
+            return false;
         }
-
-        return false;
     }
 
     @Override
     public Integer getEquippedItem(String userId, String itemType) {
-        String sql = "SELECT ui.item_id " +
-                     "FROM user_inventory ui " +
-                     "JOIN store_items si ON si.id = ui.item_id " +
-                     "WHERE ui.user_id = ?::uuid " +
-                     "  AND si.type = ? " +
-                     "  AND ui.is_equipped = true " +
-                     "LIMIT 1";
-
+        String sql = "SELECT item_id FROM user_equipped WHERE user_id = ?::uuid AND item_type_code = ?";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setString(1, userId);
             ps.setString(2, itemType);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("item_id");
-                }
+                return rs.next() ? rs.getInt(1) : null;
             }
-
         } catch (SQLException e) {
             System.err.println("[ShopDAO] Error en getEquippedItem: " + e.getMessage());
+            return null;
         }
-
-        return null;
     }
-
-    // ──────────────────────────────────────────────────────────────
-    //  MONEDAS
-    // ──────────────────────────────────────────────────────────────
 
     @Override
     public int getUserCoins(String userId) {
-        String sql = "SELECT coins FROM user_stats WHERE user_id = ?::uuid";
-
+        String sql = "SELECT coins FROM v_user_balances WHERE user_id = ?::uuid";
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-
             ps.setString(1, userId);
             try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt("coins");
+                return rs.next() ? rs.getInt(1) : 0;
             }
-
         } catch (SQLException e) {
             System.err.println("[ShopDAO] Error en getUserCoins: " + e.getMessage());
+            return 0;
         }
-
-        return 0;
     }
 
     // ──────────────────────────────────────────────────────────────
     //  COMPRA
     // ──────────────────────────────────────────────────────────────
 
+    /**
+     * Compra en una transacción, con la fila del usuario bloqueada: dos compras
+     * simultáneas no pueden gastar el mismo saldo. El saldo se calcula
+     * (v_user_balances); la compra solo agrega una fila en purchases.
+     */
     @Override
     public Purchase buyItem(String userId, int itemId) {
         Purchase result = new Purchase();
         result.setUserId(userId);
         result.setItemId(itemId);
 
-        // 1. ¿Existe el ítem?
-        Product item = getItemById(itemId);
-        if (item == null) {
-            result.setSuccess(false);
-            result.setMessage("El ítem no existe.");
-            return result;
-        }
-
-        result.setItemName(item.getName());
-        result.setItemType(item.getType());
-        result.setCostPaid(item.getCost());
-
-        // 2. ¿Ya lo tiene? (streak_shield sí se puede recomprar para renovarlo)
-        boolean isStreakShield = "streak_shield".equals(item.getType());
-        if (!isStreakShield && userOwnsItem(userId, itemId)) {
-            result.setSuccess(false);
-            result.setMessage("Ya tienes este ítem.");
-            return result;
-        }
-
-        // 3. Transacción: verificar monedas + descontar + insertar en inventario
-        String checkCoinsSQL     = "SELECT coins FROM user_stats WHERE user_id = ?::uuid";
-        String deductCoinsSQL    = "UPDATE user_stats SET coins = coins - ? " +
-                                   "WHERE user_id = ?::uuid AND coins >= ?";
-        String insertInvSQL      = "INSERT INTO user_inventory (user_id, item_id, purchased_at, is_equipped) " +
-                                   "VALUES (?::uuid, ?, NOW(), false) " +
-                                   "ON CONFLICT (user_id, item_id) DO NOTHING";
-        String activateShieldSQL = "UPDATE user_stats SET has_streak_shield = true " +
-                                   "WHERE user_id = ?::uuid";
-
-        Connection conn = null;
-        try {
-            conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
-
-            // 3a. Leer monedas actuales
-            int currentCoins;
-            try (PreparedStatement ps = conn.prepareStatement(checkCoinsSQL)) {
-                ps.setString(1, userId);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (!rs.next()) {
-                        conn.rollback();
-                        result.setSuccess(false);
-                        result.setMessage("Usuario no encontrado.");
-                        return result;
-                    }
-                    currentCoins = rs.getInt("coins");
+            try {
+                // 1. ¿Existe, está a la venta, y es consumible?
+                String name, type;
+                Integer cost;
+                boolean consumable;
+                try (PreparedStatement ps = conn.prepareStatement("""
+                        SELECT si.name, si.type, si.cost, it.is_consumable
+                        FROM store_items si JOIN item_types it ON it.code = si.type
+                        WHERE si.id = ? AND si.is_active
+                        """)) {
+                    ps.setInt(1, itemId);
+                    ResultSet rs = ps.executeQuery();
+                    if (!rs.next()) return fail(conn, result, "El ítem no existe.");
+                    name = rs.getString("name");
+                    type = rs.getString("type");
+                    cost = (Integer) rs.getObject("cost");
+                    consumable = rs.getBoolean("is_consumable");
                 }
-            }
+                result.setItemName(name);
+                result.setItemType(type);
+                if (cost == null) return fail(conn, result, "Este ítem se desbloquea por nivel, no se vende.");
+                result.setCostPaid(cost);
 
-            // 3b. ¿Alcanza el saldo?
-            if (currentCoins < item.getCost()) {
-                conn.rollback();
-                result.setSuccess(false);
-                result.setMessage("Monedas insuficientes. Tienes " + currentCoins +
-                                  " y el ítem cuesta " + item.getCost() + ".");
-                return result;
-            }
-
-            // 3c. Descontar monedas
-            try (PreparedStatement ps = conn.prepareStatement(deductCoinsSQL)) {
-                ps.setInt(1, item.getCost());
-                ps.setString(2, userId);
-                ps.setInt(3, item.getCost());
-                int rows = ps.executeUpdate();
-                if (rows == 0) {
-                    conn.rollback();
-                    result.setSuccess(false);
-                    result.setMessage("No se pudo procesar el pago. Intenta de nuevo.");
-                    return result;
-                }
-            }
-
-            // 3d. Insertar en inventario
-            try (PreparedStatement ps = conn.prepareStatement(insertInvSQL)) {
-                ps.setString(1, userId);
-                ps.setInt(2, itemId);
-                ps.executeUpdate();
-            }
-
-            // 3e. Si es streak_shield, activarlo en user_stats
-            if (isStreakShield) {
-                try (PreparedStatement ps = conn.prepareStatement(activateShieldSQL)) {
+                // 2. Bloquear al usuario y leer su saldo.
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT 1 FROM users WHERE id = ?::uuid FOR UPDATE")) {
                     ps.setString(1, userId);
+                    if (!ps.executeQuery().next()) return fail(conn, result, "Usuario no encontrado.");
+                }
+
+                // 3. Los permanentes no se compran dos veces (el protector sí se recompra).
+                if (!consumable) {
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "SELECT 1 FROM user_items WHERE user_id = ?::uuid AND item_id = ?")) {
+                        ps.setString(1, userId);
+                        ps.setInt(2, itemId);
+                        if (ps.executeQuery().next()) return fail(conn, result, "Ya tienes este ítem.");
+                    }
+                }
+
+                int coins;
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "SELECT coins FROM v_user_balances WHERE user_id = ?::uuid")) {
+                    ps.setString(1, userId);
+                    ResultSet rs = ps.executeQuery();
+                    coins = rs.next() ? rs.getInt(1) : 0;
+                }
+                if (coins < cost) {
+                    return fail(conn, result, "Monedas insuficientes. Tienes " + coins
+                            + " y el ítem cuesta " + cost + ".");
+                }
+
+                // 4. Registrar la compra y lo que el usuario recibe.
+                String purchaseId;
+                try (PreparedStatement ps = conn.prepareStatement("""
+                        INSERT INTO purchases (user_id, item_id, price_paid)
+                        VALUES (?::uuid, ?, ?) RETURNING id
+                        """)) {
+                    ps.setString(1, userId);
+                    ps.setInt(2, itemId);
+                    ps.setInt(3, cost);
+                    ResultSet rs = ps.executeQuery();
+                    rs.next();
+                    purchaseId = rs.getString(1);
+                }
+                try (PreparedStatement ps = conn.prepareStatement(consumable
+                        ? "INSERT INTO user_consumables (purchase_id) VALUES (?::uuid)"
+                        : "INSERT INTO user_items (user_id, item_id, purchase_id) "
+                        + "SELECT user_id, item_id, id FROM purchases WHERE id = ?::uuid")) {
+                    ps.setString(1, purchaseId);
                     ps.executeUpdate();
                 }
+
+                conn.commit();
+                result.setSuccess(true);
+                result.setRemainingCoins(coins - cost);
+                result.setMessage("¡Compra realizada!");
+                return result;
+
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
             }
-
-            conn.commit();
-
-            result.setSuccess(true);
-            result.setRemainingCoins(currentCoins - item.getCost());
-            result.setMessage("¡Compra exitosa! Compraste: " + item.getName());
-
         } catch (SQLException e) {
             System.err.println("[ShopDAO] Error en buyItem: " + e.getMessage());
-            if (conn != null) {
-                try { conn.rollback(); } catch (SQLException ex) { /* ignorar */ }
-            }
             result.setSuccess(false);
-            result.setMessage("Error interno al procesar la compra.");
-
-        } finally {
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) { /* ignorar */ }
-            }
+            result.setMessage("Error al procesar la compra.");
+            return result;
         }
+    }
 
+    private Purchase fail(Connection conn, Purchase result, String message) throws SQLException {
+        conn.rollback();
+        result.setSuccess(false);
+        result.setMessage(message);
         return result;
     }
 
@@ -294,80 +252,68 @@ public class ShopDAOImpl implements IShopDAO {
     //  EQUIPAR
     // ──────────────────────────────────────────────────────────────
 
+    /**
+     * Equipa un ítem del usuario (uno por tipo). La base exige que el ítem sea
+     * del usuario y del tipo correcto. Los ítems gratis (cost = 0, p. ej. el
+     * fondo por defecto) se agregan al equiparlos.
+     */
     @Override
     public boolean equipItem(String userId, int itemId) {
-        Product item = getItemById(itemId);
-        if (item == null) return false;
-
-        if ("streak_shield".equals(item.getType())) {
-            System.err.println("[ShopDAO] equipItem: streak_shield no se equipa manualmente.");
-            return false;
-        }
-
-        // [SEGURIDAD] Antes se auto-insertaba el ítem en el inventario antes de
-        // equiparlo, así que POST /shop/equip con cualquier itemId lo dejaba
-        // equipado sin pagar. Ahora solo se equipa lo que el usuario ya tiene;
-        // la única excepción son los ítems gratis (cost = 0, p. ej. el fondo
-        // por defecto), que se agregan al inventario al equiparlos.
-        boolean owned = userOwnsItem(userId, itemId);
-        if (!owned && item.getCost() > 0) {
-            System.err.println("[ShopDAO] equipItem: el usuario " + userId
-                + " intentó equipar el ítem " + itemId + " sin tenerlo.");
-            return false;
-        }
-
-        Connection conn = null;
-        PreparedStatement ps = null;
-        try {
-            conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
+            try {
+                String type;
+                Integer cost;
+                try (PreparedStatement ps = conn.prepareStatement("""
+                        SELECT si.type, si.cost FROM store_items si
+                        JOIN item_types it ON it.code = si.type
+                        WHERE si.id = ? AND it.is_equippable
+                        """)) {
+                    ps.setInt(1, itemId);
+                    ResultSet rs = ps.executeQuery();
+                    if (!rs.next()) { conn.rollback(); return false; }
+                    type = rs.getString("type");
+                    cost = (Integer) rs.getObject("cost");
+                }
 
-            // 1. Ítem gratis que todavía no está en el inventario: agregarlo
-            if (!owned) {
-                ps = conn.prepareStatement(
-                    "INSERT INTO user_inventory (user_id, item_id, purchased_at, is_equipped) " +
-                    "VALUES (?::uuid, ?, NOW(), false) ON CONFLICT (user_id, item_id) DO NOTHING");
-                ps.setString(1, userId);
-                ps.setInt(2, itemId);
-                ps.executeUpdate();
-                ps.close();
+                if (cost != null && cost == 0) {
+                    try (PreparedStatement ps = conn.prepareStatement("""
+                            INSERT INTO user_items (user_id, item_id) VALUES (?::uuid, ?)
+                            ON CONFLICT DO NOTHING
+                            """)) {
+                        ps.setString(1, userId);
+                        ps.setInt(2, itemId);
+                        ps.executeUpdate();
+                    }
+                }
+
+                // Si no lo tiene, la llave foránea a user_items lo rechaza.
+                try (PreparedStatement ps = conn.prepareStatement("""
+                        INSERT INTO user_equipped (user_id, item_type_code, item_id)
+                        VALUES (?::uuid, ?, ?)
+                        ON CONFLICT (user_id, item_type_code) DO UPDATE SET item_id = EXCLUDED.item_id
+                        """)) {
+                    ps.setString(1, userId);
+                    ps.setString(2, type);
+                    ps.setInt(3, itemId);
+                    ps.executeUpdate();
+                }
+                conn.commit();
+                return true;
+
+            } catch (SQLException e) {
+                conn.rollback();
+                // [SEGURIDAD] 23503 = el usuario no tiene ese ítem (equipar sin comprar).
+                if (!"23503".equals(e.getSQLState())) {
+                    System.err.println("[ShopDAO] Error en equipItem: " + e.getMessage());
+                }
+                return false;
+            } finally {
+                conn.setAutoCommit(true);
             }
-
-            // 2. Desequipar todos del mismo tipo
-            ps = conn.prepareStatement(
-                "UPDATE user_inventory SET is_equipped = false " +
-                "WHERE user_id = ?::uuid AND item_id IN " +
-                "(SELECT id FROM store_items WHERE type = ?)");
-            ps.setString(1, userId);
-            ps.setString(2, item.getType());
-            ps.executeUpdate();
-            ps.close();
-
-            // 3. Equipar el nuevo
-            ps = conn.prepareStatement(
-                "UPDATE user_inventory SET is_equipped = true " +
-                "WHERE user_id = ?::uuid AND item_id = ?");
-            ps.setString(1, userId);
-            ps.setInt(2, itemId);
-            ps.executeUpdate();
-            ps.close();
-            ps = null;
-
-            conn.commit();
-            return true;
-
         } catch (SQLException e) {
             System.err.println("[ShopDAO] Error en equipItem: " + e.getMessage());
-            if (conn != null) {
-                try { conn.rollback(); } catch (SQLException ex) { /* ignorar */ }
-            }
             return false;
-
-        } finally {
-            if (ps != null) { try { ps.close(); } catch (SQLException e) { /* ignorar */ } }
-            if (conn != null) {
-                try { conn.setAutoCommit(true); conn.close(); } catch (SQLException e) { /* ignorar */ }
-            }
         }
     }
 
