@@ -64,6 +64,8 @@ function renderProfile(profile) {
     document.getElementById('info-birthdate').textContent = formatDate(profile.birthdate);
     document.getElementById('info-birthdate').dataset.raw = profile.birthdate || '';
     document.getElementById('info-country').textContent   = profile.country   || '—';
+    document.getElementById('info-country').dataset.code  = profile.countryCode || '';
+    fillCountrySelect(profile.countries ?? []);
     document.getElementById('info-language').textContent  = formatLanguage(profile.language);
     document.getElementById('info-language').dataset.raw  = profile.language || 'es';
     document.getElementById('info-createdat').textContent = formatDate(profile.createdAt);
@@ -159,7 +161,7 @@ function renderDailyMissions(missions) {
 function openEditMode() {
     document.getElementById('edit-username').value  = document.getElementById('info-username').textContent.replace('—', '');
     document.getElementById('edit-fullname').value  = document.getElementById('info-fullname').textContent.replace('—', '');
-    document.getElementById('edit-country').value   = document.getElementById('info-country').textContent.replace('—', '');
+    document.getElementById('edit-country').value   = document.getElementById('info-country').dataset.code ?? '';
     document.getElementById('edit-birthdate').value = getRawBirthdate();
 
     const currentLang = document.getElementById('info-language').dataset.raw ?? 'es';
@@ -180,7 +182,9 @@ function closeEditMode() {
 async function saveProfile() {
     const username  = document.getElementById('edit-username').value.trim();
     const fullName  = document.getElementById('edit-fullname').value.trim();
-    const country   = document.getElementById('edit-country').value.trim();
+    const countrySelect = document.getElementById('edit-country');
+    const country       = countrySelect.value;   // código ISO, p. ej. "CR"
+    const countryName   = country ? countrySelect.selectedOptions[0].textContent : '';
     const language  = document.getElementById('edit-language').value;
     const birthdate = document.getElementById('edit-birthdate').value;
 
@@ -213,7 +217,8 @@ async function saveProfile() {
         document.getElementById('profile-fullname').textContent = fullName;
         document.getElementById('info-username').textContent    = username;
         document.getElementById('info-fullname').textContent    = fullName || '—';
-        document.getElementById('info-country').textContent     = country  || '—';
+        document.getElementById('info-country').textContent     = countryName || '—';
+        document.getElementById('info-country').dataset.code    = country;
         document.getElementById('info-language').textContent    = formatLanguage(language);
         document.getElementById('info-language').dataset.raw    = language;
         if (birthdate) {
@@ -226,7 +231,7 @@ async function saveProfile() {
             const stored = JSON.parse(localStorage.getItem('user')) ?? {};
             stored.username = username;
             stored.fullName = fullName;
-            stored.country  = country;
+            stored.country  = countryName;
             stored.language = language;
             if (birthdate) stored.birthdate = birthdate;
             localStorage.setItem('user', JSON.stringify(stored));
@@ -249,6 +254,13 @@ function formatDate(dateStr) {
         const date = new Date(dateStr + (dateStr.length === 10 ? 'T00:00:00' : ''));
         return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
     } catch { return dateStr; }
+}
+
+// Llena el selector de país con el catálogo que manda /api/profile (una sola vez).
+function fillCountrySelect(countries) {
+    const select = document.getElementById('edit-country');
+    if (!select || select.options.length > 1) return;
+    countries.forEach(c => select.add(new Option(c.name, c.code)));
 }
 
 function formatLanguage(code) {

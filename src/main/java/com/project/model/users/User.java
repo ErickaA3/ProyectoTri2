@@ -15,7 +15,8 @@ public class User {
     private String        passwordHash;   // NUNCA se expone al front
     private String        fullName;
     private LocalDate     birthdate;
-    private String        country;
+    private String        country;        // nombre del país, para mostrar
+    private String        countryCode;    // ISO 3166-1 alfa-2 (user_profiles.country_code)
     private String        language;
     private LocalDateTime createdAt;
 
@@ -52,6 +53,9 @@ public class User {
 
     public String getCountry()                 { return country; }
     public void setCountry(String country)     { this.country = country; }
+
+    public String getCountryCode()             { return countryCode; }
+    public void setCountryCode(String code)    { this.countryCode = code; }
 
     public String getLanguage()                { return language; }
     public void setLanguage(String language)   { this.language = language; }

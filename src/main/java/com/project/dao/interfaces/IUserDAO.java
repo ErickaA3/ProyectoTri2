@@ -20,8 +20,16 @@ public interface IUserDAO {
     boolean emailExists(String email) throws SQLException;
     boolean usernameExists(String username) throws SQLException;
 
+    /** Roles del usuario (user_roles.role_code): "student", "teacher", "admin". */
+    List<String> getRoles(UUID userId) throws SQLException;
+
     // Perfil
     void updateUser(User user) throws SQLException;
+
+    /** Países para el selector del perfil: cada elemento es {code, name}. */
+    List<String[]> getCountries() throws SQLException;
+    boolean countryExists(String code) throws SQLException;
+    boolean languageExists(String code) throws SQLException;
     List<WeeklyObjective> getWeeklyObjectives(UUID userId) throws SQLException;
     List<DailyMission> getDailyMissions(UUID userId) throws SQLException;
 

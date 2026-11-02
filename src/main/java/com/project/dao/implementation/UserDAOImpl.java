@@ -26,23 +26,32 @@ public class UserDAOImpl implements IUserDAO {
     // MAPEO
     // ═══════════════════════════════════════════════════════
 
+    // Usuario + perfil + nombre del país. username y email son citext (no
+    // distinguen mayúsculas): se comparan siempre contra ?::citext.
+    private static final String SELECT_USER = """
+            SELECT u.id, u.username::text AS username, u.email::text AS email,
+                   u.password_hash, u.created_at,
+                   p.full_name, p.country_code, co.name AS country_name,
+                   p.language_code, p.birthdate
+            FROM users u
+            LEFT JOIN user_profiles p ON p.user_id = u.id
+            LEFT JOIN countries co    ON co.code = p.country_code
+            """;
+
     private User mapUser(ResultSet rs) throws SQLException {
         User u = new User();
         u.setId(UUID.fromString(rs.getString("id")));
         u.setUsername(rs.getString("username"));
         u.setEmail(rs.getString("email"));
         u.setPasswordHash(rs.getString("password_hash"));
+        u.setFullName(rs.getString("full_name"));
+        u.setCountryCode(rs.getString("country_code"));
+        u.setCountry(rs.getString("country_name"));
+        String lang = rs.getString("language_code");
+        u.setLanguage(lang != null ? lang : "es");
 
-        try { u.setFullName(rs.getString("full_name")); }
-        catch (SQLException ignored) {}
-        try { u.setLanguage(rs.getString("language")); }
-        catch (SQLException ignored) {}
-        try { u.setCountry(rs.getString("country")); }
-        catch (SQLException ignored) {}
-        try {
-            Date bd = rs.getDate("birthdate");
-            if (bd != null) u.setBirthdate(bd.toLocalDate());
-        } catch (SQLException ignored) {}
+        Date bd = rs.getDate("birthdate");
+        if (bd != null) u.setBirthdate(bd.toLocalDate());
 
         Timestamp ca = rs.getTimestamp("created_at");
         if (ca != null) u.setCreatedAt(ca.toLocalDateTime());
@@ -50,51 +59,77 @@ public class UserDAOImpl implements IUserDAO {
         return u;
     }
 
+    private Optional<User> findOne(String where, String value) throws SQLException {
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(SELECT_USER + where)) {
+            ps.setString(1, value);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) return Optional.of(mapUser(rs));
+            return Optional.empty();
+        }
+    }
+
     // ═══════════════════════════════════════════════════════
     // REGISTRO
     // ═══════════════════════════════════════════════════════
 
+    /**
+     * Crea el usuario, su rol "student", su perfil y sus stats en una sola
+     * transacción: o se crean todos o ninguno (antes eran tres escrituras
+     * sueltas y un fallo a la mitad dejaba un usuario sin perfil o sin stats).
+     */
     @Override
     public User register(User user) throws SQLException {
-        String sqlUser = """
-                INSERT INTO users (username, email, password_hash)
-                VALUES (?, ?, ?)
-                RETURNING id, username, email, password_hash, created_at
-                """;
-        try (Connection c = conn();
-             PreparedStatement ps = c.prepareStatement(sqlUser)) {
+        String language = user.getLanguage() != null ? user.getLanguage() : "es";
 
-            ps.setString(1, user.getUsername());
-            ps.setString(2, user.getEmail());
-            ps.setString(3, user.getPasswordHash());
+        try (Connection c = conn()) {
+            c.setAutoCommit(false);
+            try {
+                UUID id;
+                try (PreparedStatement ps = c.prepareStatement("""
+                        INSERT INTO users (username, email, password_hash)
+                        VALUES (?, ?, ?)
+                        RETURNING id
+                        """)) {
+                    ps.setString(1, user.getUsername());
+                    ps.setString(2, user.getEmail());
+                    ps.setString(3, user.getPasswordHash());
+                    ResultSet rs = ps.executeQuery();
+                    if (!rs.next()) throw new SQLException("No se pudo insertar el usuario.");
+                    id = UUID.fromString(rs.getString("id"));
+                }
 
-            ResultSet rs = ps.executeQuery();
-            if (!rs.next()) throw new SQLException("No se pudo insertar el usuario.");
-            User created = mapUser(rs);
+                try (PreparedStatement ps = c.prepareStatement(
+                        "INSERT INTO user_roles (user_id, role_code) VALUES (?, 'student')")) {
+                    ps.setObject(1, id);
+                    ps.executeUpdate();
+                }
 
-            // Perfil en clientes
-            String sqlCliente = """
-                    INSERT INTO clientes (user_id, full_name, language)
-                    VALUES (?::uuid, ?, ?)
-                    """;
-            try (PreparedStatement ps2 = c.prepareStatement(sqlCliente)) {
-                ps2.setString(1, created.getId().toString());
-                ps2.setString(2, user.getFullName());
-                ps2.setString(3, user.getLanguage() != null ? user.getLanguage() : "es");
-                ps2.executeUpdate();
+                try (PreparedStatement ps = c.prepareStatement(
+                        "INSERT INTO user_profiles (user_id, full_name, language_code) VALUES (?, ?, ?)")) {
+                    ps.setObject(1, id);
+                    ps.setString(2, user.getFullName());
+                    ps.setString(3, language);
+                    ps.executeUpdate();
+                }
+
+                try (PreparedStatement ps = c.prepareStatement(
+                        "INSERT INTO user_stats (user_id) VALUES (?)")) {
+                    ps.setObject(1, id);
+                    ps.executeUpdate();
+                }
+
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            } finally {
+                c.setAutoCommit(true);
             }
-
-            // Stats vacíos
-            String sqlStats = "INSERT INTO user_stats (user_id) VALUES (?::uuid)";
-            try (PreparedStatement ps3 = c.prepareStatement(sqlStats)) {
-                ps3.setString(1, created.getId().toString());
-                ps3.executeUpdate();
-            }
-
-            created.setFullName(user.getFullName());
-            created.setLanguage(user.getLanguage() != null ? user.getLanguage() : "es");
-            return created;
         }
+
+        return findByUsername(user.getUsername())
+                .orElseThrow(() -> new SQLException("Usuario creado pero no encontrado."));
     }
 
     // ═══════════════════════════════════════════════════════
@@ -103,52 +138,62 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public Optional<User> findByEmail(String email) throws SQLException {
-        String sql = """
-                SELECT u.*, c.full_name, c.country, c.language, c.birthdate
-                FROM users u
-                LEFT JOIN clientes c ON c.user_id = u.id
-                WHERE u.email = ?
-                """;
-        try (Connection c = conn();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, email);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) return Optional.of(mapUser(rs));
-            return Optional.empty();
-        }
+        return findOne("WHERE u.email = ?::citext", email);
     }
 
     @Override
     public Optional<User> findById(UUID id) throws SQLException {
-        String sql = """
-                SELECT u.*, c.full_name, c.country, c.language, c.birthdate
-                FROM users u
-                LEFT JOIN clientes c ON c.user_id = u.id
-                WHERE u.id = ?::uuid
-                """;
-        try (Connection c = conn();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, id.toString());
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) return Optional.of(mapUser(rs));
-            return Optional.empty();
-        }
+        return findOne("WHERE u.id = ?::uuid", id.toString());
     }
 
     @Override
     public Optional<User> findByUsername(String username) throws SQLException {
-        String sql = """
-                SELECT u.*, c.full_name, c.country, c.language, c.birthdate
-                FROM users u
-                LEFT JOIN clientes c ON c.user_id = u.id
-                WHERE u.username = ?
-                """;
+        return findOne("WHERE u.username = ?::citext", username);
+    }
+
+    @Override
+    public List<String> getRoles(UUID userId) throws SQLException {
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement(
+                     "SELECT role_code FROM user_roles WHERE user_id = ? ORDER BY role_code")) {
+            ps.setObject(1, userId);
+            ResultSet rs = ps.executeQuery();
+            List<String> roles = new ArrayList<>();
+            while (rs.next()) roles.add(rs.getString(1));
+            return roles;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // CATÁLOGOS DEL PERFIL
+    // ═══════════════════════════════════════════════════════
+
+    @Override
+    public List<String[]> getCountries() throws SQLException {
+        try (Connection c = conn();
+             PreparedStatement ps = c.prepareStatement("SELECT code, name FROM countries ORDER BY name")) {
+            ResultSet rs = ps.executeQuery();
+            List<String[]> list = new ArrayList<>();
+            while (rs.next()) list.add(new String[]{ rs.getString("code"), rs.getString("name") });
+            return list;
+        }
+    }
+
+    @Override
+    public boolean countryExists(String code) throws SQLException {
+        return exists("SELECT 1 FROM countries WHERE code = ?", code);
+    }
+
+    @Override
+    public boolean languageExists(String code) throws SQLException {
+        return exists("SELECT 1 FROM languages WHERE code = ?", code);
+    }
+
+    private boolean exists(String sql, String value) throws SQLException {
         try (Connection c = conn();
              PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, username);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) return Optional.of(mapUser(rs));
-            return Optional.empty();
+            ps.setString(1, value);
+            return ps.executeQuery().next();
         }
     }
 
@@ -156,32 +201,44 @@ public class UserDAOImpl implements IUserDAO {
     // ACTUALIZACIÓN DE PERFIL
     // ═══════════════════════════════════════════════════════
 
+    /** Actualiza users y user_profiles juntos (crea el perfil si no existía). */
     @Override
     public void updateUser(User user) throws SQLException {
-        String sqlUser = """
-                UPDATE users SET username = ? WHERE id = ?::uuid
-                """;
-        try (Connection c = conn();
-             PreparedStatement ps = c.prepareStatement(sqlUser)) {
-            ps.setString(1, user.getUsername());
-            ps.setString(2, user.getId().toString());
-            ps.executeUpdate();
-        }
+        try (Connection c = conn()) {
+            c.setAutoCommit(false);
+            try {
+                try (PreparedStatement ps = c.prepareStatement(
+                        "UPDATE users SET username = ? WHERE id = ?")) {
+                    ps.setString(1, user.getUsername());
+                    ps.setObject(2, user.getId());
+                    ps.executeUpdate();
+                }
 
-        String sqlCliente = """
-                UPDATE clientes
-                   SET full_name = ?, country = ?, language = ?, birthdate = ?
-                 WHERE user_id = ?::uuid
-                """;
-        try (Connection c = conn();
-             PreparedStatement ps = c.prepareStatement(sqlCliente)) {
-            ps.setString(1, user.getFullName());
-            ps.setString(2, user.getCountry());
-            ps.setString(3, user.getLanguage());
-            ps.setObject(4, user.getBirthdate() != null
-                    ? Date.valueOf(user.getBirthdate()) : null);
-            ps.setString(5, user.getId().toString());
-            ps.executeUpdate();
+                try (PreparedStatement ps = c.prepareStatement("""
+                        INSERT INTO user_profiles (user_id, full_name, country_code, language_code, birthdate)
+                        VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT (user_id) DO UPDATE SET
+                            full_name     = EXCLUDED.full_name,
+                            country_code  = EXCLUDED.country_code,
+                            language_code = EXCLUDED.language_code,
+                            birthdate     = EXCLUDED.birthdate
+                        """)) {
+                    ps.setObject(1, user.getId());
+                    ps.setString(2, user.getFullName());
+                    ps.setString(3, user.getCountryCode());
+                    ps.setString(4, user.getLanguage() != null ? user.getLanguage() : "es");
+                    ps.setObject(5, user.getBirthdate() != null
+                            ? Date.valueOf(user.getBirthdate()) : null);
+                    ps.executeUpdate();
+                }
+
+                c.commit();
+            } catch (SQLException e) {
+                c.rollback();
+                throw e;
+            } finally {
+                c.setAutoCommit(true);
+            }
         }
     }
 
@@ -247,22 +304,12 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public boolean emailExists(String email) throws SQLException {
-        String sql = "SELECT 1 FROM users WHERE email = ?";
-        try (Connection c = conn();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, email);
-            return ps.executeQuery().next();
-        }
+        return exists("SELECT 1 FROM users WHERE email = ?::citext", email);
     }
 
     @Override
     public boolean usernameExists(String username) throws SQLException {
-        String sql = "SELECT 1 FROM users WHERE username = ?";
-        try (Connection c = conn();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, username);
-            return ps.executeQuery().next();
-        }
+        return exists("SELECT 1 FROM users WHERE username = ?::citext", username);
     }
 
     // ═══════════════════════════════════════════════════════

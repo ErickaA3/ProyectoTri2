@@ -56,9 +56,10 @@ public class UserContextService {
 
     private static void appendUserInfo(Connection conn, UUID userId, StringBuilder ctx) {
         String sql = """
-                SELECT u.username, c.full_name, c.country, u.created_at
+                SELECT u.username::text AS username, p.full_name, co.name AS country, u.created_at
                 FROM users u
-                LEFT JOIN clientes c ON c.user_id = u.id
+                LEFT JOIN user_profiles p ON p.user_id = u.id
+                LEFT JOIN countries co    ON co.code = p.country_code
                 WHERE u.id = ?
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {

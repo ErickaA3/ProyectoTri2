@@ -20,7 +20,7 @@ public class DuelDAOImpl implements IDuelDAO {
     public String sendFriendRequest(String senderId, String receiverEmailOrUsername) throws Exception {
         String findUser = """
             SELECT id FROM users
-            WHERE email = ? OR username = ?
+            WHERE email = ?::citext OR username = ?::citext
             LIMIT 1
             """;
 

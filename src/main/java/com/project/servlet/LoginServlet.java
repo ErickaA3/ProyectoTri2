@@ -80,7 +80,12 @@ public class LoginServlet extends HttpServlet {
             session.setAttribute("username", user.getUsername());
             session.setMaxInactiveInterval(60 * 60 * 8);
 
-            String token = JwtUtil.generarToken(user.getId(), "student");
+            // El rol sale de user_roles (antes era siempre "student" fijo).
+            java.util.List<String> roles = userDAO.getRoles(user.getId());
+            String rol = roles.contains("admin")   ? "admin"
+                       : roles.contains("teacher") ? "teacher"
+                       : "student";
+            String token = JwtUtil.generarToken(user.getId(), rol);
 
             String userJson = JsonUtil.buildUserJson(user, stats);
             JsonUtil.setJsonHeaders(response);

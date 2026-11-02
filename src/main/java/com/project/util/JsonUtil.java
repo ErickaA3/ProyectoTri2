@@ -59,7 +59,8 @@ public class JsonUtil {
             com.project.model.users.User user,
             com.project.model.users.Statistics stats,
             List<com.project.model.users.WeeklyObjective> weekly,
-            List<com.project.model.users.DailyMission> daily) {
+            List<com.project.model.users.DailyMission> daily,
+            List<String[]> countries) {
 
         StringBuilder sb = new StringBuilder();
         sb.append("{");
@@ -70,6 +71,16 @@ public class JsonUtil {
         sb.append("\"email\":\"").append(escape(user.getEmail())).append("\",");
         sb.append("\"fullName\":\"").append(escape(user.getFullName() != null ? user.getFullName() : "")).append("\",");
         sb.append("\"country\":\"").append(escape(user.getCountry() != null ? user.getCountry() : "")).append("\",");
+        sb.append("\"countryCode\":\"").append(escape(user.getCountryCode() != null ? user.getCountryCode() : "")).append("\",");
+
+        // Catálogo de países para el selector del perfil: [{code, name}]
+        sb.append("\"countries\":[");
+        for (int i = 0; i < countries.size(); i++) {
+            sb.append("{\"code\":\"").append(escape(countries.get(i)[0]))
+              .append("\",\"name\":\"").append(escape(countries.get(i)[1])).append("\"}");
+            if (i < countries.size() - 1) sb.append(",");
+        }
+        sb.append("],");
         sb.append("\"language\":\"").append(escape(user.getLanguage() != null ? user.getLanguage() : "")).append("\",");
         sb.append("\"birthdate\":\"").append(user.getBirthdate() != null ? user.getBirthdate().toString() : "").append("\",");
         sb.append("\"createdAt\":\"").append(user.getCreatedAt() != null ? user.getCreatedAt().toString() : "").append("\",");

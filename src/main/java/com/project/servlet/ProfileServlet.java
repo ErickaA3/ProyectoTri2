@@ -76,7 +76,7 @@ public class ProfileServlet extends HttpServlet {
             List<WeeklyObjective> weekly   = userDAO.getWeeklyObjectives(userId);
             List<DailyMission> daily       = userDAO.getDailyMissions(userId);
 
-            String json = JsonUtil.buildProfileJson(user, stats, weekly, daily);
+            String json = JsonUtil.buildProfileJson(user, stats, weekly, daily, userDAO.getCountries());
             JsonUtil.sendSuccess(response, json);
 
         } catch (SQLException e) {
@@ -129,8 +129,23 @@ public class ProfileServlet extends HttpServlet {
             }
 
             if (fullName  != null && !fullName.isBlank())  user.setFullName(fullName);
-            if (country   != null && !country.isBlank())   user.setCountry(country);
-            if (language  != null && !language.isBlank())   user.setLanguage(language);
+
+            // country llega como código ISO (el perfil usa un selector).
+            if (country != null && !country.isBlank()) {
+                String code = country.trim().toUpperCase();
+                if (!userDAO.countryExists(code)) {
+                    JsonUtil.sendError(response, 400, "País no válido.");
+                    return;
+                }
+                user.setCountryCode(code);
+            }
+            if (language != null && !language.isBlank()) {
+                if (!userDAO.languageExists(language.trim())) {
+                    JsonUtil.sendError(response, 400, "Idioma no válido.");
+                    return;
+                }
+                user.setLanguage(language.trim());
+            }
             if (birthdate != null && !birthdate.isBlank()) {
                 try {
                     user.setBirthdate(java.time.LocalDate.parse(birthdate));

@@ -335,12 +335,12 @@ public class ChatServlet extends HttpServlet {
     }
 
     private String[] loadProfesorConfig(Connection conn, UUID userId) throws Exception {
-        String sql = "SELECT professor_name, personality FROM professor_config WHERE user_id = ?";
+        String sql = "SELECT name, personality FROM assistant_settings WHERE user_id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) {
-                return new String[]{ rs.getString("professor_name"), rs.getString("personality") };
+                return new String[]{ rs.getString("name"), rs.getString("personality") };
             }
         }
         return new String[]{ "Mi ProfesorIA", "amigable y motivador" };
