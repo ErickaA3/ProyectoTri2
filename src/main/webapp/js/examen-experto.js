@@ -429,7 +429,8 @@ function finishExam() {
 
     if (!isRewardSent() && !isReviewMode && typeof sendReward === 'function') {
         markRewardSent();
-        sendReward('expert_exam', grade, examData.id, timeUsed, examData.questions.length)
+        sendReward('expert_exam', grade, examData.id, timeUsed, examData.questions.length,
+                   answers.map((option, position) => ({ position, option })))
             .then(result => {
                 const earned = result.success ? result.xpEarned   : totalXP;
                 const earnedCoins = result.success ? result.coinsEarned : 0;

@@ -51,12 +51,35 @@ public interface IGamificationDAO {
                         boolean shield) throws Exception;
 
     /**
-     * Registra una actividad completada en activity_results.
-     * @return UUID del registro creado, o null si ese contenido ya estaba registrado
+     * Registra un intento terminado sobre un contenido (attempts). Termina
+     * ahora y empezó timeTakenSeconds antes.
+     * @param status "completed" o "abandoned"
+     * @return UUID del intento
      */
-    String saveActivityResult(Connection conn, String userId, String contentId,
-                              double score, double maxScore,
-                              int timeTakenSeconds) throws Exception;
+    String createAttempt(Connection conn, String userId, String contentId,
+                         String status, int timeTakenSeconds) throws Exception;
+
+    /**
+     * ¿Hubo un intento anterior de este usuario sobre este contenido?
+     * Se usa para no pagar dos veces por el mismo contenido.
+     * @param completedOnly true: solo cuentan los intentos completados
+     */
+    boolean hasPreviousAttempt(Connection conn, String userId, String contentId,
+                               boolean completedOnly) throws Exception;
+
+    /**
+     * Califica y guarda las respuestas de un intento contra content_items e
+     * item_options (nunca contra lo que diga el cliente sobre si acertó).
+     * @param answers     [{position, option}] para preguntas, [{position, correct}] para flashcards
+     * @param flashcards  true: cada respuesta es una autoevaluación (recall_rating)
+     * @return {aciertos, total de ítems presentados}
+     * @throws IllegalArgumentException si una respuesta no corresponde a un ítem u opción del contenido
+     */
+    int[] saveGradedAnswers(Connection conn, String attemptId, String contentId,
+                            com.google.gson.JsonArray answers, boolean flashcards) throws Exception;
+
+    /** Guarda en el intento lo que se pagó por él. */
+    void setAttemptRewards(Connection conn, String attemptId, int xp, int coins) throws Exception;
 
     /**
      * Incrementa el progreso de misiones diarias que coincidan con el tipo de actividad.

@@ -36,12 +36,17 @@ function getGamificationUserId() {
  * @param {string} contentId     UUID del contenido (null si no aplica)
  * @param {number} timeTakenSecs Segundos usados (0 si no aplica)
  * @param {number} maxScore      Puntaje máximo (ej: número de preguntas)
+ * @param {Array}  answers       Respuestas para que el servidor califique.
+ *                               quiz/examen: [{ position, option }] (option null = sin responder)
+ *                               flashcards:  [{ position, correct }]
+ *                               Obligatorias para quiz, expert_exam y flashcards: el
+ *                               servidor ignora scorePercent y calcula el puntaje.
  *
  * @returns {Object} Respuesta del servidor con xpEarned, coinsEarned,
  *                   newXp, newLevel, newCoins, leveledUp, etc.
  */
 async function sendReward(activityType, scorePercent = 0, contentId = null,
-                          timeTakenSecs = 0, maxScore = 100) {
+                          timeTakenSecs = 0, maxScore = 100, answers = null) {
     const userId = getGamificationUserId();
     if (!userId) {
         console.warn('[Gamification] No userId found in localStorage');
@@ -57,7 +62,8 @@ async function sendReward(activityType, scorePercent = 0, contentId = null,
                 scorePercent,
                 contentId,
                 timeTakenSecs,
-                maxScore
+                maxScore,
+                answers
             })
         });
 

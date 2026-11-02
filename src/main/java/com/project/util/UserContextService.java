@@ -404,7 +404,7 @@ public class UserContextService {
     // ── Resultados ────────────────────────────────────────────────────────
 
     private static void appendActivityResults(Connection conn, UUID userId, StringBuilder ctx) {
-        String sql = "SELECT ar.score, ar.max_score, sc.title FROM activity_results ar JOIN generated_content sc ON sc.id = ar.content_id WHERE ar.user_id = ? ORDER BY ar.completed_at DESC LIMIT 10";
+        String sql = "SELECT round(vs.score_pct) AS score, 100 AS max_score, gc.title FROM attempts a JOIN v_attempt_scores vs ON vs.attempt_id = a.id JOIN generated_content gc ON gc.id = a.content_id WHERE a.user_id = ? AND a.status = 'completed' AND vs.score_pct IS NOT NULL ORDER BY a.finished_at DESC LIMIT 10";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ResultSet rs = ps.executeQuery();

@@ -62,6 +62,8 @@ public class ContentDAOImpl implements IContentDAO {
                     newId = rs.getString("id");
                 }
 
+                insertItems(conn, newId);
+
                 if (documentId != null) {
                     try (PreparedStatement stmt = conn.prepareStatement("""
                             INSERT INTO content_sources (content_id, chunk_id)
@@ -80,6 +82,55 @@ public class ContentDAOImpl implements IContentDAO {
                 throw e;
             } finally {
                 conn.setAutoCommit(true);
+            }
+        }
+    }
+
+    /**
+     * Crea las filas de content_items (e item_options) a partir del JSON recién
+     * guardado: las preguntas de un quiz/examen o las tarjetas de un mazo. Son
+     * las que se usan para calificar en el servidor. Mismo SQL que la V5.
+     */
+    private void insertItems(Connection conn, String contentId) throws SQLException {
+        String[] statements = {
+            """
+            INSERT INTO content_items (content_id, position, prompt, answer)
+            SELECT gc.id, q.ord - 1, coalesce(q.value ->> 'question', ''), q.value ->> 'explanation'
+            FROM generated_content gc
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE WHEN jsonb_typeof(gc.body -> 'questions') = 'array' THEN gc.body -> 'questions' ELSE '[]'::jsonb END
+            ) WITH ORDINALITY AS q(value, ord)
+            WHERE gc.id = ?::uuid AND gc.content_type_code IN ('quiz', 'expert_exam', 'duel_quiz')
+            """,
+            """
+            INSERT INTO item_options (item_id, position, text, is_correct)
+            SELECT ci.id, o.ord - 1, o.value #>> '{}',
+                   coalesce((o.ord - 1) = CASE WHEN (q.value ->> 'correct') ~ '^\\d+$'
+                                               THEN (q.value ->> 'correct')::int END, false)
+            FROM generated_content gc
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE WHEN jsonb_typeof(gc.body -> 'questions') = 'array' THEN gc.body -> 'questions' ELSE '[]'::jsonb END
+            ) WITH ORDINALITY AS q(value, ord)
+            JOIN content_items ci ON ci.content_id = gc.id AND ci.position = q.ord - 1
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE WHEN jsonb_typeof(q.value -> 'options') = 'array' THEN q.value -> 'options' ELSE '[]'::jsonb END
+            ) WITH ORDINALITY AS o(value, ord)
+            WHERE gc.id = ?::uuid AND gc.content_type_code IN ('quiz', 'expert_exam', 'duel_quiz')
+            """,
+            """
+            INSERT INTO content_items (content_id, position, prompt, answer)
+            SELECT gc.id, c.ord - 1, coalesce(c.value ->> 'front', ''), c.value ->> 'back'
+            FROM generated_content gc
+            CROSS JOIN LATERAL jsonb_array_elements(
+                CASE WHEN jsonb_typeof(gc.body -> 'cards') = 'array' THEN gc.body -> 'cards' ELSE '[]'::jsonb END
+            ) WITH ORDINALITY AS c(value, ord)
+            WHERE gc.id = ?::uuid AND gc.content_type_code = 'flashcard'
+            """
+        };
+        for (String sql : statements) {
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, contentId);
+                stmt.executeUpdate();
             }
         }
     }

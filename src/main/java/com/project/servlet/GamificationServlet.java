@@ -37,9 +37,11 @@ import jakarta.servlet.http.HttpServletResponse;
  *      un POST directo del cliente.
  *   2. Los tipos ligados a contenido (quiz, expert_exam, flashcards,
  *      resumen, generar) exigen un contentId real, que se valida contra
- *      study_content: debe existir, ser del usuario autenticado, y ser del
- *      tipo que dice ser. Ya no se puede inventar un UUID o mandar el id
- *      de otro contenido para cobrar la recompensa.
+ *      generated_content: debe existir, ser del usuario autenticado, y ser
+ *      del tipo que dice ser. Ya no se puede inventar un UUID o mandar el
+ *      id de otro contenido para cobrar la recompensa.
+ *   3. quiz, expert_exam y flashcards los califica el servidor: el cliente
+ *      manda las respuestas (answers) y se ignora su scorePercent.
  * ═══════════════════════════════════════════════════════════════════════
  */
 @WebServlet({"/api/gamification/stats", "/api/gamification/reward"})
@@ -53,12 +55,17 @@ public class GamificationServlet extends HttpServlet {
         "quiz", "expert_exam", "flashcards", "resumen", "generar", "abandon_exam"
     );
 
-    // Tipos que exigen contentId real y verificado contra study_content.
+    // Tipos que exigen contentId real y verificado contra generated_content.
     private static final Set<String> CONTENT_REQUIRED_TYPES = Set.of(
         "quiz", "expert_exam", "flashcards", "resumen"
     );
 
-    // activityType del reward → type esperado en study_content.
+    // Tipos que califica el servidor a partir de las respuestas (answers).
+    private static final Set<String> GRADED_TYPES = Set.of(
+        "quiz", "expert_exam", "flashcards"
+    );
+
+    // activityType del reward → type esperado en generated_content.
     private static String expectedContentType(String activityType) {
         return switch (activityType) {
             case "quiz"         -> "quiz";
@@ -178,20 +185,35 @@ public class GamificationServlet extends HttpServlet {
                     sendError(res, 400, "El contentId no coincide con el tipo de actividad.");
                     return;
                 }
-            } else if ("generar".equals(activityType) && contentId != null && !contentId.isBlank()) {
-                // Si mandan contentId para "generar", igual se valida dueño.
+            } else if (contentId != null && !contentId.isBlank()) {
+                // "generar" o "abandon_exam" con contentId: igual se valida dueño
+                // (el contentId queda guardado como intento).
                 if (contentDAO.getContentType(contentId, userId) == null) {
                     sendError(res, 403, "El contenido no existe o no te pertenece.");
                     return;
                 }
             }
 
-            JsonObject result = GamificationService.processActivity(
-                userId, activityType, scorePercent, contentId, timeTakenSecs, maxScore
-            );
+            JsonObject result;
+            if (GRADED_TYPES.contains(activityType)) {
+                // [SEGURIDAD] El servidor califica: se ignora scorePercent y se
+                // usan las respuestas, comparadas contra las opciones guardadas.
+                if (!data.has("answers") || !data.get("answers").isJsonArray()
+                        || data.getAsJsonArray("answers").isEmpty()) {
+                    sendError(res, 400, "Esta actividad requiere las respuestas (answers).");
+                    return;
+                }
+                result = GamificationService.processGradedActivity(
+                    userId, activityType, contentId, timeTakenSecs, data.getAsJsonArray("answers"));
+            } else {
+                result = GamificationService.processActivity(
+                    userId, activityType, scorePercent, contentId, timeTakenSecs, maxScore);
+            }
 
             res.getWriter().write(gson.toJson(result));
 
+        } catch (IllegalArgumentException e) {
+            sendError(res, 400, e.getMessage());
         } catch (Exception e) {
             sendError(res, 500, "Error procesando reward: " + e.getMessage());
         }

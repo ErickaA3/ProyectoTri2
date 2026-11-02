@@ -84,15 +84,89 @@ public class GamificationService {
      * Ahora la fila de user_stats se bloquea (FOR UPDATE) al principio, así
      * que las actividades de un mismo usuario se procesan de a una.
      */
+    /**
+     * Actividad SIN calificación del servidor: leer un resumen, abandonar un
+     * examen, generar, o el resultado de un duelo (sin contentId). El
+     * scorePercent viene de quien llama.
+     * Si trae contentId, queda registrada como intento (attempts).
+     */
     public static JsonObject processActivity(String userId, String activityType,
                                               double scorePercent, String contentId,
                                               int timeTakenSecs, double maxScore)
                                               throws Exception {
+        return inTransaction(conn -> {
+            JsonObject stats = lockStats(conn, userId);
+            String attemptId = null;
+            boolean alreadyRewarded = false;
+
+            if (contentId != null && !contentId.isEmpty()) {
+                // [SEGURIDAD] No se vuelve a pagar por el mismo contenido. Un
+                // abandono cuenta como "ya hubo intento" solo para otro abandono:
+                // abandonar no quita la recompensa de terminar el examen después.
+                boolean abandon = "abandon_exam".equals(activityType);
+                alreadyRewarded = dao.hasPreviousAttempt(conn, userId, contentId, !abandon);
+                attemptId = dao.createAttempt(conn, userId, contentId,
+                        abandon ? "abandoned" : "completed", timeTakenSecs);
+            }
+
+            JsonObject r = applyRewards(conn, stats, userId, activityType, scorePercent,
+                                        attemptId, alreadyRewarded);
+            if (attemptId != null) r.addProperty("attemptId", attemptId);
+            return r;
+        });
+    }
+
+    /**
+     * Actividad CALIFICADA POR EL SERVIDOR: quiz, examen experto o sesión de
+     * flashcards. El cliente manda qué respondió en cada pregunta o tarjeta
+     * (answers) y el servidor calcula el puntaje contra item_options. Se guarda
+     * el intento con todas sus respuestas, aunque ya se haya pagado antes.
+     *
+     * [SEGURIDAD] Antes el porcentaje lo mandaba el navegador y el servidor se
+     * lo creía.
+     *
+     * @param answers Para quiz/examen: [{ "position": 0, "option": 2 }, ...]
+     *                ("option": null = no respondió). Para flashcards:
+     *                [{ "position": 0, "correct": true }, ...].
+     */
+    public static JsonObject processGradedActivity(String userId, String activityType,
+                                                   String contentId, int timeTakenSecs,
+                                                   com.google.gson.JsonArray answers)
+                                                   throws Exception {
+        return inTransaction(conn -> {
+            JsonObject stats = lockStats(conn, userId);
+            boolean alreadyRewarded = dao.hasPreviousAttempt(conn, userId, contentId, true);
+            String attemptId = dao.createAttempt(conn, userId, contentId, "completed", timeTakenSecs);
+            int[] graded = dao.saveGradedAnswers(conn, attemptId, contentId, answers,
+                                                 "flashcards".equals(activityType));
+            int correct = graded[0], total = graded[1];
+            double scorePercent = total > 0 ? (correct * 100.0 / total) : 0;
+
+            JsonObject r = applyRewards(conn, stats, userId, activityType, scorePercent,
+                                        attemptId, alreadyRewarded);
+            r.addProperty("attemptId",    attemptId);
+            r.addProperty("correctItems", correct);
+            r.addProperty("totalItems",   total);
+            return r;
+        });
+    }
+
+    @FunctionalInterface
+    private interface TxWork { JsonObject run(Connection conn) throws Exception; }
+
+    /**
+     * Todo en UNA transacción: intento, respuestas, stats, misiones y objetivos
+     * se guardan juntos o no se guarda nada.
+     *
+     * [BUG] Antes cada paso usaba su propia conexión: si algo fallaba a la
+     * mitad quedaban datos a medias, y dos actividades simultáneas del mismo
+     * usuario leían el mismo XP/monedas y la segunda pisaba a la primera.
+     */
+    private static JsonObject inTransaction(TxWork work) throws Exception {
         try (Connection conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
-                JsonObject result = processActivity(conn, userId, activityType,
-                        scorePercent, contentId, timeTakenSecs, maxScore);
+                JsonObject result = work.run(conn);
                 conn.commit();
                 return result;
             } catch (Exception e) {
@@ -104,16 +178,22 @@ public class GamificationService {
         }
     }
 
-    private static JsonObject processActivity(Connection conn, String userId, String activityType,
-                                              double scorePercent, String contentId,
-                                              int timeTakenSecs, double maxScore)
-                                              throws Exception {
-
-        // 1. Stats actuales (bloqueando la fila hasta el commit)
+    /**
+     * Lee los stats bloqueando la fila de user_stats (FOR UPDATE) hasta el
+     * commit: las actividades de un mismo usuario se procesan de a una.
+     */
+    private static JsonObject lockStats(Connection conn, String userId) throws Exception {
         JsonObject stats = dao.getStatsForUpdate(conn, userId);
         if (stats == null) {
             throw new Exception("Usuario no encontrado en user_stats: " + userId);
         }
+        return stats;
+    }
+
+    private static JsonObject applyRewards(Connection conn, JsonObject stats, String userId,
+                                           String activityType, double scorePercent,
+                                           String attemptId, boolean alreadyRewarded)
+                                           throws Exception {
 
         int    currentXp       = stats.has("xp") && !stats.get("xp").isJsonNull() ? stats.get("xp").getAsInt() : 0;
         int    currentLevel    = stats.has("level") && !stats.get("level").isJsonNull() ? stats.get("level").getAsInt() : 1;
@@ -132,21 +212,8 @@ public class GamificationService {
 
         StreakResult streak = calculateStreak(streakCurrent, lastActivity, today, hasShield);
 
-        // 2.5. Guardar resultado + detectar si ya fue recompensado antes
-        //      saveActivityResult devuelve null cuando ya existe el registro (mismo user + content)
-        //      [SEGURIDAD] Antes esto solo aplicaba a "expert_exam"/"quiz" — se
-        //      extiende a CUALQUIER actividad que traiga contentId (resumen,
-        //      flashcards, generar, etc.), para que no se pueda volver a cobrar
-        //      recompensa por el mismo contenido reenviando la misma llamada.
-        String resultId = null;
-        boolean alreadyRewarded = false;
-        if (contentId != null && !contentId.isEmpty()) {
-            double score = (scorePercent / 100.0) * maxScore;
-            resultId = dao.saveActivityResult(conn, userId, contentId, score, maxScore, timeTakenSecs);
-            alreadyRewarded = (resultId == null);
-        }
-
-        // 3. Rewards base — 0 si ya fue recompensado
+        // 3. Rewards base — 0 si ya fue recompensado (alreadyRewarded lo decide
+        //    quien llama, según los intentos anteriores del mismo contenido)
         RewardResult baseReward = alreadyRewarded
             ? new RewardResult(0, 0)
             : getBaseReward(activityType, scorePercent);
@@ -285,7 +352,9 @@ public class GamificationService {
         r.addProperty("bonusObjectiveCoins", objectiveRewards.get("objectiveCoins").getAsInt());
         r.add("completedMissions",   missionRewards.get("completedMissions"));
         r.add("completedObjectives", objectiveRewards.get("completedObjectives"));
-        if (resultId != null) r.addProperty("activityResultId", resultId);
+        // Lo pagado por esta actividad queda guardado en su intento (las reglas
+        // pueden cambiar después; lo pagado en su momento es un hecho).
+        if (attemptId != null) dao.setAttemptRewards(conn, attemptId, xpEarned, Math.max(0, coinsEarned));
 
         return r;
     }

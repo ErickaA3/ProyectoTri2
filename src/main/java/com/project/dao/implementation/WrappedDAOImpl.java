@@ -87,12 +87,12 @@ public class WrappedDAOImpl implements IWrappedDAO {
                                 JsonObject result) throws SQLException {
         String sql = """
             SELECT
-              COALESCE(SUM(CASE WHEN completed_at >= ?::date
-                                 THEN time_taken_seconds ELSE 0 END), 0) AS this_week_secs,
-              COALESCE(SUM(CASE WHEN completed_at >= ?::date AND completed_at < ?::date
-                                 THEN time_taken_seconds ELSE 0 END), 0) AS last_week_secs
-            FROM activity_results
-            WHERE user_id = ?::uuid
+              COALESCE(SUM(CASE WHEN finished_at >= ?::date
+                                 THEN EXTRACT(EPOCH FROM finished_at - started_at) ELSE 0 END), 0)::bigint AS this_week_secs,
+              COALESCE(SUM(CASE WHEN finished_at >= ?::date AND finished_at < ?::date
+                                 THEN EXTRACT(EPOCH FROM finished_at - started_at) ELSE 0 END), 0)::bigint AS last_week_secs
+            FROM attempts
+            WHERE user_id = ?::uuid AND status = 'completed'
             """;
 
         try (Connection conn = DatabaseConnection.getConnection();
@@ -129,12 +129,14 @@ public class WrappedDAOImpl implements IWrappedDAO {
     // ─── Tema más fuerte / más débil (activity_results + study_content) ────
     private void fillSubjects(String userId, LocalDate weekStart, JsonObject result) throws SQLException {
         String sql = """
-            SELECT ar.score, ar.max_score, gc.title, s.name AS subject_name
-            FROM activity_results ar
-            LEFT JOIN generated_content gc ON gc.id = ar.content_id
+            SELECT sc.score_pct AS score, 100 AS max_score, gc.title, s.name AS subject_name
+            FROM attempts a
+            JOIN v_attempt_scores sc ON sc.attempt_id = a.id
+            LEFT JOIN generated_content gc ON gc.id = a.content_id
             LEFT JOIN topics t   ON t.id = gc.topic_id
             LEFT JOIN subjects s ON s.id = t.subject_id
-            WHERE ar.user_id = ?::uuid AND ar.completed_at >= ?::date
+            WHERE a.user_id = ?::uuid AND a.status = 'completed' AND a.finished_at >= ?::date
+              AND sc.score_pct IS NOT NULL
             """;
 
         Map<String, List<Double>> bySubject = new LinkedHashMap<>();

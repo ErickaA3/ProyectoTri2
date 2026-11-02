@@ -268,7 +268,8 @@ function showResults() {
     if (!rewardSent && typeof sendReward === 'function') {
         rewardSent = true;
         const timeTakenSecs = Math.round((Date.now() - sessionStart) / 1000);
-        sendReward('flashcards', score, contentId, timeTakenSecs, cards.length)
+        sendReward('flashcards', score, contentId, timeTakenSecs, cards.length,
+                   answers.map((ans, position) => ({ position, correct: ans ? ans.correct : null })))
             .then(result => {
                 if (result && result.success && result.xpEarned) {
                     showXPToast('+' + result.xpEarned + ' XP');

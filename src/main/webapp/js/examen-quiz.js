@@ -381,7 +381,8 @@ function finishExam() {
     // Solo enviar reward en el primer intento — bloquea XP farming
     if (!rewardSent) {
         rewardSent = true;
-        sendReward('quiz', grade, examData.id, timeUsed, examData.questions.length)
+        sendReward('quiz', grade, examData.id, timeUsed, examData.questions.length,
+                   answers.map((option, position) => ({ position, option })))
             .then(result => {
                 const earned = result.success ? result.xpEarned : fallbackXP;
             })
