@@ -3,6 +3,7 @@ package com.project.dao.implementation;
 import com.project.dao.interfaces.IUserDAO;
 import com.project.database.DatabaseConnection;
 import com.project.model.users.*;
+import com.project.util.GamificationService;
 
 import java.sql.Connection;
 import java.sql.Date;
@@ -276,12 +277,13 @@ public class UserDAOImpl implements IUserDAO {
                        udm.progress, udm.completed, udm.date
                 FROM user_daily_missions udm
                 JOIN missions m ON m.id = udm.mission_id
-                WHERE udm.user_id = ?::uuid AND udm.date = CURRENT_DATE
+                WHERE udm.user_id = ?::uuid AND udm.date = ?
                 ORDER BY udm.completed ASC, m.id ASC
                 """;
         try (Connection c = conn();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, userId.toString());
+            ps.setObject(2, GamificationService.today());
             ResultSet rs = ps.executeQuery();
             List<DailyMission> list = new ArrayList<>();
             while (rs.next()) {
@@ -304,25 +306,29 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public void ensureDailyMissions(UUID userId) throws SQLException {
+        // Fecha de Costa Rica, no CURRENT_DATE (la BD corre en UTC).
+        java.time.LocalDate today = GamificationService.today();
         String checkSql = """
                 SELECT COUNT(*) FROM user_daily_missions
-                WHERE user_id = ?::uuid AND date = CURRENT_DATE
+                WHERE user_id = ?::uuid AND date = ?
                 """;
         try (Connection c = conn();
              PreparedStatement ps = c.prepareStatement(checkSql)) {
             ps.setString(1, userId.toString());
+            ps.setObject(2, today);
             ResultSet rs = ps.executeQuery();
             if (rs.next() && rs.getInt(1) > 0) return;
         }
 
         String insertSql = """
                 INSERT INTO user_daily_missions (user_id, mission_id, date)
-                SELECT ?::uuid, id, CURRENT_DATE FROM missions
+                SELECT ?::uuid, id, ? FROM missions
                 ON CONFLICT DO NOTHING
                 """;
         try (Connection c = conn();
              PreparedStatement ps = c.prepareStatement(insertSql)) {
             ps.setString(1, userId.toString());
+            ps.setObject(2, today);
             ps.executeUpdate();
         }
     }
@@ -339,12 +345,13 @@ public class UserDAOImpl implements IUserDAO {
                        xp_reward, coin_reward
                 FROM user_weekly_objectives
                 WHERE user_id = ?::uuid
-                  AND week_start = date_trunc('week', CURRENT_DATE)::date
+                  AND week_start = ?
                 ORDER BY completed ASC, type ASC
                 """;
         try (Connection c = conn();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, userId.toString());
+            ps.setObject(2, GamificationService.currentWeekStart());
             ResultSet rs = ps.executeQuery();
             List<WeeklyObjective> list = new ArrayList<>();
             while (rs.next()) {
@@ -366,15 +373,17 @@ public class UserDAOImpl implements IUserDAO {
 
     @Override
     public void ensureWeeklyObjectives(UUID userId) throws SQLException {
-        // Verificar si ya tiene objetivos esta semana
+        // Verificar si ya tiene objetivos esta semana (lunes en hora de Costa Rica)
+        java.time.LocalDate weekStart = GamificationService.currentWeekStart();
         String checkSql = """
                 SELECT COUNT(*) FROM user_weekly_objectives
                 WHERE user_id = ?::uuid
-                AND week_start = date_trunc('week', CURRENT_DATE)::date
+                AND week_start = ?
                 """;
         try (Connection c = conn();
             PreparedStatement ps = c.prepareStatement(checkSql)) {
             ps.setString(1, userId.toString());
+            ps.setObject(2, weekStart);
             ResultSet rs = ps.executeQuery();
             if (rs.next() && rs.getInt(1) > 0) return;
         }
@@ -387,7 +396,7 @@ public class UserDAOImpl implements IUserDAO {
                 SELECT
                     ?::uuid,
                     o.type,
-                    date_trunc('week', CURRENT_DATE)::date,
+                    ?,
                     o.description,
                     o.required_count,
                     o.xp_reward,
@@ -398,6 +407,7 @@ public class UserDAOImpl implements IUserDAO {
         try (Connection c = conn();
             PreparedStatement ps = c.prepareStatement(insertSql)) {
             ps.setString(1, userId.toString());
+            ps.setObject(2, weekStart);
             ps.executeUpdate();
         }
     }

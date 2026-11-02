@@ -357,10 +357,11 @@ public class UserContextService {
         String sql = """
             SELECT m.description, udm.progress, m.required_count, udm.completed, m.xp_reward
             FROM user_daily_missions udm JOIN missions m ON m.id = udm.mission_id
-            WHERE udm.user_id = ? AND udm.date = CURRENT_DATE
+            WHERE udm.user_id = ? AND udm.date = ?
             """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
+            ps.setObject(2, GamificationService.today());
             ResultSet rs = ps.executeQuery();
             boolean has = false;
             while (rs.next()) {

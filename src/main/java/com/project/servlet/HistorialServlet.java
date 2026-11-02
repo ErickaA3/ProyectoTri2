@@ -117,9 +117,7 @@ public class HistorialServlet extends HttpServlet {
 
         try {
             if (contentId != null) {
-                // Limpiar duelos que referencian este contenido (FK constraint)
-                historialDAO.deleteDuelsForContent(contentId);
-                // Eliminar un solo elemento
+                // Eliminar un solo elemento (los duelos que lo usaron se conservan)
                 boolean deleted = contentDAO.delete(contentId, userId);
                 if (!deleted) { sendError(res, 404, "Elemento no encontrado o no te pertenece."); return; }
                 sendSuccess(res, null);

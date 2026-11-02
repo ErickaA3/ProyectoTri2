@@ -117,39 +117,17 @@ public class HistorialDAOImpl implements IHistorialDAO {
         }
     }
 
-    /**
-     * Elimina duelos que referencian un contenido específico (evita FK constraint).
-     * Se llama antes de eliminar un item de study_content.
-     */
-    public void deleteDuelsForContent(String contentId) throws Exception {
-        String sql = "DELETE FROM duels WHERE content_id = ?::uuid";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, contentId);
-            stmt.executeUpdate();
-        }
-    }
-
     @Override
     public int deleteAll(String userId) throws Exception {
-        // Eliminar duelos que referencian contenido del usuario (FK constraint)
-        String deleteDuels = """
-            DELETE FROM duels
-            WHERE content_id IN (SELECT id FROM study_content WHERE user_id = ?::uuid)
-            """;
+        // Los duelos NO se borran: desde la migración V2, duels.content_id es
+        // ON DELETE SET NULL, así que conservan su resultado (y las victorias
+        // del ranking) aunque el contenido ya no exista.
         String deleteContent = "DELETE FROM study_content WHERE user_id = ?::uuid";
 
-        try (Connection conn = DatabaseConnection.getConnection()) {
-            // 1. Borrar duelos asociados
-            try (PreparedStatement stmt = conn.prepareStatement(deleteDuels)) {
-                stmt.setString(1, userId);
-                stmt.executeUpdate();
-            }
-            // 2. Borrar contenido
-            try (PreparedStatement stmt = conn.prepareStatement(deleteContent)) {
-                stmt.setString(1, userId);
-                return stmt.executeUpdate();
-            }
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(deleteContent)) {
+            stmt.setString(1, userId);
+            return stmt.executeUpdate();
         }
     }
 }

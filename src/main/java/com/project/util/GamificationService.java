@@ -477,4 +477,18 @@ public class GamificationService {
         if (level > MAX_LEVEL) return LEVEL_THRESHOLDS[MAX_LEVEL - 1];
         return LEVEL_THRESHOLDS[level - 1];
     }
+
+    /**
+     * "Hoy" en la zona de la app. Las consultas de misiones y objetivos deben
+     * recibir esta fecha como parámetro en vez de usar CURRENT_DATE: la BD
+     * corre en UTC y el día cambiaría a las 6pm hora de Costa Rica.
+     */
+    public static LocalDate today() {
+        return LocalDate.now(APP_ZONE);
+    }
+
+    /** Lunes de la semana actual en la zona de la app. */
+    public static LocalDate currentWeekStart() {
+        return today().with(java.time.DayOfWeek.MONDAY);
+    }
 }
