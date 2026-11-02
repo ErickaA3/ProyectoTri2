@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import com.project.dao.implementation.DuelDAOImpl;
 import com.project.dao.interfaces.IDuelDAO;
 import com.project.util.GamificationService;
+import com.project.util.JwtUtil;
 
 import jakarta.websocket.*;
 import jakarta.websocket.server.PathParam;
@@ -71,10 +72,48 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
         LOG.log(Level.SEVERE, "[WS] Error en sesión userId=" + userId, t);
     }
 
+    // ── AUTENTICACIÓN ────────────────────────────────────────────
+
+    /**
+     * [SEGURIDAD] El canal WebSocket no pasa por JwtFilter. Antes se usaba tal
+     * cual el "userId" que mandaba el cliente en JOIN/RECONNECT, así que
+     * cualquiera que conociera el UUID de otro jugador podía suplantarlo.
+     * Ahora el cliente manda su JWT en el mismo mensaje y el userId sale del
+     * token. Va en el mensaje y no en la URL para que no quede en los logs.
+     * Si ya hay un usuario autenticado en esta conexión, no puede cambiar.
+     */
+    private boolean authenticate(JsonObject msg) throws IOException {
+        String token = msg.has("token") && !msg.get("token").isJsonNull()
+                ? msg.get("token").getAsString() : null;
+        if (token == null || token.isBlank()) {
+            sendError("Sesión no válida. Volvé a iniciar sesión.");
+            session.close(new CloseReason(CloseReason.CloseCodes.VIOLATED_POLICY, "Falta el token"));
+            return false;
+        }
+
+        String tokenUserId;
+        try {
+            tokenUserId = JwtUtil.getUserId(token);
+        } catch (Exception e) {
+            sendError("Sesión no válida o vencida. Volvé a iniciar sesión.");
+            session.close(new CloseReason(CloseReason.CloseCodes.VIOLATED_POLICY, "Token inválido"));
+            return false;
+        }
+
+        if (this.userId != null && !this.userId.equals(tokenUserId)) {
+            sendError("No podés cambiar de usuario en una conexión abierta.");
+            session.close(new CloseReason(CloseReason.CloseCodes.VIOLATED_POLICY, "Usuario distinto"));
+            return false;
+        }
+
+        this.userId = tokenUserId;
+        return true;
+    }
+
     // ── HANDLERS ────────────────────────────────────────────────
 
     private void handleJoin(JsonObject msg) throws Exception {
-        this.userId = msg.get("userId").getAsString();
+        if (!authenticate(msg)) return;
 
         JsonObject duelInfo = duelDAO.getDuel(duelId, userId);
         if (duelInfo == null) { sendError("No pertenecés a este duelo."); session.close(); return; }
@@ -204,7 +243,7 @@ public class DuelWebSocket implements DuelRoom.RoomCallback {
     }
 
     private void handleReconnect(JsonObject msg) throws Exception {
-        this.userId = msg.get("userId").getAsString();
+        if (!authenticate(msg)) return;
 
         DuelRoom room = DuelRoomManager.INSTANCE.get(duelId);
         if (room == null) { sendError("El duelo ya no está activo."); return; }

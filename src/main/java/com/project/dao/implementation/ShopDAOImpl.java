@@ -304,20 +304,34 @@ public class ShopDAOImpl implements IShopDAO {
             return false;
         }
 
+        // [SEGURIDAD] Antes se auto-insertaba el ítem en el inventario antes de
+        // equiparlo, así que POST /shop/equip con cualquier itemId lo dejaba
+        // equipado sin pagar. Ahora solo se equipa lo que el usuario ya tiene;
+        // la única excepción son los ítems gratis (cost = 0, p. ej. el fondo
+        // por defecto), que se agregan al inventario al equiparlos.
+        boolean owned = userOwnsItem(userId, itemId);
+        if (!owned && item.getCost() > 0) {
+            System.err.println("[ShopDAO] equipItem: el usuario " + userId
+                + " intentó equipar el ítem " + itemId + " sin tenerlo.");
+            return false;
+        }
+
         Connection conn = null;
         PreparedStatement ps = null;
         try {
             conn = DatabaseConnection.getConnection();
             conn.setAutoCommit(false);
 
-            // 1. Auto-insertar en inventario si no lo tiene
-            ps = conn.prepareStatement(
-                "INSERT INTO user_inventory (user_id, item_id, purchased_at, is_equipped) " +
-                "VALUES (?::uuid, ?, NOW(), false) ON CONFLICT (user_id, item_id) DO NOTHING");
-            ps.setString(1, userId);
-            ps.setInt(2, itemId);
-            ps.executeUpdate();
-            ps.close();
+            // 1. Ítem gratis que todavía no está en el inventario: agregarlo
+            if (!owned) {
+                ps = conn.prepareStatement(
+                    "INSERT INTO user_inventory (user_id, item_id, purchased_at, is_equipped) " +
+                    "VALUES (?::uuid, ?, NOW(), false) ON CONFLICT (user_id, item_id) DO NOTHING");
+                ps.setString(1, userId);
+                ps.setInt(2, itemId);
+                ps.executeUpdate();
+                ps.close();
+            }
 
             // 2. Desequipar todos del mismo tipo
             ps = conn.prepareStatement(

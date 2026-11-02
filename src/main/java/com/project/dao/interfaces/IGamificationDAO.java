@@ -1,5 +1,7 @@
 package com.project.dao.interfaces;
 
+import java.sql.Connection;
+
 import com.google.gson.JsonObject;
 
 /**
@@ -11,15 +13,27 @@ import com.google.gson.JsonObject;
  *                          streak_last_activity, has_streak_shield
  *   activity_results    — registro de cada actividad completada
  *   user_daily_missions — progreso de misiones diarias
+ *
+ * Los métodos que reciben una Connection se usan dentro de la transacción de
+ * GamificationService.processActivity(): no abren ni cierran la conexión, ni
+ * hacen commit. Así todos los cambios de una actividad se guardan juntos o no
+ * se guarda ninguno.
  */
 public interface IGamificationDAO {
 
     /**
-     * Obtiene los stats actuales de un usuario.
+     * Obtiene los stats actuales de un usuario (solo lectura, conexión propia).
      * @return JsonObject con xp, level, coins, streakCurrent, streakRecord,
      *         streakLastActivity, hasStreakShield. Null si no existe.
      */
     JsonObject getStats(String userId) throws Exception;
+
+    /**
+     * Igual que getStats, pero bloquea la fila de user_stats (SELECT ... FOR UPDATE)
+     * hasta que termine la transacción. Evita que dos actividades simultáneas
+     * del mismo usuario lean el mismo saldo y una pise a la otra.
+     */
+    JsonObject getStatsForUpdate(Connection conn, String userId) throws Exception;
 
     /**
      * Actualiza XP, nivel, monedas y racha de un usuario.
@@ -32,47 +46,51 @@ public interface IGamificationDAO {
      * @param lastActivity Fecha de última actividad (YYYY-MM-DD)
      * @param shield       Si tiene escudo de racha
      */
-    boolean updateStats(String userId, int xp, int level, int coins,
+    boolean updateStats(Connection conn, String userId, int xp, int level, int coins,
                         int streak, int streakRecord, String lastActivity,
                         boolean shield) throws Exception;
 
     /**
      * Registra una actividad completada en activity_results.
-     * @return UUID del registro creado
+     * @return UUID del registro creado, o null si ese contenido ya estaba registrado
      */
-    String saveActivityResult(String userId, String contentId,
+    String saveActivityResult(Connection conn, String userId, String contentId,
                               double score, double maxScore,
                               int timeTakenSeconds) throws Exception;
 
     /**
      * Incrementa el progreso de misiones diarias que coincidan con el tipo de actividad.
      * @param userId       UUID del usuario
-     * @param missionType  Tipo de misión: "evaluacion", "flashcard", "contenido", "duelo", "actividad"
+     * @param missionType  Tipo de misión (missions.type)
      * @param today        Fecha de "hoy" calculada en Java (con la zona horaria de la app,
      *                     NO se usa CURRENT_DATE de Postgres — esa corre en la zona del
      *                     servidor de BD, que puede no coincidir con la del usuario)
      * @return Número de misiones actualizadas
      */
-    int advanceDailyMissions(String userId, String missionType, java.time.LocalDate today) throws Exception;
+    int advanceDailyMissions(Connection conn, String userId, String missionType,
+                             java.time.LocalDate today) throws Exception;
 
     /**
      * Incrementa el progreso de objetivos semanales que coincidan.
      * @param userId        UUID del usuario
-     * @param objectiveType Tipo: "racha", "actividades", "duelos", "examen_perfecto"
+     * @param objectiveType Tipo (objectives.type)
      * @param weekStart     Lunes de la semana actual, calculado en Java con la zona de la app
      * @return Número de objetivos actualizados
      */
-    int advanceWeeklyObjectives(String userId, String objectiveType, java.time.LocalDate weekStart) throws Exception;
+    int advanceWeeklyObjectives(Connection conn, String userId, String objectiveType,
+                                java.time.LocalDate weekStart) throws Exception;
 
     /**
-     * Obtiene misiones diarias completadas (para dar rewards).
+     * Marca como completadas las misiones diarias que llegaron a su meta.
      * @return JsonObject con misiones recién completadas y sus rewards
      */
-    JsonObject checkCompletedMissions(String userId, java.time.LocalDate today) throws Exception;
+    JsonObject checkCompletedMissions(Connection conn, String userId,
+                                      java.time.LocalDate today) throws Exception;
 
     /**
-     * Obtiene objetivos semanales completados (para dar rewards).
+     * Marca como completados los objetivos semanales que llegaron a su meta.
      * @return JsonObject con objetivos recién completados y sus rewards
      */
-    JsonObject checkCompletedObjectives(String userId, java.time.LocalDate weekStart) throws Exception;
+    JsonObject checkCompletedObjectives(Connection conn, String userId,
+                                        java.time.LocalDate weekStart) throws Exception;
 }

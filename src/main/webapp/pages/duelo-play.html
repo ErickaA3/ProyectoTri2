@@ -332,13 +332,15 @@
         ws.onopen = () => {
             console.log('[WS] Conectado');
             intentosReconexion = 0;
+            // El servidor identifica al jugador por el JWT, no por el userId.
+            const token = localStorage.getItem('token');
             if (yaEntro) {
                 // Reconexión: el servidor responde con STATE_SYNC y seguimos donde íbamos.
-                send({ type: 'RECONNECT', duelId, userId });
+                send({ type: 'RECONNECT', duelId, token });
                 showWaiting('Reconectando...');
             } else {
                 yaEntro = true;
-                send({ type: 'JOIN', duelId, userId });
+                send({ type: 'JOIN', duelId, token });
                 showWaiting('Conectando...');
             }
         };

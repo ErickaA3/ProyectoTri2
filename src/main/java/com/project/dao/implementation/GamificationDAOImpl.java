@@ -12,43 +12,53 @@ import com.project.database.DatabaseConnection;
  * Implementación del DAO de gamificación.
  * Habla con user_stats, activity_results, user_daily_missions,
  * user_weekly_objectives en Supabase.
+ *
+ * Salvo getStats(String), todos los métodos trabajan sobre la Connection que
+ * reciben (la transacción de GamificationService.processActivity) y no la cierran.
  */
 public class GamificationDAOImpl implements IGamificationDAO {
+
+    private static final String STATS_SQL = """
+        SELECT xp, level, coins, streak_current, streak_record,
+               streak_last_activity::text, has_streak_shield
+        FROM user_stats
+        WHERE user_id = ?::uuid
+        """;
 
     // ─── GET STATS ──────────────────────────────────────────────────────────
     @Override
     public JsonObject getStats(String userId) throws Exception {
-        String sql = """
-            SELECT xp, level, coins, streak_current, streak_record,
-                   streak_last_activity::text, has_streak_shield
-            FROM user_stats
-            WHERE user_id = ?::uuid
-            """;
-
         try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
+             PreparedStatement stmt = conn.prepareStatement(STATS_SQL)) {
             stmt.setString(1, userId);
-            ResultSet rs = stmt.executeQuery();
-
-            if (rs.next()) {
-                JsonObject stats = new JsonObject();
-                stats.addProperty("xp",                rs.getInt("xp"));
-                stats.addProperty("level",             rs.getInt("level"));
-                stats.addProperty("coins",             rs.getInt("coins"));
-                stats.addProperty("streakCurrent",     rs.getInt("streak_current"));
-                stats.addProperty("streakRecord",      rs.getInt("streak_record"));
-                stats.addProperty("streakLastActivity", rs.getString("streak_last_activity"));
-                stats.addProperty("hasStreakShield",    rs.getBoolean("has_streak_shield"));
-                return stats;
-            }
-            return null;
+            return mapStats(stmt.executeQuery());
         }
+    }
+
+    @Override
+    public JsonObject getStatsForUpdate(Connection conn, String userId) throws Exception {
+        try (PreparedStatement stmt = conn.prepareStatement(STATS_SQL + " FOR UPDATE")) {
+            stmt.setString(1, userId);
+            return mapStats(stmt.executeQuery());
+        }
+    }
+
+    private JsonObject mapStats(ResultSet rs) throws SQLException {
+        if (!rs.next()) return null;
+        JsonObject stats = new JsonObject();
+        stats.addProperty("xp",                 rs.getInt("xp"));
+        stats.addProperty("level",              rs.getInt("level"));
+        stats.addProperty("coins",              rs.getInt("coins"));
+        stats.addProperty("streakCurrent",      rs.getInt("streak_current"));
+        stats.addProperty("streakRecord",       rs.getInt("streak_record"));
+        stats.addProperty("streakLastActivity", rs.getString("streak_last_activity"));
+        stats.addProperty("hasStreakShield",    rs.getBoolean("has_streak_shield"));
+        return stats;
     }
 
     // ─── UPDATE STATS ───────────────────────────────────────────────────────
     @Override
-    public boolean updateStats(String userId, int xp, int level, int coins,
+    public boolean updateStats(Connection conn, String userId, int xp, int level, int coins,
                                int streak, int streakRecord, String lastActivity,
                                boolean shield) throws Exception {
         String sql = """
@@ -60,9 +70,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
             WHERE user_id = ?::uuid
             """;
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, xp);
             stmt.setInt(2, level);
             stmt.setInt(3, coins);
@@ -78,17 +86,16 @@ public class GamificationDAOImpl implements IGamificationDAO {
 
     // ─── SAVE ACTIVITY RESULT ───────────────────────────────────────────────
     @Override
-    public String saveActivityResult(String userId, String contentId,
+    public String saveActivityResult(Connection conn, String userId, String contentId,
                                      double score, double maxScore,
                                      int timeTakenSeconds) throws Exception {
         // [SEGURIDAD] Chequeo de duplicado ANTES de insertar: si ya existe un
         // resultado para este (userId, contentId), se devuelve null y
         // processActivity() lo interpreta como "alreadyRewarded" → no se
         // vuelve a pagar XP/monedas por el mismo contenido.
-        // No se asume que exista un UNIQUE constraint en la BD para esto
-        // (por eso el check explícito acá, no un ON CONFLICT); si se agrega
-        // el constraint en Supabase más adelante, este método sigue
-        // funcionando igual.
+        // Ya no hay carrera entre el check y el insert: processActivity()
+        // bloquea la fila de user_stats del usuario antes de llegar acá, así
+        // que dos peticiones del mismo usuario se procesan de a una.
         String checkSql = """
             SELECT id FROM activity_results
             WHERE user_id = ?::uuid AND content_id = ?::uuid
@@ -102,43 +109,34 @@ public class GamificationDAOImpl implements IGamificationDAO {
             RETURNING id
             """;
 
-        try (Connection conn = DatabaseConnection.getConnection()) {
-
-            try (PreparedStatement check = conn.prepareStatement(checkSql)) {
-                check.setString(1, userId);
-                check.setString(2, contentId);
-                ResultSet rsCheck = check.executeQuery();
-                if (rsCheck.next()) {
-                    return null; // ya existe → alreadyRewarded
-                }
+        try (PreparedStatement check = conn.prepareStatement(checkSql)) {
+            check.setString(1, userId);
+            check.setString(2, contentId);
+            ResultSet rsCheck = check.executeQuery();
+            if (rsCheck.next()) {
+                return null; // ya existe → alreadyRewarded
             }
+        }
 
-            try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
-                stmt.setString(1, userId);
-                stmt.setString(2, contentId);
-                stmt.setDouble(3, score);
-                stmt.setDouble(4, maxScore);
-                stmt.setInt(5, timeTakenSeconds);
+        try (PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+            stmt.setString(1, userId);
+            stmt.setString(2, contentId);
+            stmt.setDouble(3, score);
+            stmt.setDouble(4, maxScore);
+            stmt.setInt(5, timeTakenSeconds);
 
-                ResultSet rs = stmt.executeQuery();
-                if (rs.next()) {
-                    return rs.getString("id");
-                }
-                throw new Exception("No se pudo guardar el resultado de actividad.");
-            } catch (SQLException e) {
-                // Por si sí existe un UNIQUE constraint en la BD y hubo una
-                // carrera entre el check y el insert (dos requests casi
-                // simultáneos con el mismo contentId): tratarlo también
-                // como "ya recompensado" en vez de reventar con un 500.
-                if ("23505".equals(e.getSQLState())) return null;
-                throw e;
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("id");
             }
+            throw new Exception("No se pudo guardar el resultado de actividad.");
         }
     }
 
     // ─── ADVANCE DAILY MISSIONS ─────────────────────────────────────────────
     @Override
-    public int advanceDailyMissions(String userId, String missionType, LocalDate today) throws Exception {
+    public int advanceDailyMissions(Connection conn, String userId, String missionType,
+                                    LocalDate today) throws Exception {
         // Incrementa progress en misiones del día que coincidan con el tipo
         // y que aún no estén completadas.
         // [BUG] Antes usaba CURRENT_DATE (zona horaria del servidor de BD,
@@ -156,9 +154,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
               AND m.type = ?
             """;
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, userId);
             stmt.setDate(2, java.sql.Date.valueOf(today));
             stmt.setString(3, missionType);
@@ -169,7 +165,8 @@ public class GamificationDAOImpl implements IGamificationDAO {
 
     // ─── ADVANCE WEEKLY OBJECTIVES ──────────────────────────────────────────
     @Override
-    public int advanceWeeklyObjectives(String userId, String objectiveType, LocalDate weekStart) throws Exception {
+    public int advanceWeeklyObjectives(Connection conn, String userId, String objectiveType,
+                                       LocalDate weekStart) throws Exception {
         String sql = """
             UPDATE user_weekly_objectives
             SET progress = progress + 1
@@ -179,9 +176,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
               AND type = ?
             """;
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, userId);
             stmt.setDate(2, java.sql.Date.valueOf(weekStart));
             stmt.setString(3, objectiveType);
@@ -192,7 +187,8 @@ public class GamificationDAOImpl implements IGamificationDAO {
 
     // ─── CHECK COMPLETED MISSIONS ───────────────────────────────────────────
     @Override
-    public JsonObject checkCompletedMissions(String userId, LocalDate today) throws Exception {
+    public JsonObject checkCompletedMissions(Connection conn, String userId,
+                                             LocalDate today) throws Exception {
         // Marca como completadas las misiones que alcanzaron su required_count
         // y devuelve sus rewards
         String sql = """
@@ -207,9 +203,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
             RETURNING m.description, m.xp_reward, m.coin_reward
             """;
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, userId);
             stmt.setDate(2, java.sql.Date.valueOf(today));
             ResultSet rs = stmt.executeQuery();
@@ -237,7 +231,8 @@ public class GamificationDAOImpl implements IGamificationDAO {
 
     // ─── CHECK COMPLETED OBJECTIVES ─────────────────────────────────────────
     @Override
-    public JsonObject checkCompletedObjectives(String userId, LocalDate weekStart) throws Exception {
+    public JsonObject checkCompletedObjectives(Connection conn, String userId,
+                                               LocalDate weekStart) throws Exception {
         String sql = """
             UPDATE user_weekly_objectives
             SET completed = true
@@ -248,9 +243,7 @@ public class GamificationDAOImpl implements IGamificationDAO {
             RETURNING objective_description, xp_reward, coin_reward
             """;
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, userId);
             stmt.setDate(2, java.sql.Date.valueOf(weekStart));
             ResultSet rs = stmt.executeQuery();

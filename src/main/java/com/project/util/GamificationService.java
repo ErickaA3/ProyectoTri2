@@ -1,11 +1,13 @@
 package com.project.util;
 
+import java.sql.Connection;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
 import com.google.gson.JsonObject;
 import com.project.dao.implementation.GamificationDAOImpl;
 import com.project.dao.interfaces.IGamificationDAO;
+import com.project.database.DatabaseConnection;
 
 /**
  * Servicio central de gamificación de Polaris / Mi ProfesorIA.
@@ -72,13 +74,43 @@ public class GamificationService {
     // MÉTODO PRINCIPAL
     // ═════════════════════════════════════════════════════════════════════════
 
+    /**
+     * Procesa una actividad completa en UNA transacción: stats, resultado,
+     * misiones y objetivos se guardan juntos o no se guarda nada.
+     *
+     * [BUG] Antes cada paso usaba su propia conexión: si algo fallaba a la
+     * mitad quedaban datos a medias, y dos actividades simultáneas del mismo
+     * usuario leían el mismo XP/monedas y la segunda pisaba a la primera.
+     * Ahora la fila de user_stats se bloquea (FOR UPDATE) al principio, así
+     * que las actividades de un mismo usuario se procesan de a una.
+     */
     public static JsonObject processActivity(String userId, String activityType,
                                               double scorePercent, String contentId,
                                               int timeTakenSecs, double maxScore)
                                               throws Exception {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                JsonObject result = processActivity(conn, userId, activityType,
+                        scorePercent, contentId, timeTakenSecs, maxScore);
+                conn.commit();
+                return result;
+            } catch (Exception e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        }
+    }
 
-        // 1. Stats actuales
-        JsonObject stats = dao.getStats(userId);
+    private static JsonObject processActivity(Connection conn, String userId, String activityType,
+                                              double scorePercent, String contentId,
+                                              int timeTakenSecs, double maxScore)
+                                              throws Exception {
+
+        // 1. Stats actuales (bloqueando la fila hasta el commit)
+        JsonObject stats = dao.getStatsForUpdate(conn, userId);
         if (stats == null) {
             throw new Exception("Usuario no encontrado en user_stats: " + userId);
         }
@@ -110,7 +142,7 @@ public class GamificationService {
         boolean alreadyRewarded = false;
         if (contentId != null && !contentId.isEmpty()) {
             double score = (scorePercent / 100.0) * maxScore;
-            resultId = dao.saveActivityResult(userId, contentId, score, maxScore, timeTakenSecs);
+            resultId = dao.saveActivityResult(conn, userId, contentId, score, maxScore, timeTakenSecs);
             alreadyRewarded = (resultId == null);
         }
 
@@ -149,7 +181,7 @@ public class GamificationService {
         int newStreakRecord = Math.max(streakRecord, streak.newStreak);
 
         // 8. Guardar
-        dao.updateStats(userId, newXp, newLevel, newCoins,
+        dao.updateStats(conn, userId, newXp, newLevel, newCoins,
             streak.newStreak, newStreakRecord,
             today.toString(), streak.shieldUsed ? false : hasShield);
 
@@ -162,12 +194,12 @@ public class GamificationService {
         // ══════════════════════════════════════════════════════════════════════
         String missionType = mapToMissionType(activityType);
         if (missionType != null && !alreadyRewarded) {
-            dao.advanceDailyMissions(userId, missionType, today);
+            dao.advanceDailyMissions(conn, userId, missionType, today);
         }
 
         // Si la racha subió, avanzar misiones de tipo maintain_streak
         if (streak.newStreak > streakCurrent) {
-            dao.advanceDailyMissions(userId, "maintain_streak", today);
+            dao.advanceDailyMissions(conn, userId, "maintain_streak", today);
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -178,7 +210,7 @@ public class GamificationService {
         LocalDate weekStart = today.with(java.time.DayOfWeek.MONDAY);
         String objectiveType = mapToObjectiveType(activityType, scorePercent);
         if (objectiveType != null) {
-            dao.advanceWeeklyObjectives(userId, objectiveType, weekStart);
+            dao.advanceWeeklyObjectives(conn, userId, objectiveType, weekStart);
             // [BUG] El pool de objetivos semanales (UserDAOImpl.ensureWeeklyObjectives)
             // tiene DOS entradas distintas para "ganar duelos": type="duels_won"
             // ("Ganar 2 duelos") y type="win_duel" ("Ganar 3 duelos"). Acá solo se
@@ -187,23 +219,23 @@ public class GamificationService {
             // avanzaba — se quedaba pegado en 0/2 sin importar cuántos duelos
             // ganara. Se avanzan ambos tipos para que ninguno quede huérfano.
             if ("win_duel".equals(objectiveType)) {
-                dao.advanceWeeklyObjectives(userId, "duels_won", weekStart);
+                dao.advanceWeeklyObjectives(conn, userId, "duels_won", weekStart);
             }
         }
 
         // "activities" cuenta CUALQUIER actividad positiva (no abandon)
         if (!"abandon_exam".equals(activityType)) {
-            dao.advanceWeeklyObjectives(userId, "activities", weekStart);
+            dao.advanceWeeklyObjectives(conn, userId, "activities", weekStart);
         }
 
         // Si la racha subió, avanzar objetivo de streak_days
         if (streak.newStreak > streakCurrent) {
-            dao.advanceWeeklyObjectives(userId, "streak_days", weekStart);
+            dao.advanceWeeklyObjectives(conn, userId, "streak_days", weekStart);
         }
 
         // 12. Check completados
-        JsonObject missionRewards   = dao.checkCompletedMissions(userId, today);
-        JsonObject objectiveRewards = dao.checkCompletedObjectives(userId, weekStart);
+        JsonObject missionRewards   = dao.checkCompletedMissions(conn, userId, today);
+        JsonObject objectiveRewards = dao.checkCompletedObjectives(conn, userId, weekStart);
 
         int bonusXp    = missionRewards.get("missionXp").getAsInt()
                        + objectiveRewards.get("objectiveXp").getAsInt();
@@ -215,7 +247,7 @@ public class GamificationService {
             newCoins += bonusCoins;
             int levelAfterBonus = calculateLevel(newXp);
             if (levelAfterBonus > newLevel) { newLevel = levelAfterBonus; leveledUp = true; }
-            dao.updateStats(userId, newXp, newLevel, newCoins,
+            dao.updateStats(conn, userId, newXp, newLevel, newCoins,
                 streak.newStreak, newStreakRecord,
                 today.toString(), streak.shieldUsed ? false : hasShield);
         }
