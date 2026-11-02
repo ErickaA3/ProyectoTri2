@@ -123,6 +123,22 @@ from professor_config;
 
 -- ── users ───────────────────────────────────────────────────────────────────
 
+-- Con citext, "Ana" y "ana" pasan a ser el mismo username. Si ya hay usernames
+-- que solo difieren en mayúsculas, la cuenta más antigua conserva el nombre y
+-- las demás reciben un sufijo (_2, _3...). El login es por email, así que nadie
+-- pierde el acceso.
+with ranked as (
+    select id, username,
+           row_number() over (partition by lower(username) order by created_at, id) as rn
+    from users
+)
+update users u
+set username = left(r.username, 27) || '_' || r.rn
+from ranked r
+where u.id = r.id and r.rn > 1;
+
+update users set created_at = now() where created_at is null;
+
 alter table users
     alter column username type citext,
     alter column email    type citext,

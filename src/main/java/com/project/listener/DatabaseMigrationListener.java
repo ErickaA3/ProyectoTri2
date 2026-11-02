@@ -17,15 +17,16 @@ import jakarta.servlet.annotation.WebListener;
  * Localmente queda apagado a propósito: si cada integrante corriera su rama
  * contra la base compartida, una migración a medio hacer llegaría a producción.
  *
- * La base de producción ya tenía las V1 y V2 aplicadas a mano antes de usar
- * Flyway: con baselineOnMigrate, la primera vez Flyway la marca como "al día
- * hasta la V2" y solo ejecuta de la V3 en adelante. En una base vacía corre
- * todas desde la V1.
+ * Las migraciones de la reestructuración se están aplicando a mano en el SQL
+ * Editor de Supabase. BASELINE_VERSION es la última aplicada así: la primera
+ * vez que Flyway corra contra producción la marca como "al día" hasta esa
+ * versión y solo ejecuta las siguientes. En una base vacía corre todas desde
+ * la V1. Cada vez que se aplique otra migración a mano, hay que subir este número.
  */
 @WebListener
 public class DatabaseMigrationListener implements ServletContextListener {
 
-    private static final String BASELINE_VERSION = "2";
+    private static final String BASELINE_VERSION = "3";
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
@@ -39,7 +40,7 @@ public class DatabaseMigrationListener implements ServletContextListener {
                 .locations("classpath:db/migration")
                 .baselineOnMigrate(true)
                 .baselineVersion(BASELINE_VERSION)
-                .baselineDescription("Esquema previo a Flyway (V1 + V2 aplicadas a mano)")
+                .baselineDescription("Migraciones aplicadas a mano hasta la V" + BASELINE_VERSION)
                 .load()
                 .migrate();
 

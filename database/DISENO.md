@@ -113,7 +113,7 @@ Las migraciones viven en [`src/main/resources/db/migration/`](../src/main/resour
 - **Solo corren si la variable de entorno `DB_MIGRATE=true`.** Se define en Railway. Localmente queda apagado, para que nadie aplique a la base compartida una migración de su rama a medio hacer.
 - **Nunca se edita una migración ya aplicada.** Si hay que corregir algo, se escribe una migración nueva (`V4__...`).
 - **Nombres:** `V<número>__<descripcion_con_guiones_bajos>.sql` (dos guiones bajos).
-- **Producción ya tenía V1 y V2 aplicadas a mano.** La primera vez que arranque con `DB_MIGRATE=true`, Flyway la marca como "al día hasta la V2" (baseline) y solo ejecuta de la V3 en adelante. En una base vacía corre todas desde la V1.
+- **Mientras dure la reestructuración, las migraciones se aplican a mano** en el SQL Editor de Supabase. `BASELINE_VERSION` en `DatabaseMigrationListener` es la última aplicada así (hoy, la V3). La primera vez que la app arranque con `DB_MIGRATE=true`, Flyway marca producción como "al día" hasta esa versión y solo ejecuta las siguientes. En una base vacía corre todas desde la V1. Cada migración aplicada a mano sube ese número en el mismo commit.
 
 ## Plan de migración
 
