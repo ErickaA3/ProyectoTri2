@@ -193,11 +193,12 @@ public class WrappedDAOImpl implements IWrappedDAO {
         }
     }
 
-    // ─── Pregunta / tema más frecuente (chat_history) ──────────────────────
+    // ─── Pregunta / tema más frecuente (chat_messages) ──────────────────────
     private void fillFrequentTopic(String userId, LocalDate weekStart, JsonObject result) throws SQLException {
         String sql = """
-            SELECT message FROM chat_history
-            WHERE user_id = ?::uuid AND role = 'user' AND created_at >= ?::date
+            SELECT m.body AS message
+            FROM chat_messages m JOIN chat_sessions s ON s.id = m.session_id
+            WHERE s.user_id = ?::uuid AND m.role = 'user' AND m.created_at >= ?::date
             """;
 
         Map<String, Integer> counts = new LinkedHashMap<>();

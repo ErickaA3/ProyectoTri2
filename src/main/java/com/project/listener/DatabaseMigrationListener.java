@@ -26,7 +26,7 @@ import jakarta.servlet.annotation.WebListener;
 @WebListener
 public class DatabaseMigrationListener implements ServletContextListener {
 
-    private static final String BASELINE_VERSION = "7";
+    private static final String BASELINE_VERSION = "8";
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {

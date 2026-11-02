@@ -97,3 +97,28 @@ La respuesta agrega `topicId` y `documentId`. El material subido (archivo o text
 - **`GET /api/historial/{id}`:** trae `topicId` en lugar de `sessionId`.
 - **`GET /api/summaries?id=…`:** trae `topicId`, `topicName`, `subjectId` y `subjectName` en lugar de `sessionId`.
 - **Borrar contenido** (uno o todo el historial) ahora es borrado lógico: deja de verse, pero sus resultados y duelos se conservan.
+
+## Chat del profesor IA con alcance
+
+`POST /api/chat` acepta, al **empezar** una conversación (sin `sessionId`), un alcance opcional:
+
+- `topicId`: el profesor IA busca solo en el material de ese tema.
+- `subjectId`: busca en toda esa materia.
+- Ninguno: busca en todo el material del estudiante (como hasta ahora).
+
+Si vienen los dos, manda el tema. El alcance queda guardado en la sesión: los mensajes siguientes con el mismo `sessionId` no necesitan repetirlo. Tema o materia que no existe o no es del usuario: `404`.
+
+La respuesta agrega `topicId` / `subjectId` (si la sesión tiene alcance) y **`sources`**: de qué material salió la respuesta.
+
+```json
+{
+  "reply": "La regla de la cadena dice...",
+  "sessionId": "c0000000-…",
+  "topicId": "68eab3be-…",
+  "sources": [
+    { "subject": "Cálculo", "topic": "Derivadas", "document": "clase3.pdf" }
+  ]
+}
+```
+
+En la lista de conversaciones (`GET /api/chat`), `firstMessage` ahora es el título de la sesión (el primer mensaje, recortado a 100 caracteres).

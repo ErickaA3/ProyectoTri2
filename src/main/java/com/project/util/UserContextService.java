@@ -26,6 +26,18 @@ public class UserContextService {
             new com.project.dao.implementation.LibraryDAOImpl();
 
     public static String buildContext(UUID userId, String userMessage) {
+        return buildContext(userId, userMessage, null, null, null);
+    }
+
+    /**
+     * Contexto para el profesor IA con alcance: solo busca material dentro de
+     * la materia o el tema de la sesión (los dos en null = todo el material).
+     * @param sourcesOut si no es null, recibe los fragmentos usados como
+     *                   {chunkId, subject, topic, document} para guardar las citas
+     */
+    public static String buildContext(UUID userId, String userMessage,
+                                      String subjectId, String topicId,
+                                      com.google.gson.JsonArray sourcesOut) {
         StringBuilder ctx = new StringBuilder();
 
         try (Connection conn = DatabaseConnection.getConnection()) {
@@ -34,7 +46,7 @@ public class UserContextService {
             appendStats(conn, userId, ctx);
 
             appendAllTitles(conn, userId, ctx);
-            appendRelevantContent(conn, userId, userMessage, ctx);
+            appendRelevantContent(conn, userId, userMessage, subjectId, topicId, sourcesOut, ctx);
 
             appendDailyMissions(conn, userId, ctx);
             appendWeeklyObjectives(conn, userId, ctx);
@@ -155,8 +167,10 @@ public class UserContextService {
 
     // ── Búsqueda de contenido RELEVANTE — AHORA POR SIMILITUD VECTORIAL ────
 
-    private static void appendRelevantContent(Connection conn, UUID userId,
-                                               String userMessage, StringBuilder ctx) {
+    private static void appendRelevantContent(Connection conn, UUID userId, String userMessage,
+                                               String subjectId, String topicId,
+                                               com.google.gson.JsonArray sourcesOut,
+                                               StringBuilder ctx) {
         if (userMessage == null || userMessage.isBlank()) {
             appendRecentContent(conn, userId, ctx, 3);
             return;
@@ -178,7 +192,8 @@ public class UserContextService {
         //    Solo entran fragmentos que ya tienen embedding.
         try {
             com.google.gson.JsonArray chunks =
-                    LIBRARY.searchChunks(userId.toString(), queryEmbedding, MAX_RELEVANT_ITEMS);
+                    LIBRARY.searchChunks(userId.toString(), queryEmbedding, MAX_RELEVANT_ITEMS,
+                                         subjectId, topicId);
 
             if (chunks.isEmpty()) {
                 ctx.append("NOTA: No se encontró material del estudiante relacionado con la pregunta.\n");
@@ -189,6 +204,11 @@ public class UserContextService {
             ctx.append("MATERIAL DEL ESTUDIANTE RELEVANTE A LA PREGUNTA:\n");
             for (var el : chunks) {
                 var chunk = el.getAsJsonObject();
+                if (sourcesOut != null) {
+                    var source = chunk.deepCopy();
+                    source.remove("content");
+                    sourcesOut.add(source);
+                }
                 ctx.append("\n── ").append(chunk.get("subject").getAsString())
                    .append(" › ").append(chunk.get("topic").getAsString())
                    .append(" (documento: \"").append(chunk.get("document").getAsString()).append("\") ──\n");

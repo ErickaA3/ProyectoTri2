@@ -195,6 +195,19 @@ public class LibraryDAOImpl implements ILibraryDAO {
     }
 
     @Override
+    public boolean subjectBelongsToUser(String subjectId, String userId) throws Exception {
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement ps = conn.prepareStatement("""
+                     SELECT 1 FROM subjects
+                     WHERE id = ?::uuid AND owner_id = ?::uuid AND archived_at IS NULL
+                     """)) {
+            ps.setString(1, subjectId);
+            ps.setString(2, userId);
+            return ps.executeQuery().next();
+        }
+    }
+
+    @Override
     public boolean topicBelongsToUser(String topicId, String userId) throws Exception {
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(OWNED_TOPIC)) {
@@ -296,26 +309,40 @@ public class LibraryDAOImpl implements ILibraryDAO {
 
     @Override
     public JsonArray searchChunks(String userId, float[] queryEmbedding, int limit) throws Exception {
+        return searchChunks(userId, queryEmbedding, limit, null, null);
+    }
+
+    @Override
+    public JsonArray searchChunks(String userId, float[] queryEmbedding, int limit,
+                                  String subjectId, String topicId) throws Exception {
         String sql = """
-            SELECT s.name AS subject, t.name AS topic, d.file_name AS document, ch.content
+            SELECT ch.id::text AS chunk_id, s.name AS subject, t.name AS topic,
+                   d.file_name AS document, ch.content
             FROM document_chunks ch
             JOIN documents d ON d.id = ch.document_id
             JOIN topics t    ON t.id = d.topic_id   AND t.archived_at IS NULL
             JOIN subjects s  ON s.id = t.subject_id AND s.archived_at IS NULL
             WHERE s.owner_id = ? AND ch.embedding IS NOT NULL
+              AND (?::uuid IS NULL OR s.id = ?::uuid)
+              AND (?::uuid IS NULL OR t.id = ?::uuid)
             ORDER BY ch.embedding <=> ?
             LIMIT ?
             """;
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, UUID.fromString(userId));
-            ps.setObject(2, new PGvector(queryEmbedding));
-            ps.setInt(3, limit);
+            ps.setString(2, subjectId);
+            ps.setString(3, subjectId);
+            ps.setString(4, topicId);
+            ps.setString(5, topicId);
+            ps.setObject(6, new PGvector(queryEmbedding));
+            ps.setInt(7, limit);
             ResultSet rs = ps.executeQuery();
 
             JsonArray result = new JsonArray();
             while (rs.next()) {
                 JsonObject o = new JsonObject();
+                o.addProperty("chunkId",  rs.getString("chunk_id"));
                 o.addProperty("subject",  rs.getString("subject"));
                 o.addProperty("topic",    rs.getString("topic"));
                 o.addProperty("document", rs.getString("document"));

@@ -6,7 +6,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -36,6 +35,9 @@ import jakarta.servlet.http.HttpSession;
 @WebServlet("/api/chat")
 public class ChatServlet extends HttpServlet {
 
+    private static final com.project.dao.interfaces.ILibraryDAO LIBRARY =
+            new com.project.dao.implementation.LibraryDAOImpl();
+
     // Límite de texto extraído del PDF que se pasa a la IA (chars)
     private static final int PDF_TEXT_LIMIT = 8000;
 
@@ -61,6 +63,8 @@ public class ChatServlet extends HttpServlet {
         String sessionId;
         String pdfBase64;
         String pdfName;
+        String topicId;
+        String subjectId;
 
         try {
             JsonObject json = JsonParser.parseString(body).getAsJsonObject();
@@ -78,6 +82,12 @@ public class ChatServlet extends HttpServlet {
             pdfName = json.has("pdfName") && !json.get("pdfName").isJsonNull()
                     ? json.get("pdfName").getAsString() : "documento.pdf";
 
+            // Alcance de una sesión NUEVA (opcional): un tema o una materia.
+            topicId = json.has("topicId") && !json.get("topicId").isJsonNull()
+                    ? json.get("topicId").getAsString() : null;
+            subjectId = json.has("subjectId") && !json.get("subjectId").isJsonNull()
+                    ? json.get("subjectId").getAsString() : null;
+
         } catch (Exception e) {
             JsonUtil.sendError(response, 400, "Body inválido, se esperaba JSON.");
             return;
@@ -87,12 +97,6 @@ public class ChatServlet extends HttpServlet {
             JsonUtil.sendError(response, 400, "El mensaje no puede estar vacío.");
             return;
         }
-
-        if (sessionId == null || sessionId.isBlank()) {
-            sessionId = UUID.randomUUID().toString();
-        }
-
-        final String finalSessionId = sessionId;
 
         // Extraer texto del PDF si viene adjunto
         String pdfTexto = null;
@@ -104,9 +108,15 @@ public class ChatServlet extends HttpServlet {
             List<AIService.ChatMessage> historial;
             String profesorNombre;
             String personalidad;
+            ChatSession session;
 
             try (Connection conn = DatabaseConnection.getConnection()) {
-                historial = loadHistory(conn, userId, finalSessionId);
+                session = resolveSession(conn, userId, sessionId, subjectId, topicId, mensaje);
+                if (session == null) {
+                    JsonUtil.sendError(response, 404, "Conversación, tema o materia no encontrados.");
+                    return;
+                }
+                historial = loadHistory(conn, userId, session.id());
 
                 String[] profesorConfig = loadProfesorConfig(conn, userId);
                 profesorNombre = profesorConfig[0];
@@ -116,10 +126,10 @@ public class ChatServlet extends HttpServlet {
                 String mensajeGuardado = (pdfTexto != null)
                         ? mensaje + "\n[PDF adjunto: " + pdfName + "]"
                         : mensaje;
-                saveMessage(conn, userId, finalSessionId, "user", mensajeGuardado);
+                saveMessage(conn, session.id(), "user", mensajeGuardado);
             }
 
-            // Contexto RAG
+            // Contexto RAG, limitado al alcance de la sesión
             StringBuilder searchContext = new StringBuilder();
             int start = Math.max(0, historial.size() - 6);
             for (int i = start; i < historial.size(); i++) {
@@ -127,7 +137,9 @@ public class ChatServlet extends HttpServlet {
             }
             searchContext.append(mensaje);
 
-            String contexto = UserContextService.buildContext(userId, searchContext.toString());
+            JsonArray sources = new JsonArray();
+            String contexto = UserContextService.buildContext(userId, searchContext.toString(),
+                    session.subjectId(), session.topicId(), sources);
 
             // Llamar a la IA (con o sin PDF)
             String respuesta = AIService.chat(
@@ -140,17 +152,30 @@ public class ChatServlet extends HttpServlet {
                     pdfName
             );
 
-            // Guardar respuesta
+            // Guardar respuesta y de qué fragmentos del material salió
             try (Connection conn = DatabaseConnection.getConnection()) {
-                saveMessage(conn, userId, finalSessionId, "assistant", respuesta);
+                String messageId = saveMessage(conn, session.id(), "assistant", respuesta);
+                saveSources(conn, messageId, sources);
             }
 
             JsonObject responseJson = new JsonObject();
             responseJson.addProperty("reply",     respuesta);
-            responseJson.addProperty("sessionId", finalSessionId);
+            responseJson.addProperty("sessionId", session.id().toString());
+            if (session.topicId() != null)   responseJson.addProperty("topicId",   session.topicId());
+            if (session.subjectId() != null) responseJson.addProperty("subjectId", session.subjectId());
+            // Fuentes para mostrar al estudiante: materia, tema y documento (sin ids internos)
+            JsonArray publicSources = new JsonArray();
+            for (var el : sources) {
+                JsonObject src = el.getAsJsonObject().deepCopy();
+                src.remove("chunkId");
+                publicSources.add(src);
+            }
+            responseJson.add("sources", publicSources);
 
             JsonUtil.sendSuccess(response, responseJson.toString());
 
+        } catch (IllegalArgumentException e) {
+            JsonUtil.sendError(response, 400, "Identificador inválido.");
         } catch (Exception e) {
             e.printStackTrace();
             JsonUtil.sendError(response, 500, "Error interno del servidor.");
@@ -212,7 +237,7 @@ public class ChatServlet extends HttpServlet {
 
             } else if (search != null && !search.isBlank()) {
                 // [FEATURE] Búsqueda por palabra clave — recorre TODO el contenido
-                // de los mensajes guardados en chat_history, no solo el primer
+                // de los mensajes guardados en chat_messages, no solo el primer
                 // mensaje de cada sesión. Así "cuéntame de spiderman" encuentra
                 // un chat aunque esa palabra haya salido a mitad de conversación.
                 List<String[]> results = searchSessions(conn, userId, search.trim());
@@ -264,7 +289,8 @@ public class ChatServlet extends HttpServlet {
         }
 
         try (Connection conn = DatabaseConnection.getConnection()) {
-            String sql = "DELETE FROM chat_history WHERE user_id = ? AND session_id = ?";
+            // Borra la sesión; sus mensajes y citas se borran en cascada.
+            String sql = "DELETE FROM chat_sessions WHERE user_id = ? AND id = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setObject(1, userId);
                 ps.setObject(2, UUID.fromString(sessionId));
@@ -294,43 +320,112 @@ public class ChatServlet extends HttpServlet {
         try { return UUID.fromString(uid); } catch (IllegalArgumentException e) { return null; }
     }
 
+    /** Sesión de chat con su alcance (subjectId y topicId null = todo el material). */
+    private record ChatSession(UUID id, String subjectId, String topicId) {}
+
+    /**
+     * Devuelve la sesión del usuario, o la crea si no existe (con el alcance
+     * pedido y el primer mensaje como título). Null si la sesión es de otro
+     * usuario o si el tema/materia no existe o no es suyo.
+     */
+    private ChatSession resolveSession(Connection conn, UUID userId, String sessionId,
+                                       String subjectId, String topicId, String firstMessage)
+            throws Exception {
+        UUID id = (sessionId == null || sessionId.isBlank()) ? UUID.randomUUID() : UUID.fromString(sessionId);
+
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT user_id, subject_id::text, topic_id::text FROM chat_sessions WHERE id = ?")) {
+            ps.setObject(1, id);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next()) {
+                if (!userId.equals(rs.getObject(1, UUID.class))) return null;
+                return new ChatSession(id, rs.getString(2), rs.getString(3));
+            }
+        }
+
+        // Nueva: un tema ya implica su materia, así que si viene tema se ignora la materia.
+        if (topicId != null && !topicId.isBlank()) {
+            if (!LIBRARY.topicBelongsToUser(topicId, userId.toString())) return null;
+            subjectId = null;
+        } else if (subjectId != null && !subjectId.isBlank()) {
+            if (!LIBRARY.subjectBelongsToUser(subjectId, userId.toString())) return null;
+            topicId = null;
+        } else {
+            subjectId = null;
+            topicId = null;
+        }
+
+        String title = firstMessage.trim();
+        if (title.length() > 100) title = title.substring(0, 100);
+        try (PreparedStatement ps = conn.prepareStatement("""
+                INSERT INTO chat_sessions (id, user_id, subject_id, topic_id, title)
+                VALUES (?, ?, ?::uuid, ?::uuid, ?)
+                """)) {
+            ps.setObject(1, id);
+            ps.setObject(2, userId);
+            ps.setString(3, subjectId);
+            ps.setString(4, topicId);
+            ps.setString(5, title.isEmpty() ? "Conversación" : title);
+            ps.executeUpdate();
+        }
+        return new ChatSession(id, subjectId, topicId);
+    }
+
     private List<AIService.ChatMessage> loadHistory(Connection conn, UUID userId, String sessionId)
             throws Exception {
+        return loadHistory(conn, userId, UUID.fromString(sessionId));
+    }
+
+    private List<AIService.ChatMessage> loadHistory(Connection conn, UUID userId, UUID sessionId)
+            throws Exception {
         String sql = """
-                SELECT role, message
-                FROM chat_history
-                WHERE user_id = ? AND session_id = ?
-                ORDER BY created_at DESC
+                SELECT m.role, m.body
+                FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                WHERE s.user_id = ? AND s.id = ?
+                ORDER BY m.created_at DESC
                 LIMIT 20
                 """;
         List<AIService.ChatMessage> list = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
-            ps.setObject(2, UUID.fromString(sessionId));
+            ps.setObject(2, sessionId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                list.add(new AIService.ChatMessage(rs.getString("role"), rs.getString("message")));
+                list.add(new AIService.ChatMessage(rs.getString("role"), rs.getString("body")));
             }
         }
         java.util.Collections.reverse(list);
         return list;
     }
 
-    private void saveMessage(Connection conn, UUID userId, String sessionId,
-                             String role, String message) throws Exception {
+    /** @return id del mensaje guardado */
+    private String saveMessage(Connection conn, UUID sessionId, String role, String message) throws Exception {
+        String sql = "INSERT INTO chat_messages (session_id, role, body) VALUES (?, ?, ?) RETURNING id::text";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setObject(1, sessionId);
+            ps.setString(2, role);
+            ps.setString(3, message);
+            ResultSet rs = ps.executeQuery();
+            rs.next();
+            return rs.getString(1);
+        }
+    }
+
+    /** Guarda de qué fragmentos del material salió una respuesta (citas). */
+    private void saveSources(Connection conn, String messageId, JsonArray sources) throws Exception {
+        if (sources.isEmpty()) return;
         String sql = """
-                INSERT INTO chat_history
-                (id, user_id, session_id, role, message, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO chat_message_sources (message_id, chunk_id)
+                VALUES (?::uuid, ?::uuid) ON CONFLICT DO NOTHING
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setObject(1, UUID.randomUUID());
-            ps.setObject(2, userId);
-            ps.setObject(3, UUID.fromString(sessionId));
-            ps.setString(4, role);
-            ps.setString(5, message);
-            ps.setTimestamp(6, new Timestamp(System.currentTimeMillis()));
-            ps.executeUpdate();
+            for (var el : sources) {
+                ps.setString(1, messageId);
+                ps.setString(2, el.getAsJsonObject().get("chunkId").getAsString());
+                ps.addBatch();
+            }
+            ps.executeBatch();
         }
     }
 
@@ -347,32 +442,21 @@ public class ChatServlet extends HttpServlet {
     }
 
     private List<String[]> loadSessions(Connection conn, UUID userId) throws Exception {
+        // El título de la sesión es el "firstMessage" que muestra el sidebar.
         String sql = """
-                WITH first_msgs AS (
-                    SELECT DISTINCT ON (session_id)
-                        session_id, message, created_at
-                    FROM chat_history
-                    WHERE user_id = ? AND role = 'user'
-                    ORDER BY session_id, created_at ASC
-                ),
-                last_activity AS (
-                    SELECT session_id, MAX(created_at) AS last_at
-                    FROM chat_history
-                    WHERE user_id = ?
-                    GROUP BY session_id
-                )
-                SELECT f.session_id::text, f.message, f.created_at::text
-                FROM first_msgs f
-                JOIN last_activity l ON l.session_id = f.session_id
-                ORDER BY l.last_at DESC
+                SELECT s.id::text, s.title, s.created_at::text
+                FROM chat_sessions s
+                LEFT JOIN LATERAL (SELECT max(created_at) AS last_at
+                                   FROM chat_messages WHERE session_id = s.id) l ON true
+                WHERE s.user_id = ?
+                ORDER BY coalesce(l.last_at, s.created_at) DESC
                 """;
         List<String[]> list = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
-            ps.setObject(2, userId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                list.add(new String[]{ rs.getString("session_id"), rs.getString("message"), rs.getString("created_at") });
+                list.add(new String[]{ rs.getString(1), rs.getString(2), rs.getString(3) });
             }
         }
         return list;
@@ -381,53 +465,32 @@ public class ChatServlet extends HttpServlet {
     /**
      * [FEATURE] Busca sesiones cuyo contenido (en CUALQUIER mensaje, no solo el
      * primero) contenga la palabra clave. Devuelve, por cada sesión que matchea:
-     * el sessionId, el primer mensaje (para el título en el sidebar), la fecha
-     * de creación, y un snippet del mensaje donde apareció la coincidencia
-     * (para mostrar contexto de por qué ese chat matcheó la búsqueda).
-     *
-     * Usa ILIKE (case-insensitive) sobre message, agrupado por session_id para
-     * no repetir la misma sesión si la palabra aparece en varios mensajes.
+     * el sessionId, el título, la fecha del mensaje y un snippet de ese mensaje.
      */
     private List<String[]> searchSessions(Connection conn, UUID userId, String keyword) throws Exception {
         String sql = """
-                WITH matches AS (
-                    SELECT DISTINCT ON (session_id)
-                        session_id, message AS snippet, created_at
-                    FROM chat_history
-                    WHERE user_id = ? AND message ILIKE ?
-                    ORDER BY session_id, created_at DESC
-                ),
-                first_msgs AS (
-                    SELECT DISTINCT ON (session_id)
-                        session_id, message AS first_message
-                    FROM chat_history
-                    WHERE user_id = ? AND role = 'user'
-                    ORDER BY session_id, created_at ASC
-                )
-                SELECT m.session_id::text, f.first_message, m.created_at::text, m.snippet
-                FROM matches m
-                LEFT JOIN first_msgs f ON f.session_id = m.session_id
-                ORDER BY m.created_at DESC
-                LIMIT 30
+                SELECT DISTINCT ON (s.id)
+                       s.id::text, s.title, m.created_at::text, m.body
+                FROM chat_messages m
+                JOIN chat_sessions s ON s.id = m.session_id
+                WHERE s.user_id = ? AND m.body ILIKE ?
+                ORDER BY s.id, m.created_at DESC
                 """;
         List<String[]> list = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ps.setString(2, "%" + keyword + "%");
-            ps.setObject(3, userId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
-                String firstMessage = rs.getString("first_message");
-                String snippet      = rs.getString("snippet");
                 list.add(new String[]{
-                    rs.getString("session_id"),
-                    firstMessage != null ? firstMessage : snippet,
-                    rs.getString("created_at"),
-                    truncateSnippet(snippet, keyword)
+                    rs.getString(1), rs.getString(2), rs.getString(3),
+                    truncateSnippet(rs.getString(4), keyword)
                 });
             }
         }
-        return list;
+        // Más recientes primero, como máximo 30
+        list.sort((x, y) -> y[2].compareTo(x[2]));
+        return list.size() > 30 ? new ArrayList<>(list.subList(0, 30)) : list;
     }
 
     /** Recorta el snippet alrededor de la palabra clave para no devolver mensajes larguísimos. */

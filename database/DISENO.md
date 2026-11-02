@@ -113,7 +113,7 @@ Las migraciones viven en [`src/main/resources/db/migration/`](../src/main/resour
 - **Solo corren si la variable de entorno `DB_MIGRATE=true`.** Se define en Railway. Localmente queda apagado, para que nadie aplique a la base compartida una migración de su rama a medio hacer.
 - **Nunca se edita una migración ya aplicada.** Si hay que corregir algo, se escribe una migración nueva (`V4__...`).
 - **Nombres:** `V<número>__<descripcion_con_guiones_bajos>.sql` (dos guiones bajos).
-- **Mientras dure la reestructuración, las migraciones se aplican a mano** en el SQL Editor de Supabase. `BASELINE_VERSION` en `DatabaseMigrationListener` es la última aplicada así (hoy, la V7). La primera vez que la app arranque con `DB_MIGRATE=true`, Flyway marca producción como "al día" hasta esa versión y solo ejecuta las siguientes. En una base vacía corre todas desde la V1. Cada migración aplicada a mano sube ese número en el mismo commit.
+- **Mientras dure la reestructuración, las migraciones se aplican a mano** en el SQL Editor de Supabase. `BASELINE_VERSION` en `DatabaseMigrationListener` es la última aplicada así (hoy, la V8). La primera vez que la app arranque con `DB_MIGRATE=true`, Flyway marca producción como "al día" hasta esa versión y solo ejecuta las siguientes. En una base vacía corre todas desde la V1. Cada migración aplicada a mano sube ese número en el mismo commit.
 
 ## Plan de migración
 
@@ -145,7 +145,7 @@ La reestructuración va **por fases**: cada fase es una migración más el códi
    - `levels` reemplaza los umbrales fijos en Java. `missions` tiene diarias y semanales (`period`) y apunta a `activity_types`.
    - Tienda: `item_types`, `purchases`, `user_items`, `user_consumables` (protectores) y `user_equipped`. La base impide equipar lo que no se tiene.
    - **La racha se reinició** (decisión del equipo). Generar contenido ya no da XP.
-8. **Fase 6:** chat con `chat_sessions` y alcance.
+8. **Fase 6 · `V8__chat_sesiones.sql`:** `chat_sessions` (título y alcance: un tema, una materia o todo el material), `chat_messages` y `chat_message_sources` (de qué fragmentos salió cada respuesta). El profesor IA busca solo dentro del alcance de la sesión. Las sesiones migradas conservan su id.
 9. **Limpieza:** se borran `study_content`, `clientes`, `professor_config` y el resto de tablas viejas.
 
 ## Supabase

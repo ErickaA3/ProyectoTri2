@@ -36,6 +36,8 @@ public interface ILibraryDAO {
 
     boolean topicBelongsToUser(String topicId, String userId) throws Exception;
 
+    boolean subjectBelongsToUser(String subjectId, String userId) throws Exception;
+
     /**
      * Tema "General" de la materia "Sin clasificar" del usuario; lo crea si no
      * existe. Es donde va lo que se genera sin elegir tema.
@@ -54,7 +56,14 @@ public interface ILibraryDAO {
 
     /**
      * Fragmentos del material del usuario más parecidos a la consulta
-     * (distancia coseno). Cada elemento: subject, topic, document, content.
+     * (distancia coseno). Cada elemento: chunkId, subject, topic, document, content.
      */
     JsonArray searchChunks(String userId, float[] queryEmbedding, int limit) throws Exception;
+
+    /**
+     * Igual, pero limitado a una materia o a un tema (alcance de una sesión de
+     * chat). Los dos en null = todo el material del usuario.
+     */
+    JsonArray searchChunks(String userId, float[] queryEmbedding, int limit,
+                           String subjectId, String topicId) throws Exception;
 }
