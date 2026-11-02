@@ -13,7 +13,7 @@ import com.project.database.DatabaseConnection;
 
 /**
  * Implementación de IHistorialDAO.
- * Habla con study_content en Supabase para las consultas del historial.
+ * Habla con generated_content (y topics, subjects, favorites) para el historial.
  *
  * Todos los filtros son opcionales — si son null o vacíos no se aplican.
  */
@@ -23,19 +23,28 @@ public class HistorialDAOImpl implements IHistorialDAO {
     public JsonArray getHistory(String userId, String type, String date, String search)
             throws Exception {
 
+        // Biblioteca del usuario: lo suyo, no borrado, en temas y materias activos
+        // (deja fuera el quiz de los duelos, que no tiene tema).
         StringBuilder sql = new StringBuilder("""
-            SELECT id, type, title, is_favorite,
-                   EXTRACT(EPOCH FROM created_at) * 1000 AS created_at_ms,
-                   content->>'schemaType' AS schema_type
-            FROM study_content
-            WHERE user_id = ?::uuid
+            SELECT gc.id, gc.content_type_code AS type, gc.title,
+                   (f.content_id IS NOT NULL) AS is_favorite,
+                   EXTRACT(EPOCH FROM gc.created_at) * 1000 AS created_at_ms,
+                   gc.body->>'schemaType' AS schema_type,
+                   t.id AS topic_id, t.name AS topic_name,
+                   s.id AS subject_id, s.name AS subject_name
+            FROM generated_content gc
+            JOIN topics t   ON t.id = gc.topic_id   AND t.archived_at IS NULL
+            JOIN subjects s ON s.id = t.subject_id  AND s.archived_at IS NULL
+            LEFT JOIN favorites f ON f.content_id = gc.id AND f.user_id = gc.created_by
+            WHERE gc.created_by = ?::uuid AND gc.deleted_at IS NULL
             """);
 
-        if (type   != null && !type.isBlank())   sql.append(" AND type = ?");
-        if (date   != null && !date.isBlank())   sql.append(" AND DATE(created_at) = ?::date");
-        if (search != null && !search.isBlank()) sql.append(" AND LOWER(title) LIKE ?");
+        if (type   != null && !type.isBlank())   sql.append(" AND gc.content_type_code = ?");
+        // El día se cuenta en hora de Costa Rica (created_at es timestamptz).
+        if (date   != null && !date.isBlank())   sql.append(" AND (gc.created_at AT TIME ZONE 'America/Costa_Rica')::date = ?::date");
+        if (search != null && !search.isBlank()) sql.append(" AND LOWER(gc.title) LIKE ?");
 
-        sql.append(" ORDER BY created_at DESC");
+        sql.append(" ORDER BY gc.created_at DESC");
 
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql.toString())) {
@@ -62,6 +71,10 @@ public class HistorialDAOImpl implements IHistorialDAO {
                 if (schemaType != null && !schemaType.isBlank()) {
                     item.addProperty("schemaType", schemaType);
                 }
+                item.addProperty("topicId",     rs.getString("topic_id"));
+                item.addProperty("topicName",   rs.getString("topic_name"));
+                item.addProperty("subjectId",   rs.getString("subject_id"));
+                item.addProperty("subjectName", rs.getString("subject_name"));
                 items.add(item);
             }
 
@@ -72,12 +85,13 @@ public class HistorialDAOImpl implements IHistorialDAO {
     @Override
     public JsonObject getById(String id, String userId) throws Exception {
         String sql = """
-            SELECT id, type, title, content::text AS content_json,
-                   is_favorite,
-                   EXTRACT(EPOCH FROM created_at) * 1000 AS created_at_ms,
-                   session_id
-            FROM study_content
-            WHERE id = ?::uuid AND user_id = ?::uuid
+            SELECT gc.id, gc.content_type_code AS type, gc.title, gc.body::text AS content_json,
+                   EXISTS (SELECT 1 FROM favorites f
+                           WHERE f.content_id = gc.id AND f.user_id = gc.created_by) AS is_favorite,
+                   EXTRACT(EPOCH FROM gc.created_at) * 1000 AS created_at_ms,
+                   gc.topic_id
+            FROM generated_content gc
+            WHERE gc.id = ?::uuid AND gc.created_by = ?::uuid AND gc.deleted_at IS NULL
             """;
 
         try (Connection conn = DatabaseConnection.getConnection();
@@ -96,8 +110,8 @@ public class HistorialDAOImpl implements IHistorialDAO {
             item.addProperty("isFavorite", rs.getBoolean("is_favorite"));
             item.addProperty("createdAt",  rs.getLong("created_at_ms"));
 
-            String sessionId = rs.getString("session_id");
-            if (sessionId != null) item.addProperty("sessionId", sessionId);
+            String topicId = rs.getString("topic_id");
+            if (topicId != null) item.addProperty("topicId", topicId);
 
             // Parsear el JSONB de content y mezclar sus campos en el objeto raíz
             // Así las páginas reciben la misma estructura que genera ModoEstudioServlet
@@ -119,10 +133,13 @@ public class HistorialDAOImpl implements IHistorialDAO {
 
     @Override
     public int deleteAll(String userId) throws Exception {
-        // Los duelos NO se borran: desde la migración V2, duels.content_id es
-        // ON DELETE SET NULL, así que conservan su resultado (y las victorias
-        // del ranking) aunque el contenido ya no exista.
-        String deleteContent = "DELETE FROM study_content WHERE user_id = ?::uuid";
+        // Borrado lógico: desaparece de la biblioteca, pero los resultados y los
+        // duelos que usaron ese contenido (y las victorias del ranking) se conservan.
+        // El quiz de los duelos (sin tema) no es parte del historial y no se toca.
+        String deleteContent = """
+            UPDATE generated_content SET deleted_at = now()
+            WHERE created_by = ?::uuid AND deleted_at IS NULL AND topic_id IS NOT NULL
+            """;
 
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(deleteContent)) {

@@ -544,9 +544,9 @@ public class DuelDAOImpl implements IDuelDAO {
             String getDuel = """
                 SELECT d.challenger_id, d.opponent_id, d.status, d.question_count,
                        d.challenger_score, d.opponent_score, d.time_per_question,
-                       sc.content::text AS content_json
+                       sc.body::text AS content_json
                 FROM duels d
-                JOIN study_content sc ON sc.id = d.content_id
+                JOIN generated_content sc ON sc.id = d.content_id
                 WHERE d.id = ?::uuid
                 FOR UPDATE
                 """;
@@ -766,9 +766,9 @@ public class DuelDAOImpl implements IDuelDAO {
         }
 
         String sql = """
-            SELECT sc.content::text, sc.title, d.question_count, d.topic, d.time_per_question
+            SELECT sc.body::text AS content, sc.title, d.question_count, d.topic, d.time_per_question
             FROM duels d
-            JOIN study_content sc ON sc.id = d.content_id
+            JOIN generated_content sc ON sc.id = d.content_id
             WHERE d.id = ?::uuid
               AND (d.challenger_id = ?::uuid OR d.opponent_id = ?::uuid)
             """;

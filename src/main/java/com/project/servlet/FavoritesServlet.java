@@ -76,7 +76,7 @@ public class FavoritesServlet extends HttpServlet {
                 if (!schemaIds.isEmpty()) {
                     try {
                         String placeholders = schemaIds.stream().map(id -> "?::uuid").collect(Collectors.joining(","));
-                        String sql = "SELECT id::text, content->>'schemaType' AS schema_type FROM study_content WHERE id IN (" + placeholders + ")";
+                        String sql = "SELECT id::text, body->>'schemaType' AS schema_type FROM generated_content WHERE id IN (" + placeholders + ")";
                         try (java.sql.Connection conn = com.project.database.DatabaseConnection.getConnection();
                              java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
                             for (int i = 0; i < schemaIds.size(); i++) {

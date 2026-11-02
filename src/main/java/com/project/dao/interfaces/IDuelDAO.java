@@ -5,7 +5,7 @@ import com.google.gson.JsonObject;
 
 /**
  * Contrato para operaciones de duelos y amistades.
- * Tablas: friendships, duels, duel_answers, study_content
+ * Tablas: friendships, duels, duel_answers, generated_content
  */
 public interface IDuelDAO {
 
@@ -37,7 +37,7 @@ public interface IDuelDAO {
      * Crear un duelo nuevo.
      * @param challengerId  UUID del retador
      * @param opponentId    UUID del oponente
-     * @param contentId     UUID del quiz generado (study_content)
+     * @param contentId     UUID del quiz generado (generated_content)
      * @param topic         Tema del duelo
      * @param questionCount Número de preguntas (5, 10 o 15)
      * @return UUID del duelo creado
@@ -88,7 +88,7 @@ public interface IDuelDAO {
      * A diferencia de submitDuelResult(), acá el score y la corrección de
      * cada respuesta NO se reciben del cliente: se recalculan en el
      * servidor comparando cada "answerGiven" contra la respuesta correcta
-     * real, guardada en study_content para ese duelo. El maxScore también
+     * real, guardada en generated_content para ese duelo. El maxScore también
      * se toma del question_count real del duelo, nunca del body.
      *
      * @param duelId      UUID del duelo
@@ -102,6 +102,6 @@ public interface IDuelDAO {
     JsonObject submitDuelResultGraded(String duelId, String userId,
                                       JsonArray rawAnswers, int timeSecsRaw) throws Exception;
 
-    /** Obtener preguntas del quiz del duelo (desde study_content). */
+    /** Obtener preguntas del quiz del duelo (desde generated_content). */
     JsonObject getDuelQuestions(String duelId, String userId) throws Exception;
 }

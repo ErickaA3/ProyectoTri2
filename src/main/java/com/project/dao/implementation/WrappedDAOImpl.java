@@ -129,9 +129,11 @@ public class WrappedDAOImpl implements IWrappedDAO {
     // ─── Tema más fuerte / más débil (activity_results + study_content) ────
     private void fillSubjects(String userId, LocalDate weekStart, JsonObject result) throws SQLException {
         String sql = """
-            SELECT ar.score, ar.max_score, sc.title, sc.source_text
+            SELECT ar.score, ar.max_score, gc.title, s.name AS subject_name
             FROM activity_results ar
-            LEFT JOIN study_content sc ON sc.id = ar.content_id
+            LEFT JOIN generated_content gc ON gc.id = ar.content_id
+            LEFT JOIN topics t   ON t.id = gc.topic_id
+            LEFT JOIN subjects s ON s.id = t.subject_id
             WHERE ar.user_id = ?::uuid AND ar.completed_at >= ?::date
             """;
 
@@ -151,9 +153,12 @@ public class WrappedDAOImpl implements IWrappedDAO {
                 double maxScore = rs.getDouble("max_score");
                 if (maxScore <= 0) continue;
 
-                String text = (rs.getString("title") != null ? rs.getString("title") : "")
-                            + " " + (rs.getString("source_text") != null ? rs.getString("source_text") : "");
-                String subject = detectSubject(text);
+                // La materia ahora es un dato real. Solo para lo que está en
+                // "Sin clasificar" se sigue adivinando por palabras clave del título.
+                String subjectName = rs.getString("subject_name");
+                String subject = (subjectName != null && !"Sin clasificar".equals(subjectName))
+                        ? subjectName
+                        : detectSubject(rs.getString("title") != null ? rs.getString("title") : "");
                 double pct = (score / maxScore) * 100.0;
                 bySubject.computeIfAbsent(subject, k -> new ArrayList<>()).add(pct);
             }

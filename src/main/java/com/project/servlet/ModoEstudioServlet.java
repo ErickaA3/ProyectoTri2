@@ -23,7 +23,9 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.project.dao.implementation.ContentDAOImpl;
+import com.project.dao.implementation.LibraryDAOImpl;
 import com.project.dao.interfaces.IContentDAO;
+import com.project.dao.interfaces.ILibraryDAO;
 import com.project.model.content.Diagram;
 import com.project.model.content.EducationalContent;
 import com.project.model.content.Flashcard;
@@ -57,6 +59,7 @@ import jakarta.servlet.http.Part;
 public class ModoEstudioServlet extends HttpServlet {
 
     private final IContentDAO contentDAO = new ContentDAOImpl();
+    private final ILibraryDAO libraryDAO = new LibraryDAOImpl();
     private final Gson gson = new Gson();
 
     @Override
@@ -78,10 +81,14 @@ public class ModoEstudioServlet extends HttpServlet {
             }
             List<String> options;
             String textoBase;
+            String topicId;
+            String docName = "Texto pegado";
+            String docMime = "text/plain";
             JsonObject configs = new JsonObject();
 
             if ("file".equals(dataType)) {
                 // ── Multipart: viene con archivo ──────────────────────
+                topicId = req.getParameter("topicId");
                 String optionsParam = req.getParameter("options");
                 options = gson.fromJson(optionsParam,
                     new com.google.gson.reflect.TypeToken<List<String>>(){}.getType());
@@ -111,6 +118,14 @@ public class ModoEstudioServlet extends HttpServlet {
                 }
 
                 byte[] fileBytes = filePart.getInputStream().readAllBytes();
+                docName = fileName;
+                docMime = switch (ext) {
+                    case "pdf"  -> "application/pdf";
+                    case "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                    case "doc"  -> "application/msword";
+                    case "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+                    default     -> "text/plain";
+                };
 
                 // Extraer texto según el formato
                 textoBase = switch (ext) {
@@ -127,6 +142,8 @@ public class ModoEstudioServlet extends HttpServlet {
                 String body = req.getReader().lines().collect(Collectors.joining());
                 JsonObject data = JsonParser.parseString(body).getAsJsonObject();
 
+                topicId = (data.has("topicId") && !data.get("topicId").isJsonNull())
+                    ? data.get("topicId").getAsString() : null;
                 options = gson.fromJson(data.getAsJsonArray("options"),
                     new com.google.gson.reflect.TypeToken<List<String>>(){}.getType());
                 textoBase = (data.has("text") && !data.get("text").isJsonNull()) ? data.get("text").getAsString() : null;
@@ -144,8 +161,17 @@ public class ModoEstudioServlet extends HttpServlet {
                 sendError(res, 400, "Selecciona al menos un tipo de contenido."); return;
             }
 
-            // ── Generar sessionId ─────────────────────────────────────────
-            String sessionId = UUID.randomUUID().toString();
+            // ── Tema: el elegido (si es del usuario) o "Sin clasificar / General" ──
+            if (topicId == null || topicId.isBlank()) {
+                topicId = libraryDAO.ensureDefaultTopic(userId);
+            } else if (!isUuid(topicId) || !libraryDAO.topicBelongsToUser(topicId, userId)) {
+                sendError(res, 404, "Tema no encontrado.");
+                return;
+            }
+
+            // ── El material se guarda una vez como documento (base del RAG) ──
+            // Todo lo que se genere en esta petición sale de este documento.
+            String documentId = libraryDAO.createDocument(topicId, userId, docName, docMime, textoBase);
 
             // ── Generar contenido para cada opción seleccionada ───────────
             JsonObject results = new JsonObject();
@@ -159,7 +185,7 @@ public class ModoEstudioServlet extends HttpServlet {
 
                 try {
                     JsonObject generated = generateAndSave(
-                        userId, contentTypeStr, option, textoBase, sessionId, moduleConfig
+                        userId, contentTypeStr, textoBase, topicId, documentId, moduleConfig
                     );
                     results.add(option, generated);
                 } catch (Exception e) {
@@ -172,7 +198,11 @@ public class ModoEstudioServlet extends HttpServlet {
             // ── Respuesta ─────────────────────────────────────────────────
             JsonObject response = new JsonObject();
             response.addProperty("success", true);
-            response.addProperty("sessionId", sessionId);
+            // sessionId se mantiene por compatibilidad con el front: ahora es el
+            // documento del que salió todo lo generado en esta petición.
+            response.addProperty("sessionId", documentId);
+            response.addProperty("documentId", documentId);
+            response.addProperty("topicId", topicId);
             response.add("results", results);
             res.getWriter().write(gson.toJson(response));
 
@@ -185,8 +215,8 @@ public class ModoEstudioServlet extends HttpServlet {
     // GENERAR Y GUARDAR
     // ─────────────────────────────────────────────────────────────────────────
 
-    private JsonObject generateAndSave(String userId, String contentType, String option,
-                                        String textoBase, String sessionId,
+    private JsonObject generateAndSave(String userId, String contentType, String textoBase,
+                                        String topicId, String documentId,
                                         JsonObject moduleConfig) throws Exception {
 
         // AIService solo tiene case "quiz" para exámenes — expert_exam usa el mismo prompt
@@ -213,12 +243,13 @@ public class ModoEstudioServlet extends HttpServlet {
             aiData.addProperty("schemaType", moduleConfig.get("tipo").getAsString());
         }
 
-        EducationalContent content = buildContentObject(userId, contentType, title, sessionId);
-        String savedId = contentDAO.save(content, gson.toJson(aiData), textoBase);
+        EducationalContent content = buildContentObject(userId, contentType, title);
+        String savedId = contentDAO.save(content, gson.toJson(aiData), topicId, documentId);
 
         aiData.addProperty("id", savedId);
         aiData.addProperty("type", contentType);
-        aiData.addProperty("sessionId", sessionId);
+        aiData.addProperty("sessionId", documentId);
+        aiData.addProperty("topicId", topicId);
 
         return aiData;
     }
@@ -323,14 +354,17 @@ public class ModoEstudioServlet extends HttpServlet {
         };
     }
 
-    private EducationalContent buildContentObject(String userId, String type,
-                                                   String title, String sessionId) {
+    private EducationalContent buildContentObject(String userId, String type, String title) {
         return switch (type) {
-            case "flashcard"           -> new Flashcard(userId, title, sessionId, null);
-            case "schema"              -> new Diagram(userId, title, sessionId, null);
-            case "quiz", "expert_exam" -> new Quiz(userId, type, title, sessionId);
-            default                    -> new Summary(userId, title, sessionId, null);
+            case "flashcard"           -> new Flashcard(userId, title, null, null);
+            case "schema"              -> new Diagram(userId, title, null, null);
+            case "quiz", "expert_exam" -> new Quiz(userId, type, title, null);
+            default                    -> new Summary(userId, title, null, null);
         };
+    }
+
+    private static boolean isUuid(String s) {
+        try { UUID.fromString(s); return true; } catch (IllegalArgumentException e) { return false; }
     }
 
     private void sendError(HttpServletResponse res, int status, String message) throws IOException {

@@ -66,10 +66,13 @@ public class SummaryServlet extends HttpServlet {
             response.addProperty("isFavorite",
                 data.has("isFavorite") && data.get("isFavorite").getAsBoolean());
 
-            String[] meta = ((ContentDAOImpl) contentDAO).getMetadata(contentId, userId);
+            String[] meta = contentDAO.getMetadata(contentId, userId);
             if (meta != null) {
-                response.addProperty("createdAt", meta[0]);
-                response.addProperty("sessionId", meta[1]);
+                response.addProperty("createdAt",   meta[0]);
+                response.addProperty("topicId",     meta[1]);
+                response.addProperty("topicName",   meta[2]);
+                response.addProperty("subjectId",   meta[3]);
+                response.addProperty("subjectName", meta[4]);
             }
 
             if (data.has("content") && data.get("content").isJsonObject()) {

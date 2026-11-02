@@ -306,7 +306,8 @@ public class DuelServlet extends HttpServlet {
         String title = aiData.has("title") ? aiData.get("title").getAsString() : topic;
 
         Quiz quizContent = new Quiz(userId, "duel_quiz", title, null);
-        String contentId = contentDAO.save(quizContent, aiJson, text);
+        // El quiz del duelo no va a la biblioteca de nadie: sin tema ni documento.
+        String contentId = contentDAO.save(quizContent, aiJson, null, null);
 
         String duelId = duelDAO.createDuel(userId, opponentId, contentId, topic, questionCount, timePerQ);
 

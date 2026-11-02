@@ -20,7 +20,10 @@ import java.util.UUID;
  */
 public class UserContextService {
 
-    private static final int MAX_RELEVANT_ITEMS = 4;
+    private static final int MAX_RELEVANT_ITEMS = 6;   // fragmentos de ~2000 caracteres
+
+    private static final com.project.dao.interfaces.ILibraryDAO LIBRARY =
+            new com.project.dao.implementation.LibraryDAOImpl();
 
     public static String buildContext(UUID userId, String userMessage) {
         StringBuilder ctx = new StringBuilder();
@@ -98,10 +101,14 @@ public class UserContextService {
 
     private static void appendAllTitles(Connection conn, UUID userId, StringBuilder ctx) {
         String sql = """
-            SELECT type, title, is_favorite
-            FROM study_content
-            WHERE user_id = ?
-            ORDER BY created_at DESC
+            SELECT gc.content_type_code AS type, gc.title,
+                   (f.content_id IS NOT NULL) AS is_favorite
+            FROM generated_content gc
+            JOIN topics t   ON t.id = gc.topic_id   AND t.archived_at IS NULL
+            JOIN subjects s ON s.id = t.subject_id  AND s.archived_at IS NULL
+            LEFT JOIN favorites f ON f.content_id = gc.id AND f.user_id = gc.created_by
+            WHERE gc.created_by = ? AND gc.deleted_at IS NULL
+            ORDER BY gc.created_at DESC
             """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
@@ -165,55 +172,32 @@ public class UserContextService {
             return;
         }
 
-        // 2. Buscar los contenidos más parecidos por distancia coseno (<=>)
-        //    Solo entre filas que YA tienen embedding (embedding IS NOT NULL)
-        String sql = """
-            SELECT id, type, title, content::text, is_favorite
-            FROM study_content
-            WHERE user_id = ? AND embedding IS NOT NULL
-            ORDER BY embedding <=> ?
-            LIMIT ?
-            """;
+        // 2. Buscar los fragmentos del MATERIAL ORIGINAL más parecidos (distancia
+        //    coseno). Antes se buscaba sobre lo generado (resúmenes, flashcards);
+        //    ahora se busca en lo que el estudiante subió, que es más completo.
+        //    Solo entran fragmentos que ya tienen embedding.
+        try {
+            com.google.gson.JsonArray chunks =
+                    LIBRARY.searchChunks(userId.toString(), queryEmbedding, MAX_RELEVANT_ITEMS);
 
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setObject(1, userId);
-            ps.setObject(2, new PGvector(queryEmbedding));
-            ps.setInt(3, MAX_RELEVANT_ITEMS);
-
-            ResultSet rs = ps.executeQuery();
-            boolean hasResults = false;
-
-            while (rs.next()) {
-                if (!hasResults) {
-                    ctx.append("CONTENIDO RELEVANTE A TU PREGUNTA (detalle completo):\n");
-                    hasResults = true;
-                }
-
-                String id      = rs.getString("id");
-                String type    = rs.getString("type");
-                String title   = rs.getString("title");
-                String content = rs.getString("content");
-                boolean fav    = rs.getBoolean("is_favorite");
-
-                ctx.append("\n── ").append(mapType(type)).append(": \"");
-                ctx.append(title != null ? title : "Sin título").append("\"");
-                if (fav) ctx.append(" ★FAV");
-                ctx.append(" ──\n");
-
-                if (content != null && !content.isBlank()) {
-                    appendFullContent(ctx, type, content, id);
-                }
-            }
-
-            if (!hasResults) {
-                ctx.append("NOTA: No se encontró contenido que matchee con la pregunta del usuario.\n");
+            if (chunks.isEmpty()) {
+                ctx.append("NOTA: No se encontró material del estudiante relacionado con la pregunta.\n");
                 ctx.append("El estudiante tiene contenido pero sobre otros temas (ver lista arriba).\n\n");
-            } else {
-                ctx.append("\n");
+                return;
             }
 
-        } catch (SQLException e) {
-            logErr("relevantContent", e);
+            ctx.append("MATERIAL DEL ESTUDIANTE RELEVANTE A LA PREGUNTA:\n");
+            for (var el : chunks) {
+                var chunk = el.getAsJsonObject();
+                ctx.append("\n── ").append(chunk.get("subject").getAsString())
+                   .append(" › ").append(chunk.get("topic").getAsString())
+                   .append(" (documento: \"").append(chunk.get("document").getAsString()).append("\") ──\n");
+                ctx.append(chunk.get("content").getAsString()).append("\n");
+            }
+            ctx.append("\n");
+
+        } catch (Exception e) {
+            System.err.println("[UserContextService] relevantContent: " + e.getMessage());
             appendRecentContent(conn, userId, ctx, 3);
         }
     }
@@ -221,9 +205,10 @@ public class UserContextService {
     /** Fallback: traer los N más recientes con detalle */
     private static void appendRecentContent(Connection conn, UUID userId, StringBuilder ctx, int limit) {
         String sql = """
-            SELECT id, type, title, content::text, is_favorite
-            FROM study_content WHERE user_id = ?
-            ORDER BY created_at DESC LIMIT ?
+            SELECT gc.id, gc.content_type_code AS type, gc.title, gc.body::text AS content
+            FROM generated_content gc
+            WHERE gc.created_by = ? AND gc.deleted_at IS NULL AND gc.topic_id IS NOT NULL
+            ORDER BY gc.created_at DESC LIMIT ?
             """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
@@ -419,7 +404,7 @@ public class UserContextService {
     // ── Resultados ────────────────────────────────────────────────────────
 
     private static void appendActivityResults(Connection conn, UUID userId, StringBuilder ctx) {
-        String sql = "SELECT ar.score, ar.max_score, sc.title FROM activity_results ar JOIN study_content sc ON sc.id = ar.content_id WHERE ar.user_id = ? ORDER BY ar.completed_at DESC LIMIT 10";
+        String sql = "SELECT ar.score, ar.max_score, sc.title FROM activity_results ar JOIN generated_content sc ON sc.id = ar.content_id WHERE ar.user_id = ? ORDER BY ar.completed_at DESC LIMIT 10";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, userId);
             ResultSet rs = ps.executeQuery();
